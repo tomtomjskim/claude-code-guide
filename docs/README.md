@@ -16,6 +16,7 @@ Claude Code를 효과적으로 사용하기 위한 종합 가이드입니다.
 | [05. 에이전트 페르소나](05-agent-personas.md) | PM, Architect, Developer 등 페르소나 |
 | [06. 프로젝트 구조](06-project-structure.md) | 표준 프로젝트 구조 템플릿 |
 | [07. CLAUDE.md 템플릿](07-claude-md-template.md) | 프로젝트 CLAUDE.md 템플릿 |
+| [08. 관련 프로젝트](08-related-projects.md) | Team Orchestrator, Agent Monitor 등 |
 
 ---
 
@@ -121,6 +122,7 @@ docs/requires/ → docs/spec/ → docs/tasks/ → docs/complete/
 
 ## 관련 링크
 
-- [Team Orchestrator MCP](https://github.com/tomtomjskim/team-orchestrator-mcp)
-- [Serena MCP](https://github.com/serena-ai/serena-mcp)
+- [Team Orchestrator MCP](https://github.com/tomtomjskim/team-orchestrator-mcp) - 멀티 에이전트 오케스트레이션
+- [Agent Orchestra Monitor](https://github.com/tomtomjskim/agent-orchestra-monitor) - 실시간 모니터링 대시보드
+- [Serena MCP](https://github.com/serena-ai/serena-mcp) - 시맨틱 코드 분석
 - [Claude Code 공식 문서](https://docs.anthropic.com/claude-code)
