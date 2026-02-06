@@ -69,6 +69,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | [에이전트 페르소나](docs/05-agent-personas.md) | PM, Architect, Developer, QA |
 | [프로젝트 구조](docs/06-project-structure.md) | 표준 프로젝트 구조 |
 | [CLAUDE.md 템플릿](docs/07-claude-md-template.md) | 프로젝트 설정 템플릿 |
+| [추천 플러그인](docs/09-recommended-plugins.md) | 추천 플러그인 설치 및 활용 가이드 |
 
 ---
 
@@ -169,6 +170,23 @@ docs/
   }
 }
 ```
+
+---
+
+## 추천 플러그인
+
+### 필수
+- **[Superpowers](https://github.com/obra/superpowers)** - TDD, 체계적 디버깅, 서브에이전트 개발 워크플로우
+  - 설치: `claude plugin marketplace add obra/superpowers-marketplace && claude plugin install superpowers@superpowers-marketplace`
+  - 주요 기능: brainstorming, write-plan, execute-plan, TDD, systematic-debugging
+  - 42,000+ GitHub Stars, Anthropic 공식 마켓플레이스 등록
+
+### 추천 (추가 검토)
+- **[Context7](https://github.com/upstash/context7)** - 최신 문서 검색/참조
+- **[Superpowers Lab](https://github.com/obra/superpowers-lab)** - 실험적 스킬 확장
+- **[Superpowers Chrome](https://github.com/obra/superpowers-chrome)** - 브라우저 직접 제어
+
+자세한 내용은 [추천 플러그인 가이드](docs/09-recommended-plugins.md)를 참조하세요.
 
 ---
 

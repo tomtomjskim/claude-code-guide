@@ -69,6 +69,28 @@ claude --mcp-test
 
 ---
 
+## 2.5 플러그인 설정 체크리스트
+
+### 필수 플러그인
+- [ ] **Superpowers** - TDD, 체계적 디버깅, 서브에이전트 개발
+  ```bash
+  claude plugin marketplace add obra/superpowers-marketplace
+  claude plugin install superpowers@superpowers-marketplace
+  ```
+
+### 플러그인 설정 확인
+```bash
+# 설치된 플러그인 확인
+claude plugin list
+
+# settings.json에서 활성화 확인
+# "enabledPlugins": { "superpowers@superpowers-marketplace": true }
+```
+
+자세한 내용은 [추천 플러그인 가이드](09-recommended-plugins.md)를 참조하세요.
+
+---
+
 ## 3. 프로젝트별 설정
 
 ### 3.1 프로젝트 CLAUDE.md 생성
