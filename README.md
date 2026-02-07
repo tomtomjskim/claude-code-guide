@@ -70,6 +70,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | [프로젝트 구조](docs/06-project-structure.md) | 표준 프로젝트 구조 |
 | [CLAUDE.md 템플릿](docs/07-claude-md-template.md) | 프로젝트 설정 템플릿 |
 | [추천 플러그인](docs/09-recommended-plugins.md) | 추천 플러그인 설치 및 활용 가이드 |
+| [코드 리뷰 시스템](docs/10-code-review-system.md) | 전문 리뷰어 6명, 6단계, 3프리셋, 하이브리드 모드 |
 
 ---
 
@@ -105,14 +106,39 @@ docs/
 
 ### 에이전트 페르소나
 
+#### Core Agents (9개)
 | 에이전트 | 역할 | 산출물 |
 |---------|------|--------|
-| PM | 요구사항 분석, 태스크 분해 | REQ-XXX.md |
+| PM | 요구사항 분석, 태스크 분해, 리뷰 판정 | REQ-XXX.md |
 | Explorer | 코드 탐색, 영향도 분석 | 분석 리포트 |
 | Architect | 시스템 설계 | spec/*.md |
 | Developer | 구현 | 코드, 테스트 |
 | QA | 검수 | 검수 리포트 |
+| DBA | DB 스키마, 마이그레이션 | schema.sql |
+| Designer | UI/UX 설계 | component-spec.md |
+| Publisher | 빌드/배포 | deployment-log.md |
 | Documenter | 문서화 | DONE-XXX.md |
+
+#### Specialist Reviewers (6개, v2.0)
+| 리뷰어 | 페르소나 | 핵심 관점 |
+|--------|---------|----------|
+| Security Reviewer | Security Sentinel | "공격자에게 노출되면?" |
+| Performance Reviewer | Performance Prophet | "트래픽 10배면?" |
+| Test Coverage Reviewer | Test Guardian | "이 테스트가 진짜 검증하나?" |
+| Accessibility Reviewer | Access Advocate | "장애인도 쓸 수 있나?" |
+| UX Reviewer | UX Harmonizer | "사용자가 혼란스럽지 않나?" |
+| API Reviewer | API Arbiter | "1년 후에도 호환되나?" |
+
+### 코드 리뷰 v2.0
+
+```
+"빠른 리뷰: [설명]"       → quick (~2분, 자동 분석만)
+"리뷰: [설명]"            → standard (~10분, 기본)
+"상세 리뷰: [설명]"       → thorough (~20분, 전체 6단계)
+"팀 리뷰: [설명]"         → Agent Teams + thorough
+```
+
+자세한 내용은 [코드 리뷰 시스템 가이드](docs/10-code-review-system.md)를 참조하세요.
 
 ### 세션 관리
 

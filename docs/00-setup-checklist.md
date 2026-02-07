@@ -23,10 +23,13 @@ npm update -g @anthropic-ai/claude-code
 ~/.claude/
 ├── settings.json       # 글로벌 설정
 ├── CLAUDE.md          # 글로벌 규칙/컨텍스트
+├── agents/            # 공식 서브에이전트 (v2.0, 14개)
 └── team/              # 팀 오케스트레이션 설정 (선택)
-    ├── agents.yaml
-    ├── prompts/
-    └── workflows/
+    ├── agents.yaml    # 에이전트 정의 (v2.0, 15개)
+    ├── prompts/       # 역할별 프롬프트 (15개)
+    ├── workflows/     # 워크플로우 (8개)
+    ├── templates/     # 리뷰/세션 템플릿
+    └── artifacts/     # 산출물 (리뷰 히스토리 포함)
 ```
 
 ### 1.3 settings.json 필수 설정
