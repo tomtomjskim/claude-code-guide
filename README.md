@@ -12,7 +12,7 @@
 - PDARR 워크플로우 커맨드 시스템 (/dispatch, /prd, /run, /workflow 등)
 - 2단계 복잡도 판단 → 최적 실행 전략 자동 선택
 - 멀티 Agent 팀 구성 (단일/병렬/팀 Agent 3전략)
-- MCP 서버 설정 (Serena, Team Orchestrator 등)
+- MCP 서버 설정 (Serena 등)
 - 에이전트 페르소나 정의 (9 Core + 6 Specialist Reviewers)
 - 문서화 규칙 및 템플릿
 - 체크리스트 기반 워크플로우
@@ -28,9 +28,6 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "alwaysThinkingEnabled": true,
-  "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-  },
   "mcpServers": {
     "serena": {
       "command": "uvx",
@@ -74,14 +71,14 @@ cp .claude/workflow-commands-guide.md /your/project/.claude/
 | # | 문서 | 설명 |
 |---|------|------|
 | 00 | [셋업 체크리스트](docs/00-setup-checklist.md) | 초기 설정 체크리스트 |
-| 01 | [MCP 설정](docs/01-mcp-configuration.md) | Serena, Team Orchestrator 등 MCP 설정 |
+| 01 | [MCP 설정](docs/01-mcp-configuration.md) | Serena 등 MCP 설정 |
 | 02 | [커맨드/스킬](docs/02-commands-skills.md) | 기본 슬래시 커맨드 및 스킬 구조 |
 | 03 | [개발 파이프라인](docs/03-development-pipeline.md) | 기본 파이프라인 (요구사항 → 설계 → 검수 → 구현) |
 | 04 | [문서화 규칙](docs/04-documentation-rules.md) | 세션 독립적 문서화 |
 | 05 | [에이전트 페르소나](docs/05-agent-personas.md) | PM, Architect, Developer, QA 등 15개 Agent |
 | 06 | [프로젝트 구조](docs/06-project-structure.md) | 표준 프로젝트 구조 |
 | 07 | [CLAUDE.md 템플릿](docs/07-claude-md-template.md) | 프로젝트 설정 템플릿 |
-| 08 | [관련 프로젝트](docs/08-related-projects.md) | Team Orchestrator, Agent Monitor 등 |
+| 08 | [관련 프로젝트](docs/08-related-projects.md) | Serena MCP, Agent Monitor 등 |
 | 09 | [추천 플러그인](docs/09-recommended-plugins.md) | Superpowers, Context7 등 |
 | 10 | [코드 리뷰 시스템](docs/10-code-review-system.md) | 전문 리뷰어 6명, 6단계, 3프리셋 |
 | 11 | [Workflow Commands](docs/11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
@@ -221,8 +218,7 @@ docs/
 ### 필수
 - **Serena MCP** - 시맨틱 코드 분석/편집
 
-### 권장
-- **Team Orchestrator MCP** - 멀티 에이전트 오케스트레이션
+> 멀티 에이전트 오케스트레이션은 Claude Code 네이티브 도구(Task, Agent, TeamCreate, SendMessage)로 처리합니다. Team Orchestrator MCP는 더 이상 권장하지 않습니다.
 
 ### 설정 예시
 ```json
@@ -231,10 +227,6 @@ docs/
     "serena": {
       "command": "uvx",
       "args": ["--from", "serena-mcp", "serena", "--project", "."]
-    },
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
     }
   }
 }
@@ -245,9 +237,13 @@ docs/
 ## 추천 플러그인
 
 ### 필수
-- **[Superpowers](https://github.com/obra/superpowers)** - TDD, 체계적 디버깅, 서브에이전트 개발 워크플로우
+- **[Superpowers](https://github.com/obra/superpowers)** - TDD, 체계적 디버깅, 서브에이전트 개발 워크플로우 (14개 스킬)
   - 설치: `claude plugin marketplace add obra/superpowers-marketplace && claude plugin install superpowers@superpowers-marketplace`
-  - 주요 기능: brainstorming, write-plan, execute-plan, TDD, systematic-debugging
+  - 주요 기능: brainstorming, writing-plans, executing-plans, TDD, systematic-debugging, dispatching-parallel-agents 등
+- **Skill Creator** (Anthropic 공식) - 스킬 생성/테스트/개선/벤치마크
+  - 설치: `claude plugin install skill-creator@claude-plugins-official`
+  - 4가지 모드: Create, Eval, Improve, Benchmark
+  - 슬래시 커맨드: `/skill-creator`
 
 ### 추천 (추가 검토)
 - **[Context7](https://github.com/upstash/context7)** - 최신 문서 검색/참조
@@ -308,7 +304,6 @@ docs/
 | 프로젝트 | 설명 | 용도 |
 |---------|------|------|
 | [Serena MCP](https://github.com/serena-ai/serena-mcp) | 시맨틱 코드 분석/편집 | 필수 - 코드 탐색, 심볼 분석, 리팩토링 |
-| [Team Orchestrator MCP](https://github.com/tomtomjskim/team-orchestrator-mcp) | 멀티 에이전트 오케스트레이션 | 권장 - 팀 템플릿, 워크플로우, 에이전트 관리 |
 
 ### 모니터링
 
@@ -323,22 +318,30 @@ docs/
 │                           Claude Code                                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌──────────────┐    ┌─────────────────────┐    ┌───────────────────┐  │
-│  │  Serena MCP  │    │ Team Orchestrator   │    │  Agent Orchestra  │  │
-│  │              │    │       MCP           │    │     Monitor       │  │
-│  │ - 코드 분석  │    │                     │    │                   │  │
-│  │ - 심볼 탐색  │    │ - 팀 템플릿         │───▶│ - 실시간 대시보드 │  │
-│  │ - 리팩토링   │    │ - 워크플로우 엔진   │    │ - 태스크 추적     │  │
-│  │              │    │ - 에이전트 관리     │    │ - 이벤트 로그     │  │
-│  └──────────────┘    │ - 이벤트 발행       │    └───────────────────┘  │
-│                      └─────────────────────┘                            │
+│  ┌──────────────┐    ┌─────────────────────────────────────────────┐   │
+│  │  Serena MCP  │    │  Claude Code Native Multi-Agent Tools        │   │
+│  │              │    │                                              │   │
+│  │ - 코드 분석  │    │  Task()        - 서브에이전트 스폰           │   │
+│  │ - 심볼 탐색  │    │  Agent()       - 에이전트 실행              │   │
+│  │ - 리팩토링   │    │  TeamCreate()  - 팀 생성                    │   │
+│  │              │    │  SendMessage() - 에이전트 간 통신           │   │
+│  └──────────────┘    └──────────────────────┬──────────────────────┘   │
+│                                             │                            │
+│                                             ▼                            │
+│                              ┌───────────────────────┐                  │
+│                              │  Agent Orchestra      │                  │
+│                              │  Monitor              │                  │
+│                              │  - 실시간 대시보드    │                  │
+│                              │  - 태스크 추적        │                  │
+│                              │  - 이벤트 로그        │                  │
+│                              └───────────────────────┘                  │
 │                                                                          │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
 │  │  PDARR Workflow Commands (.claude/commands/)                      │  │
 │  │  /dispatch → /prd → /analyze → /spec → /run → /check-code       │  │
 │  │  → /reflect → /complete → /stage                                  │  │
 │  │                                                                    │  │
-│  │  + Claude Code Native Tools (Task, TeamCreate, SendMessage)       │  │
+│  │  + Superpowers Plugin (14 Skills)                                 │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘

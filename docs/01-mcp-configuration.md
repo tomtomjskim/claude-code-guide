@@ -51,30 +51,6 @@ MCP (Model Context Protocol)는 Claude Code의 기능을 확장하는 서버 프
 4. 코드 수정 → replace_symbol_body / replace_content
 ```
 
-### 2.2 Team Orchestrator MCP
-
-멀티 에이전트 팀 오케스트레이션.
-
-```json
-{
-  "mcpServers": {
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-#### 주요 도구
-| 카테고리 | 도구 | 설명 |
-|----------|------|------|
-| Team | `team_init` | 팀 템플릿 초기화 |
-| Team | `team_list_templates` | 템플릿 목록 |
-| Agent | `agent_list` | 에이전트 목록 |
-| Workflow | `workflow_run` | 워크플로우 실행 |
-| Registry | `registry_search` | 템플릿 검색 |
-
 ---
 
 ## 3. 추가 MCP 서버 (선택)
@@ -123,10 +99,10 @@ MCP (Model Context Protocol)는 Claude Code의 기능을 확장하는 서버 프
 
 | 프로젝트 유형 | 필수 MCP | 권장 MCP |
 |--------------|---------|---------|
-| 웹 개발 | Serena | Team Orchestrator, GitHub |
+| 웹 개발 | Serena | GitHub |
 | 데이터/ML | Serena | Database, Filesystem |
 | 인프라/DevOps | Serena | Filesystem, GitHub |
-| 풀스택 | Serena | Team Orchestrator, Database, GitHub |
+| 풀스택 | Serena | Database, GitHub |
 
 ### 도구 선택 흐름
 ```
@@ -141,8 +117,9 @@ MCP (Model Context Protocol)는 Claude Code의 기능을 확장하는 서버 프
 └── 정규식 치환 → Serena replace_content
 
 팀 협업이 필요한가?
-├── 워크플로우 실행 → Team Orchestrator
-└── 에이전트 스폰 → Task tool
+├── 단일 서브에이전트 → Task tool
+├── 병렬 에이전트 → Task tool (복수 호출)
+└── 에이전트 팀 → TeamCreate + SendMessage (Claude Code 네이티브)
 ```
 
 ---
@@ -206,10 +183,6 @@ npm install -g typescript typescript-language-server
     "serena": {
       "command": "uvx",
       "args": ["--from", "serena-mcp", "serena", "--project", "."]
-    },
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
     }
   }
 }

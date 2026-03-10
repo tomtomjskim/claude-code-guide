@@ -52,96 +52,44 @@ replace_symbol_body("UserService/login", "src/services/auth.ts", newBody)
 
 ---
 
-## 2. Team Orchestrator MCP
+## 2. Claude Code 네이티브 멀티 에이전트 (Team Orchestrator MCP 대체)
 
-### 소개
-멀티 에이전트 팀 오케스트레이션을 위한 MCP 서버입니다.
+> **Team Orchestrator MCP는 deprecated 되었습니다.**
+> Claude Code는 이제 멀티 에이전트 오케스트레이션을 네이티브로 지원합니다.
+> 별도 MCP 서버 없이 아래 도구들을 직접 사용하세요.
 
-- **GitHub**: https://github.com/tomtomjskim/team-orchestrator-mcp
-- **용도**: 권장 - 팀 템플릿, 워크플로우, 에이전트 관리
+### 네이티브 도구
 
-### 설치
-```json
-{
-  "mcpServers": {
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
-    }
-  }
-}
-```
-
-### 핵심 기능
-
-| 기능 | 설명 |
-|------|------|
-| **팀 템플릿** | web-dev, general, data-team, devops-team, design-team, content-team |
-| **워크플로우 엔진** | DAG 기반 태스크 스케줄링, 병렬 실행 |
-| **템플릿 레지스트리** | 원격 템플릿 검색, 다운로드, 캐싱 |
-| **이벤트 발행** | SSE, Webhook, File, OTLP 지원 |
-
-### 제공 템플릿
-
-| 템플릿 | 에이전트 | 용도 |
-|--------|---------|------|
-| `web-dev` | PM, Explorer, Architect, Frontend, Backend, DevOps, QA, Documenter | 웹 서비스 개발 |
-| `general` | PM, Explorer, Developer, Tester | 범용 프로젝트 |
-| `data-team` | PM, Explorer, Data Engineer, ML Engineer, Analyst, DBA | 데이터/ML 프로젝트 |
-| `devops-team` | PM, Explorer, Infra Engineer, CI/CD Engineer, Security Engineer, SRE | 인프라 관리 |
-| `design-team` | PM, Explorer, UI Designer, UX Researcher, Design System, Prototyper | 디자인/UX 프로젝트 |
-| `content-team` | PM, Explorer, Strategist, Writer, Editor, SEO Specialist | 콘텐츠/마케팅 |
-
-### 주요 도구
-
-#### Team Management
-| 도구 | 설명 |
-|------|------|
-| `team_list_templates` | 사용 가능한 템플릿 목록 |
-| `team_init` | 프로젝트에 팀 초기화 |
-| `team_get_config` | 현재 팀 설정 조회 |
-| `team_set_goal` | 프로젝트 목표 설정 |
-
-#### Agent Management
-| 도구 | 설명 |
-|------|------|
-| `agent_list` | 팀 에이전트 목록 |
-| `agent_add` | 커스텀 에이전트 추가 |
-| `agent_modify` | 에이전트 설정 수정 |
-
-#### Workflow Management
-| 도구 | 설명 |
-|------|------|
-| `workflow_list` | 워크플로우 목록 |
-| `workflow_run` | 워크플로우 실행 |
-| `workflow_status` | 실행 상태 조회 |
-
-#### Task Events (Agent Monitor 연동)
-| 도구 | 설명 |
-|------|------|
-| `task_start` | 태스크 시작 이벤트 |
-| `task_progress` | 진행 상황 업데이트 |
-| `task_complete` | 태스크 완료 |
-| `task_fail` | 태스크 실패 |
-
-#### Template Registry
-| 도구 | 설명 |
-|------|------|
-| `registry_search` | 템플릿 검색 |
-| `registry_download` | 템플릿 다운로드 |
+| 도구 | 설명 | 사용 시점 |
+|------|------|----------|
+| `Task()` | 서브에이전트 스폰 및 실행 | 독립적인 작업 위임 |
+| `Agent()` | 에이전트 실행 | 단일 에이전트 작업 |
+| `TeamCreate()` | 에이전트 팀 생성 | 복잡한 멀티 에이전트 협업 |
+| `SendMessage()` | 에이전트 간 메시지 전달 | 에이전트 통신 |
 
 ### 사용 예시
 
 ```
-// 팀 초기화
-team_init({ template: "web-dev", projectPath: "/path/to/project" })
+// 단일 서브에이전트 실행
+Task("백엔드 API 구현", { persona: "Developer" })
 
-// 워크플로우 실행
-workflow_run({ workflowId: "standard", input: { task: "로그인 구현" } })
+// 병렬 에이전트 실행
+Task("프론트엔드 구현", { persona: "Frontend" })
+Task("백엔드 구현", { persona: "Backend" })
 
-// 태스크 이벤트 발행 (모니터 연동)
-task_start({ agentId: "dev-1", agentType: "Developer", description: "API 구현" })
+// 팀 생성 후 메시지 전달
+TeamCreate([{ role: "PM" }, { role: "Developer" }, { role: "QA" }])
+SendMessage("PM", "로그인 기능 구현 시작")
 ```
+
+### 기존 Team Orchestrator MCP와의 차이
+
+| 항목 | Team Orchestrator MCP | Claude Code 네이티브 |
+|------|----------------------|---------------------|
+| 설치 | 별도 Node.js 서버 | 내장 (설치 불필요) |
+| 팀 템플릿 | web-dev, general 등 사전 정의 | CLAUDE.md 페르소나로 자유 정의 |
+| 워크플로우 엔진 | DAG 기반 YAML | 커스텀 커맨드 + 스킬 |
+| 이벤트 발행 | SSE/Webhook → Agent Monitor | 직접 연동 가능 |
 
 ---
 
@@ -166,14 +114,14 @@ task_start({ agentId: "dev-1", agentType: "Developer", description: "API 구현"
 
 ```
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
-│  Team           │      │  Agent          │      │  Frontend       │
-│  Orchestrator   │─────▶│  Orchestra      │─────▶│  Dashboard      │
-│  MCP            │      │  Monitor        │      │                 │
-│                 │      │  (Express)      │      │  (React)        │
-│  - task_start   │      │                 │      │                 │
-│  - task_progress│      │  - Webhook API  │      │  - 실시간 뷰    │
-│  - task_complete│      │  - SSE Ingest   │      │  - 타임라인     │
-│  - task_fail    │      │  - WebSocket    │      │  - 로그         │
+│  Claude Code    │      │  Agent          │      │  Frontend       │
+│  Native Tools   │─────▶│  Orchestra      │─────▶│  Dashboard      │
+│                 │      │  Monitor        │      │                 │
+│  - Task()       │      │  (Express)      │      │  (React)        │
+│  - Agent()      │      │                 │      │                 │
+│  - TeamCreate() │      │  - Webhook API  │      │  - 실시간 뷰    │
+│  - SendMessage()│      │  - SSE Ingest   │      │  - 타임라인     │
+│                 │      │  - WebSocket    │      │  - 로그         │
 └─────────────────┘      └─────────────────┘      └─────────────────┘
 ```
 
@@ -204,19 +152,15 @@ monitor_register({
 ```mermaid
 sequenceDiagram
     participant Claude as Claude Code
-    participant MCP as Team Orchestrator
     participant Monitor as Agent Monitor
 
-    Claude->>MCP: task_start()
-    MCP->>Monitor: POST /api/webhook/events
+    Claude->>Monitor: POST /api/webhook/events (task_start)
     Monitor-->>Monitor: 대시보드 업데이트
 
-    Claude->>MCP: task_progress()
-    MCP->>Monitor: POST /api/webhook/events
+    Claude->>Monitor: POST /api/webhook/events (task_progress)
     Monitor-->>Monitor: 진행률 업데이트
 
-    Claude->>MCP: task_complete()
-    MCP->>Monitor: POST /api/webhook/events
+    Claude->>Monitor: POST /api/webhook/events (task_complete)
     Monitor-->>Monitor: 완료 표시
 ```
 
@@ -231,10 +175,6 @@ sequenceDiagram
     "serena": {
       "command": "uvx",
       "args": ["--from", "serena-mcp", "serena", "--project", "."]
-    },
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
     }
   }
 }
@@ -279,11 +219,11 @@ services:
 
 ### 표준 (권장)
 - Serena MCP
-- Team Orchestrator MCP
+- Claude Code 네이티브 멀티 에이전트 (Task, Agent, TeamCreate, SendMessage)
 
-### 전체 (팀 협업)
+### 전체 (팀 협업 모니터링)
 - Serena MCP
-- Team Orchestrator MCP
+- Claude Code 네이티브 멀티 에이전트
 - Agent Orchestra Monitor
 
 ---
@@ -291,6 +231,5 @@ services:
 ## 참고 링크
 
 - [Serena MCP 문서](https://github.com/serena-ai/serena-mcp)
-- [Team Orchestrator MCP 문서](https://github.com/tomtomjskim/team-orchestrator-mcp)
 - [Agent Orchestra Monitor 문서](https://github.com/tomtomjskim/agent-orchestra-monitor)
 - [Claude Code 공식 문서](https://docs.anthropic.com/claude-code)

@@ -40,10 +40,6 @@ npm update -g @anthropic-ai/claude-code
     "serena": {
       "command": "uvx",
       "args": ["--from", "serena-mcp", "serena", "--project", "."]
-    },
-    "team-orchestrator": {
-      "command": "node",
-      "args": ["/path/to/team-orchestrator-mcp/dist/index.js"]
     }
   }
 }
@@ -60,9 +56,10 @@ npm update -g @anthropic-ai/claude-code
   - 참조 분석
 
 ### 권장 MCP
-- [ ] **Team Orchestrator MCP** - 멀티 에이전트 오케스트레이션
 - [ ] **GitHub MCP** - GitHub 연동 (PR, Issue)
 - [ ] **Database MCP** - DB 직접 접근 (선택)
+
+> **멀티 에이전트 오케스트레이션**은 Claude Code 네이티브 도구(Task, Agent, TeamCreate, SendMessage)로 처리합니다. Team Orchestrator MCP는 더 이상 권장하지 않습니다.
 
 ### MCP 설정 확인
 ```bash

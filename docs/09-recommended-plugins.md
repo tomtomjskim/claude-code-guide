@@ -59,21 +59,33 @@ claude plugin install superpowers@superpowers-marketplace
 claude plugin list
 ```
 
-#### 핵심 스킬
+#### 핵심 스킬 (14개 라우터 테이블)
 
-| 스킬 | 설명 | 자동 발동 시점 |
-|------|------|--------------|
-| **brainstorming** | 소크라테스식 요구사항 정제 | 새 기능 작업 시작 시 |
-| **writing-plans** | 세부 구현 계획 작성 | 설계 승인 후 |
-| **executing-plans** | 배치 실행 + 체크포인트 | 계획 실행 시 |
-| **subagent-driven-development** | 서브에이전트 병렬 개발 + 2단계 리뷰 | 계획 실행 시 |
-| **test-driven-development** | RED-GREEN-REFACTOR 사이클 강제 | 코드 구현 시 |
-| **systematic-debugging** | 4단계 근본 원인 분석 | 버그 수정 시 |
-| **requesting-code-review** | 코드 리뷰 체크리스트 | 태스크 간 전환 시 |
-| **using-git-worktrees** | 격리된 워크스페이스 생성 | 설계 승인 후 |
-| **finishing-a-development-branch** | 머지/PR 결정 워크플로우 | 모든 태스크 완료 시 |
-| **verification-before-completion** | 실제로 수정됐는지 검증 | 디버깅 완료 시 |
-| **writing-skills** | 새 스킬 작성 가이드 | 스킬 확장 시 |
+| 카테고리 | 스킬 | 발동 시점 |
+|----------|------|----------|
+| **프로세스** | brainstorming | 새 기능/컴포넌트 설계 시 |
+| | writing-plans | 스펙/요구사항 → 구현 계획 작성 |
+| | executing-plans | 별도 세션에서 계획 배치 실행 |
+| **구현** | test-driven-development | 코드 구현 전 (RED-GREEN-REFACTOR) |
+| | systematic-debugging | 버그/에러/실패 시 (4단계 근본 원인) |
+| | subagent-driven-development | 같은 세션에서 계획 실행 (2단계 리뷰) |
+| | dispatching-parallel-agents | 2+ 독립 문제 병렬 처리 |
+| **검증** | verification-before-completion | 완료 주장 전 증거 확인 |
+| | requesting-code-review | 태스크/기능 완료 후 리뷰 요청 |
+| | receiving-code-review | 리뷰 피드백 수신 시 평가 |
+| **인프라** | using-git-worktrees | 격리 워크스페이스 필요 시 |
+| | finishing-a-development-branch | 브랜치 완료 → 머지/PR/정리 |
+| **메타** | using-superpowers | 스킬 라우팅 (어떤 스킬 쓸지) |
+| | writing-skills | 스킬 작성/수정/검증 |
+
+#### 토큰 최적화 (2026-03-10)
+
+| 항목 | 원본 | 최적화 후 | 절감 |
+|------|------|-----------|------|
+| 전체 SKILL.md (14개) | 13,496 words | 8,326 words | -38.3% |
+| Hook 세션 주입 | 581 words | 70 words | -88.0% |
+
+> 플러그인 업데이트 시 최적화가 초기화될 수 있음. 재적용 스크립트: `/home/ubuntu/superpowers-benchmark/reapply-optimizations.sh`
 
 #### 슬래시 커맨드
 
@@ -99,14 +111,14 @@ claude plugin list
    → 실패 시 자동 재시도
 ```
 
-#### 기존 멀티 에이전트 시스템과의 통합
+#### Claude Code 네이티브 멀티 에이전트와의 통합
 
-Superpowers는 기존 팀 오케스트레이션 시스템과 공존 가능합니다:
+Claude Code는 이제 멀티 에이전트 오케스트레이션을 네이티브로 지원합니다. Superpowers는 이 네이티브 도구들과 함께 구조화된 워크플로우를 제공합니다:
 
-| 기능 | 기존 시스템 | Superpowers | 권장 사용 |
-|------|-----------|-------------|----------|
-| 에이전트 오케스트레이션 | Team Orchestrator MCP | subagent-driven-development | 상황에 따라 선택 |
-| 워크플로우 관리 | workflows/*.yaml | 자동 스킬 발동 | 병행 사용 |
+| 기능 | Claude Code 네이티브 | Superpowers | 권장 사용 |
+|------|---------------------|-------------|----------|
+| 에이전트 오케스트레이션 | Task, Agent, TeamCreate, SendMessage | subagent-driven-development, dispatching-parallel-agents | **네이티브 도구** (Superpowers 스킬로 강화) |
+| 워크플로우 관리 | 커스텀 커맨드 | 자동 스킬 발동 | 병행 사용 |
 | TDD | 미적용 | RED-GREEN-REFACTOR 강제 | **Superpowers** |
 | 체계적 디버깅 | 미적용 | 4단계 디버깅 | **Superpowers** |
 | 브레인스토밍 | PM 에이전트 | 소크라테스식 정제 | **Superpowers** |
@@ -115,8 +127,72 @@ Superpowers는 기존 팀 오케스트레이션 시스템과 공존 가능합니
 **권장 하이브리드 전략:**
 - 새 기능 개발 → Superpowers 워크플로우 (brainstorm → plan → execute)
 - 긴급 버그 수정 → 기존 quick-fix 워크플로우
+- 병렬 독립 작업 → `dispatching-parallel-agents` 스킬 + Claude Code `Task()`
 - 대규모 리팩토링 → 기존 refactor 워크플로우 + Superpowers TDD
 - 코드 품질 → Superpowers TDD + systematic-debugging
+
+---
+
+## 필수 플러그인: Skill Creator (Anthropic 공식)
+
+> 스킬 생성, 테스트, 개선, 벤치마크를 위한 Anthropic 공식 플러그인
+
+| 항목 | 내용 |
+|------|------|
+| **개발자** | Anthropic (공식) |
+| **마켓플레이스** | claude-plugins-official (내장) |
+| **라이선스** | MIT |
+
+#### 설치
+
+```bash
+# 마켓플레이스 등록 (이미 내장되어 있을 수 있음)
+claude plugin marketplace add anthropics/claude-plugins-official
+
+# 플러그인 설치
+claude plugin install skill-creator@claude-plugins-official
+```
+
+#### 슬래시 커맨드
+
+```bash
+/skill-creator    # Skill Creator 실행
+```
+
+#### 4가지 모드
+
+| 모드 | 용도 | 사용 시점 |
+|------|------|----------|
+| **Create** | 대화형 Q&A로 새 스킬 생성 | "PR 보안 리뷰 스킬 만들어줘" |
+| **Eval** | 테스트 케이스로 스킬 검증 | "내 code-review 스킬 eval 돌려줘" |
+| **Improve** | 평가 결과 기반 스킬 최적화 | 피드백 반영 후 반복 개선 |
+| **Benchmark** | 여러 번 실행해 성능/분산 비교 | "10회 벤치마크하고 분산 보여줘" |
+
+#### 내부 에이전트
+
+| 에이전트 | 역할 |
+|---------|------|
+| Executor | 스킬을 적용하여 테스트 프롬프트 실행 |
+| Grader | assertion 기반 정량 평가 |
+| Comparator | 블라인드 A/B 비교 |
+| Analyzer | 벤치마크 패턴 분석 |
+
+#### 워크플로우
+
+```
+1. Create: 의도 파악 → 인터뷰 → SKILL.md 작성
+2. Eval: 테스트 프롬프트 작성 → with-skill / baseline 병렬 실행
+3. Review: eval-viewer로 결과 비교 → 사용자 피드백
+4. Improve: 피드백 반영 → 스킬 수정 → 재실행
+5. Benchmark: 반복 실행으로 안정성/성능 검증
+6. Description Optimization: 트리거 정확도 최적화 (선택)
+```
+
+#### Superpowers와의 관계
+
+- Superpowers 스킬을 분석/개선할 때 Skill Creator 사용
+- 커스텀 스킬 작성 시 Superpowers의 `writing-skills` 스킬과 병행
+- 예: Superpowers 14개 스킬 벤치마크 → 토큰 38.3% 절감 달성 (2026-03-10)
 
 ---
 
@@ -152,7 +228,8 @@ Superpowers는 기존 팀 오케스트레이션 시스템과 공존 가능합니
 ```json
 {
   "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true
+    "superpowers@superpowers-marketplace": true,
+    "skill-creator@claude-plugins-official": true
   }
 }
 ```

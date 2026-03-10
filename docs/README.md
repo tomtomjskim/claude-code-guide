@@ -16,7 +16,7 @@ Claude Code를 효과적으로 사용하기 위한 종합 가이드입니다.
 | 05 | [에이전트 페르소나](05-agent-personas.md) | PM, Architect, Developer 등 15개 페르소나 |
 | 06 | [프로젝트 구조](06-project-structure.md) | 표준 프로젝트 구조 템플릿 |
 | 07 | [CLAUDE.md 템플릿](07-claude-md-template.md) | 프로젝트 CLAUDE.md 템플릿 |
-| 08 | [관련 프로젝트](08-related-projects.md) | Team Orchestrator, Agent Monitor 등 |
+| 08 | [관련 프로젝트](08-related-projects.md) | Serena MCP, Agent Monitor, 네이티브 멀티 에이전트 |
 | 09 | [추천 플러그인](09-recommended-plugins.md) | Superpowers, Context7 등 |
 | 10 | [코드 리뷰 시스템](10-code-review-system.md) | 전문 리뷰어 6명, 6단계, 3프리셋, 하이브리드 모드 |
 | 11 | [Workflow Commands](11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
@@ -119,7 +119,7 @@ Complex → /prd → /analyze → /workflow (팀 Agent)
 
 ### MCP
 - **Serena**: 필수 - 시맨틱 코드 분석
-- **Team Orchestrator**: 권장 - 멀티 에이전트
+- 멀티 에이전트: Claude Code 네이티브 도구 (Task, Agent, TeamCreate)
 
 ### 플러그인
 - **Superpowers**: 필수 - TDD, 디버깅, 서브에이전트 개발
@@ -133,7 +133,6 @@ Complex → /prd → /analyze → /workflow (팀 Agent)
 
 ## 관련 링크
 
-- [Team Orchestrator MCP](https://github.com/tomtomjskim/team-orchestrator-mcp) - 멀티 에이전트 오케스트레이션
 - [Agent Orchestra Monitor](https://github.com/tomtomjskim/agent-orchestra-monitor) - 실시간 모니터링 대시보드
 - [Serena MCP](https://github.com/serena-ai/serena-mcp) - 시맨틱 코드 분석
 - [Superpowers](https://github.com/obra/superpowers) - 개발 워크플로우 플러그인
