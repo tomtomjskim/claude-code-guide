@@ -1,0 +1,80 @@
+# Handoff Protocol Template v1.0
+# ~/.claude/team/context/handoff-protocol.md 에 배치
+
+# 에이전트 간 컨텍스트 전달 표준 스키마
+handoff_schema:
+  from_agent: string        # 전달하는 에이전트 ID
+  to_agent: string          # 수신하는 에이전트 ID
+  task_id: string           # 태스크 식별자
+  payload:
+    scope: string           # Return.scope에서 가져옴
+    findings: string[]      # Return.findings에서 가져옴
+    recommendation: string
+    validation_status: pass | fail | partial
+    residual_risk: string[]
+    artifacts: string[]     # 생성된 파일 경로
+  validation:
+    required_fields: [scope, findings, recommendation, validation_status]
+    completeness_check: true
+    on_validation_fail: retry_once | escalate_to_pm
+
+# Data Flow Contracts - 프로젝트에 맞게 수정하세요
+data_flow:
+  analysis_to_design:
+    from: [explorer, pm]
+    to: [architect]
+    required: [codebase_analysis, requirements, impact_assessment]
+
+  design_to_preparation:
+    from: [architect]
+    to: [dba, designer]
+    required: [design_doc, schema_changes, component_specs]
+
+  preparation_to_implementation:
+    from: [dba, designer]
+    to: [developer]
+    required: [schema_sql, component_specs, design_doc]
+
+  implementation_to_verification:
+    from: [developer]
+    to: [qa, reviewers]
+    required: [changed_files, implementation_scope, known_risks]
+
+  verification_to_deployment:
+    from: [qa]
+    to: [publisher]
+    required: [test_report, approval_status, review_reports]
+
+  deployment_to_documentation:
+    from: [publisher, developer]
+    to: [documenter]
+    required: [deployment_log, changed_files, api_changes]
+
+# Validation Rules
+validation_rules:
+  - required_fields_must_not_be_empty
+  - critical_issues_block_next_phase
+  - residual_risk_must_propagate
+  - artifacts_must_exist
+  - retry_once_before_escalation
+
+# PM Handoff Template
+pm_template: |
+  ## 컨텍스트
+  - 프로젝트: {{PROJECT_PATH}}
+  - 기술스택: {{TECH_STACK}}
+  - 태스크 ID: {{TASK_ID}}
+
+  ## 이전 단계 결과
+  - **범위**: {{PREVIOUS_SCOPE}}
+  - **발견사항**: {{PREVIOUS_FINDINGS}}
+  - **권장사항**: {{PREVIOUS_RECOMMENDATION}}
+  - **검증 상태**: {{PREVIOUS_VALIDATION_STATUS}}
+  - **잔여 위험**: {{PREVIOUS_RESIDUAL_RISK}}
+  - **산출물**: {{PREVIOUS_ARTIFACTS}}
+
+  ## 현재 태스크
+  {{TASK_DESCRIPTION}}
+
+  ## 주의사항
+  {{INHERITED_RISKS}}

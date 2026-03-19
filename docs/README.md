@@ -20,6 +20,8 @@ Claude Code를 효과적으로 사용하기 위한 종합 가이드입니다.
 | 09 | [추천 플러그인](09-recommended-plugins.md) | Superpowers, Context7 등 |
 | 10 | [코드 리뷰 시스템](10-code-review-system.md) | 전문 리뷰어 6명, 6단계, 3프리셋, 하이브리드 모드 |
 | 11 | [Workflow Commands](11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
+| 12 | [v3.0 시스템 아키텍처](12-v3-architecture.md) | 5-section 템플릿, Handoff Protocol, 모델 라우팅, Tiebreaker 등 v3.0 전체 설계 |
+| 13 | [핸드오프 & 실패 복구](13-handoff-and-failure.md) | Handoff Protocol 설정, failure-policy.yaml, 실전 예시, PM/에스컬레이션 템플릿 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |

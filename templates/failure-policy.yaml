@@ -1,0 +1,69 @@
+# Failure Recovery Policy Template v1.0
+# ~/.claude/team/workflows/failure-policy.yaml 에 배치
+
+version: "1.0"
+
+# 재시도 정책
+retry_policy:
+  max_attempts: 2
+  strategy: "different_approach"
+  on_retry: |
+    이전 시도가 실패했습니다. 다른 접근 방식으로 시도하세요.
+    이전 실패 원인: {{FAILURE_REASON}}
+  applicable_tasks: [exploration, documentation, review, testing]
+
+# 에스컬레이션 정책
+escalation_policy:
+  to: pm
+  include_in_report:
+    - error_description
+    - attempted_approaches
+    - partial_output
+    - suggested_alternatives
+  pm_actions:
+    reassign: "다른 에이전트에게 재할당"
+    decompose: "더 작은 태스크로 분해"
+    manual_intervention: "사용자에게 판단 요청"
+  applicable_tasks: [implementation, schema_change, architecture]
+
+# 롤백 정책 - 프로젝트에 맞게 수정하세요
+rollback_policy:
+  triggers:
+    - critical_bug_found
+    - deployment_failed
+    - health_check_failed
+    - tests_regression
+  strategies:
+    code_rollback:
+      command: "git revert HEAD --no-edit"
+      verify: "npm test"
+    container_rollback:
+      command: "docker compose stop {{SERVICE}} && docker compose up -d {{SERVICE}}"
+      verify: "curl -sf http://{{SERVICE_IP}}:{{PORT}}/health"
+    schema_rollback:
+      command: "psql -f rollback.sql"
+      prerequisite: "롤백 스크립트 사전 준비 필수"
+
+# 서킷 브레이커
+circuit_breaker:
+  consecutive_failures: 3
+  action: pause_workflow
+  resume_condition: "PM의 명시적 승인 또는 사용자 개입"
+
+# 태스크별 실패 매핑
+task_failure_mapping:
+  exploration: { on_fail: retry, fallback: escalate }
+  design: { on_fail: escalate }
+  implementation: { on_fail: escalate }
+  testing: { on_fail: retry, fallback: escalate }
+  review: { on_fail: retry, fallback: escalate }
+  deployment: { on_fail: rollback, fallback: escalate }
+  schema_change: { on_fail: rollback, prerequisite: "rollback script", fallback: escalate }
+
+# 부분 완료 보존
+partial_completion:
+  strategy: "preserve_and_report"
+  actions:
+    - "완료된 아티팩트 보존"
+    - "진행 상태 PM 보고"
+    - "미완료 항목 새 태스크 생성"

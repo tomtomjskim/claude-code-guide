@@ -1,0 +1,106 @@
+# Multi-Agent Team Configuration v3.0
+# ~/.claude/team/agents.yaml 에 배치
+
+version: "3.0"
+team_name: "my-team"
+
+# 모델 라우팅 전략
+model_routing:
+  default_model: "sonnet"
+  routing_rules:
+    - condition: "cross_service_architecture"
+      agent: architect
+      model: "opus"
+    - condition: "critical_security_issue"
+      agent: security-reviewer
+      model: "opus"
+    - condition: "large_change_set"
+      agent: code-reviewer
+      model: "opus"
+    - condition: "simple_scan"
+      agent: explorer
+      model: "haiku"
+
+# 핸드오프 프로토콜
+handoff_protocol:
+  version: "1.0"
+  config: "context/handoff-protocol.md"
+  validation: true
+  on_validation_fail: "retry_once_then_escalate"
+
+# 에이전트 정의 (간략 버전 - 필요한 에이전트만 활성화)
+agents:
+  pm:
+    name: "PM"
+    type: "orchestrator"
+    handoff:
+      accepts: [all]
+      produces: [task-breakdown, progress-report, final-report]
+      requires_from_upstream: [user_request]
+
+  architect:
+    name: "Architect"
+    type: "Plan"
+    model: "sonnet"
+    handoff:
+      accepts: [explorer, pm]
+      produces: [design-doc, adr]
+      requires_from_upstream: [scope, requirements]
+
+  developer:
+    name: "Developer"
+    type: "general-purpose"
+    model: "sonnet"
+    handoff:
+      accepts: [architect, designer, dba]
+      produces: [source-code, implementation-report]
+      requires_from_upstream: [scope, design_doc]
+
+  qa-engineer:
+    name: "QA Engineer"
+    type: "general-purpose"
+    model: "sonnet"
+    handoff:
+      accepts: [developer]
+      produces: [test-report, bug-report]
+      requires_from_upstream: [scope, changed_files]
+
+  explorer:
+    name: "Code Explorer"
+    type: "Explore"
+    model: "sonnet"  # PM이 haiku로 오버라이드 가능
+    handoff:
+      accepts: [pm]
+      produces: [analysis-report]
+      requires_from_upstream: [scope]
+
+  # Specialist Reviewers
+  security-reviewer:
+    name: "Security Sentinel"
+    type: "general-purpose"
+    model: "sonnet"
+    persona: "보안 전문 코드 리뷰어"
+    perspective: "공격자에게 노출되면?"
+    handoff:
+      accepts: [developer]
+      produces: [security-review]
+      requires_from_upstream: [scope, changed_files]
+
+  # ... 나머지 에이전트는 프로젝트 필요에 따라 추가
+
+# 품질 게이트
+quality_gates:
+  before_deploy:
+    required_approvals: [qa-engineer]
+    checks: [all_tests_pass, no_critical_bugs]
+  before_code_review_approve:
+    required_approvals: [security-reviewer, performance-reviewer]
+    checks: [no_critical_security_issues, no_critical_performance_issues]
+
+# 시스템 메타데이터
+system_meta:
+  version: "3.0"
+  template_version: "5-section-v1"
+  handoff_protocol: "v1.0"
+  failure_policy: "v1.0"
+  model_routing: "v1.0"

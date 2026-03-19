@@ -1,4 +1,4 @@
-# Claude Code 셋업 가이드
+# Claude Code 셋업 가이드 v3.0
 
 **Claude Code를 효과적으로 사용하기 위한 종합 가이드 및 템플릿**
 
@@ -13,9 +13,14 @@
 - 2단계 복잡도 판단 → 최적 실행 전략 자동 선택
 - 멀티 Agent 팀 구성 (단일/병렬/팀 Agent 3전략)
 - MCP 서버 설정 (Serena 등)
-- 에이전트 페르소나 정의 (9 Core + 6 Specialist Reviewers)
+- 에이전트 페르소나 정의 (9 Core + 7 Specialist Reviewers)
 - 문서화 규칙 및 템플릿
 - 체크리스트 기반 워크플로우
+- **v3.0 신규**: 5-section 표준 프롬프트 템플릿 (Opening/Working Mode/Focus On/Quality Checks/Return/Boundary)
+- **v3.0 신규**: Handoff Protocol (에이전트 간 구조화된 컨텍스트 전달)
+- **v3.0 신규**: Failure Recovery (retry/escalate/rollback/circuit-breaker)
+- **v3.0 신규**: Model Routing (opus/sonnet/haiku 동적 선택)
+- **v3.0 신규**: Tiebreaker Protocol (리뷰어 충돌 시 4단계 중재)
 
 ---
 
@@ -82,6 +87,8 @@ cp .claude/workflow-commands-guide.md /your/project/.claude/
 | 09 | [추천 플러그인](docs/09-recommended-plugins.md) | Superpowers, Context7 등 |
 | 10 | [코드 리뷰 시스템](docs/10-code-review-system.md) | 전문 리뷰어 6명, 6단계, 3프리셋 |
 | 11 | [Workflow Commands](docs/11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
+| 12 | [v3.0 아키텍처](docs/12-v3-architecture.md) | v3.0 시스템 아키텍처 (핸드오프, 실패 복구, 모델 라우팅) |
+| 13 | [핸드오프 & 실패 복구](docs/13-handoff-failure-recovery.md) | 실전 가이드 (설정, 예시, 템플릿) |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
 
 ---
@@ -174,7 +181,7 @@ docs/
 | Publisher | 빌드/배포 | deployment-log.md |
 | Documenter | 문서화 | DONE-XXX.md |
 
-#### Specialist Reviewers (6개, v2.0)
+#### Specialist Reviewers (7개, v3.0)
 | 리뷰어 | 페르소나 | 핵심 관점 |
 |--------|---------|----------|
 | Security Reviewer | Security Sentinel | "공격자에게 노출되면?" |
@@ -183,14 +190,19 @@ docs/
 | Accessibility Reviewer | Access Advocate | "장애인도 쓸 수 있나?" |
 | UX Reviewer | UX Harmonizer | "사용자가 혼란스럽지 않나?" |
 | API Reviewer | API Arbiter | "1년 후에도 호환되나?" |
+| Code Reviewer | Code Craftsman | "코드 품질과 유지보수성이 충분한가?" |
 
-### 코드 리뷰 v2.0
+> v3.0부터 각 페르소나는 5-section 표준 템플릿(Opening/Working Mode/Focus On/Quality Checks/Return/Boundary)을 따릅니다.
+
+### 코드 리뷰 v3.0
 
 ```
 "빠른 리뷰: [설명]"       → quick (~2분, 자동 분석만)
 "리뷰: [설명]"            → standard (~10분, 기본)
 "상세 리뷰: [설명]"       → thorough (~20분, 전체 6단계)
 "팀 리뷰: [설명]"         → Agent Teams + thorough
+"시스템 검증"             → validate-system.sh 실행, 전체 무결성 점검
+"모델 [opus/haiku]로"     → 해당 모델로 리뷰 실행 (Model Routing)
 ```
 
 자세한 내용은 [코드 리뷰 시스템 가이드](docs/10-code-review-system.md)를 참조하세요.
@@ -311,6 +323,12 @@ docs/
 |---------|------|------|
 | [Agent Orchestra Monitor](https://github.com/tomtomjskim/agent-orchestra-monitor) | 실시간 에이전트 모니터링 대시보드 | 에이전트 활동 시각화, 태스크 추적 |
 
+### 참조 자료
+
+| 프로젝트 | 설명 | 용도 |
+|---------|------|------|
+| [awesome-codex-subagents](https://github.com/awesome-codex-subagents/awesome-codex-subagents) | 에이전트 프롬프트 설계 참조 (136 agents, 5-section template 원본) | v3.0 5-section 표준 템플릿 설계 기반 |
+
 ### 에코시스템 구성도
 
 ```
@@ -342,6 +360,13 @@ docs/
 │  │  → /reflect → /complete → /stage                                  │  │
 │  │                                                                    │  │
 │  │  + Superpowers Plugin (14 Skills)                                 │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  v3.0 Features                                                    │  │
+│  │  Handoff Protocol  - 에이전트 간 구조화된 컨텍스트 전달           │  │
+│  │  Failure Recovery  - retry/escalate/rollback/circuit-breaker     │  │
+│  │  Model Routing     - opus/sonnet/haiku 동적 선택                  │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘

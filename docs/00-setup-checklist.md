@@ -23,13 +23,17 @@ npm update -g @anthropic-ai/claude-code
 ~/.claude/
 ├── settings.json       # 글로벌 설정
 ├── CLAUDE.md          # 글로벌 규칙/컨텍스트
-├── agents/            # 공식 서브에이전트 (v2.0, 14개)
+├── agents/            # 공식 서브에이전트 (v3.0, 15개)
 └── team/              # 팀 오케스트레이션 설정 (선택)
-    ├── agents.yaml    # 에이전트 정의 (v2.0, 15개)
-    ├── prompts/       # 역할별 프롬프트 (15개)
-    ├── workflows/     # 워크플로우 (8개)
+    ├── agents.yaml    # 에이전트 정의 (v3.0, 16개)
+    ├── prompts/       # 역할별 프롬프트 (16개)
+    ├── workflows/     # 워크플로우 (8개 + failure-policy.yaml)
     ├── templates/     # 리뷰/세션 템플릿
-    └── artifacts/     # 산출물 (리뷰 히스토리 포함)
+    ├── artifacts/     # 산출물 (리뷰 히스토리 포함)
+    ├── context/
+    │   └── handoff-protocol.md   # 핸드오프 프로토콜 정의
+    └── scripts/
+        └── validate-system.sh    # 시스템 무결성 검증 스크립트
 ```
 
 ### 1.3 settings.json 필수 설정
@@ -163,17 +167,33 @@ docs/
 
 ## 6. 에이전트 페르소나 설정
 
-### 6.1 기본 페르소나
+> v3.0부터 각 페르소나는 **5-section 표준 템플릿**을 따릅니다: Opening / Working Mode / Focus On / Quality Checks / Return / Boundary
+
+### 6.1 기본 페르소나 (Core Agents)
 - [ ] **PM** - 요구사항 분석, 태스크 분해
 - [ ] **Architect** - 시스템 설계
 - [ ] **Developer** - 구현
 - [ ] **QA** - 검수
+- [ ] **DBA** - DB 스키마, 마이그레이션
+- [ ] **Designer** - UI/UX 설계
+- [ ] **Publisher** - 빌드/배포
 - [ ] **Documenter** - 문서화
+- [ ] **Explorer** - 코드 탐색, 영향도 분석
 
-### 6.2 페르소나별 규칙
+### 6.2 Specialist Reviewers (v3.0, 7개)
+- [ ] **Security Reviewer** - "공격자에게 노출되면?"
+- [ ] **Performance Reviewer** - "트래픽 10배면?"
+- [ ] **Test Coverage Reviewer** - "이 테스트가 진짜 검증하나?"
+- [ ] **Accessibility Reviewer** - "장애인도 쓸 수 있나?"
+- [ ] **UX Reviewer** - "사용자가 혼란스럽지 않나?"
+- [ ] **API Reviewer** - "1년 후에도 호환되나?"
+- [ ] **Code Reviewer** - "코드 품질과 유지보수성이 충분한가?"
+
+### 6.3 페르소나별 규칙
 - 각 페르소나의 역할과 책임
 - 산출물 정의
 - 체크리스트
+- 5-section 템플릿 준수 확인
 
 ---
 
@@ -235,6 +255,108 @@ docs/
 - [ ] 체크리스트 템플릿 준비
 - [ ] 에이전트 페르소나 정의
 - [ ] 커맨드/스킬 설정
+- [ ] 시스템 무결성 검증: `bash ~/.claude/team/scripts/validate-system.sh`
+
+---
+
+## 11. v3.0 고급 설정
+
+### 11.1 Handoff Protocol 설정
+
+에이전트 간 컨텍스트를 구조화된 방식으로 전달하기 위한 프로토콜입니다.
+
+```bash
+# 핸드오프 프로토콜 정의 파일 위치
+~/.claude/team/context/handoff-protocol.md
+```
+
+핸드오프 메시지는 다음 구조를 따릅니다:
+```
+HANDOFF: [송신 에이전트] → [수신 에이전트]
+TASK: [태스크 설명]
+CONTEXT: [현재까지의 작업 컨텍스트]
+ARTIFACTS: [생성된 산출물 경로 목록]
+NEXT_ACTION: [수신 에이전트가 수행해야 할 다음 작업]
+CONSTRAINTS: [제약 사항 및 주의 사항]
+```
+
+- [ ] `handoff-protocol.md` 파일 생성 확인
+- [ ] 핸드오프 구조 숙지
+- [ ] 에이전트 페르소나에 핸드오프 수신/송신 규칙 추가
+
+### 11.2 Failure Policy 설정
+
+에이전트 실패 시 복구 전략을 정의합니다.
+
+```bash
+# 실패 정책 파일 위치
+~/.claude/team/workflows/failure-policy.yaml
+```
+
+```yaml
+# failure-policy.yaml 예시
+failure_policy:
+  retry:
+    max_attempts: 3
+    backoff: exponential
+  escalate:
+    threshold: 2          # 재시도 2회 실패 시 상위 에이전트로 에스컬레이션
+    target: PM
+  rollback:
+    enabled: true
+    checkpoint: last_successful_artifact
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5  # 5회 연속 실패 시 차단
+    recovery_timeout: 300 # 5분 후 재시도
+```
+
+- [ ] `failure-policy.yaml` 파일 생성
+- [ ] retry/escalate/rollback/circuit-breaker 정책 설정
+- [ ] 에이전트별 실패 처리 동작 검증
+
+### 11.3 Model Routing 설정
+
+작업 복잡도에 따라 적절한 모델을 동적으로 선택합니다.
+
+| 모델 | 사용 시점 | 비용 |
+|------|----------|------|
+| claude-opus | 복잡한 설계/분석, thorough 리뷰 | 높음 |
+| claude-sonnet | 일반 구현, standard 리뷰 (기본값) | 중간 |
+| claude-haiku | 단순 태스크, quick 리뷰, 반복 작업 | 낮음 |
+
+```bash
+# 모델 라우팅 규칙은 agents.yaml에 정의
+# agents.yaml 예시
+agents:
+  architect:
+    model: claude-opus      # 설계는 항상 opus
+  developer:
+    model: claude-sonnet    # 구현은 sonnet (기본)
+  reviewer_quick:
+    model: claude-haiku     # 빠른 리뷰는 haiku
+```
+
+- [ ] `agents.yaml`에 에이전트별 model 필드 추가
+- [ ] 리뷰 프리셋별 모델 매핑 확인 (quick→haiku, standard→sonnet, thorough→opus)
+- [ ] "모델 [opus/haiku]로 [작업]" 커맨드 패턴 숙지
+
+### 11.4 System Validation
+
+설치 및 설정 완료 후 전체 시스템 무결성을 검증합니다.
+
+```bash
+# 시스템 검증 스크립트 실행
+bash ~/.claude/team/scripts/validate-system.sh
+```
+
+검증 항목:
+- [ ] agents.yaml 문법 오류 없음
+- [ ] prompts/ 디렉토리 내 모든 파일 존재 확인 (16개)
+- [ ] workflows/ 디렉토리 내 파일 존재 확인 (failure-policy.yaml 포함)
+- [ ] handoff-protocol.md 존재 확인
+- [ ] MCP 서버 연결 상태
+- [ ] 에이전트 페르소나 5-section 템플릿 준수 여부
 
 ---
 
@@ -245,3 +367,5 @@ docs/
 3. [개발 파이프라인](03-development-pipeline.md)
 4. [문서화 규칙](04-documentation-rules.md)
 5. [에이전트 페르소나](05-agent-personas.md)
+6. [v3.0 아키텍처](12-v3-architecture.md)
+7. [핸드오프 & 실패 복구](13-handoff-failure-recovery.md)
