@@ -89,7 +89,9 @@ cp .claude/workflow-commands-guide.md /your/project/.claude/
 | 11 | [Workflow Commands](docs/11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
 | 12 | [v3.0 아키텍처](docs/12-v3-architecture.md) | v3.0 시스템 아키텍처 (핸드오프, 실패 복구, 모델 라우팅) |
 | 13 | [핸드오프 & 실패 복구](docs/13-handoff-failure-recovery.md) | 실전 가이드 (설정, 예시, 템플릿) |
+| **14** | **[프리셋 시스템](docs/14-preset-system.md)** | **깊이(depth) x 실행(mode) 2축 체계. analyze/spec/check-code 프리셋** |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
+| -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |
 
 ---
 
@@ -194,18 +196,27 @@ docs/
 
 > v3.0부터 각 페르소나는 5-section 표준 템플릿(Opening/Working Mode/Focus On/Quality Checks/Return/Boundary)을 따릅니다.
 
-### 코드 리뷰 v3.0
+### 프리셋 시스템 (v3.0 확장)
+
+**깊이(depth) x 실행(mode) 2축 독립 제어:**
 
 ```
-"빠른 리뷰: [설명]"       → quick (~2분, 자동 분석만)
-"리뷰: [설명]"            → standard (~10분, 기본)
-"상세 리뷰: [설명]"       → thorough (~20분, 전체 6단계)
-"팀 리뷰: [설명]"         → Agent Teams + thorough
-"시스템 검증"             → validate-system.sh 실행, 전체 무결성 점검
-"모델 [opus/haiku]로"     → 해당 모델로 리뷰 실행 (Model Routing)
+깊이:  --quick ← standard → --thorough
+실행:  단일    ← 기본    → --team
+
+--team 단독 = thorough + 팀 (기본 최대 성능)
+--team --quick = quick + 팀 (조합 가능)
 ```
 
-자세한 내용은 [코드 리뷰 시스템 가이드](docs/10-code-review-system.md)를 참조하세요.
+**3개 스킬에 공통 적용:**
+```
+/analyze --team {기능}              # 팀 분석 (최대 깊이)
+/spec --team                        # 팀 설계 (최대 깊이)
+/check-code --team {모듈}           # 팀 리뷰 (최대 깊이)
+/check-code --team --quick {모듈}   # 팀 리뷰 (빠른 스캔)
+```
+
+자세한 내용은 [프리셋 시스템](docs/14-preset-system.md), [코드 리뷰 시스템](docs/10-code-review-system.md)을 참조하세요.
 
 ---
 
@@ -215,6 +226,14 @@ docs/
 - [프로젝트 구조](templates/project-structure/) - 표준 디렉토리 구조
 - [CLAUDE.md](templates/CLAUDE.md) - 프로젝트 설정 파일
 - [체크리스트](templates/checklists/) - 워크플로우 체크리스트
+
+### 에이전트 템플릿 (v3.0)
+- [agents-v3.yaml](templates/agents-v3.yaml) - 16개 에이전트 정의 + Model Routing + Team Templates
+- [5-Section 프롬프트 템플릿](templates/prompts/TEMPLATE.md) - 새 에이전트 작성용
+- [16개 구체적 프롬프트](templates/prompts/) - Core 9개 + Specialist 7개 즉시 사용 가능
+- [Handoff Protocol](templates/handoff-protocol.yaml) - 에이전트 간 컨텍스트 전달
+- [Failure Policy](templates/failure-policy.yaml) - 실패 복구 정책
+- [Tiebreaker Protocol](templates/tiebreaker-protocol.md) - 리뷰어 의견 충돌 중재
 
 ### 문서 템플릿
 - [요구사항 (REQ-XXX)](templates/docs/REQ-template.md)

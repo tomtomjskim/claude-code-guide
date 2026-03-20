@@ -1,0 +1,160 @@
+# Quick Start Guide
+
+v3.0 기능을 실전에서 바로 활용하기 위한 실전 가이드.
+
+---
+
+## 1. 일상 코딩 (변경 없음)
+
+기존과 동일하게 사용. v3.0 기능은 기존 워크플로우를 **확장**한 것이지 대체가 아님.
+
+```
+/dispatch {작업}          # 평소대로 시작
+/run {간단한 수정}         # 평소대로 구현
+/check-code {모듈}        # standard 프리셋 (기본)
+```
+
+---
+
+## 2. 프리셋 선택 기준
+
+### 2축 체계: 깊이(depth) x 실행(mode)
+
+```
+깊이:  --quick ← standard → --thorough
+실행:  단일    ← 기본    → --team
+
+--team 단독 사용 = thorough + 팀 (기본 최대 깊이)
+--team --quick   = quick + 팀 (조합 가능)
+```
+
+### /analyze 프리셋
+
+| 상황 | 프리셋 | 명령어 |
+|------|--------|--------|
+| 버그 원인 빠른 파악 | `--quick` | `/analyze --quick {버그 현상}` |
+| 일반 기능 분석 (기본) | standard | `/analyze {기능}` |
+| 복잡 기능, 아키텍처 변경 | `--thorough` | `/analyze --thorough {기능}` |
+| 크로스 도메인, 대규모 기능 | `--team` | `/analyze --team {기능}` |
+
+### /spec 프리셋
+
+| 상황 | 프리셋 | 명령어 |
+|------|--------|--------|
+| 패턴 명확한 간단 기능 | `--quick` | `/spec --quick` |
+| 일반 명세서 (기본) | standard | `/spec` |
+| 외부 연동, 복잡 기능 | `--thorough` | `/spec --thorough` |
+| 대규모 신규 모듈 | `--team` | `/spec --team` |
+
+### /check-code 프리셋
+
+| 상황 | 프리셋 | 명령어 |
+|------|--------|--------|
+| 빠른 문법 체크만 | `--quick` | `/check-code --quick {모듈}` |
+| 일반 코드 검수 (기본) | standard | `/check-code {모듈}` |
+| 배포 전 종합 검수 | `--thorough` | `/check-code --thorough {모듈}` |
+| 보안 감사/대규모 리팩토링 | `--team` | `/check-code --team {모듈}` |
+
+---
+
+## 3. 팀 에이전트 활용 시점
+
+**사용하지 않아도 되는 경우** (대부분):
+- 버그 수정, 소규모 기능 추가 → 단일 에이전트 or `/run`
+- 분석만 필요 → `/analyze`
+
+**팀 에이전트 추천 상황**:
+
+| 작업 복잡도 | 수정 파일 수 | 추천 |
+|------------|------------|------|
+| 1~3개 파일 | 단순 수정 | 단일 에이전트 |
+| 4~6개 파일 | 중간 수정 | 병렬 Task Agent |
+| 7개+ 파일 | 전 레이어 | **팀 에이전트** (Type C~D) |
+| 코드 리뷰만 | 리뷰 전용 | **팀 리뷰** (Type E) |
+
+---
+
+## 4. Model Routing 체감 효과
+
+**자동 적용** — 별도 설정 불필요:
+
+- Explorer 초기 탐색 → **haiku** (빠르고 저렴)
+- 일반 구현/리뷰 → **sonnet** (기본)
+- CRITICAL 보안 이슈, 복잡 아키텍처 → **opus** (정확)
+
+---
+
+## 5. Handoff / Failure Recovery 체감
+
+**자동 적용** — `--team` 또는 `/workflow` 사용 시:
+
+| 기능 | 이전 | v3.0 |
+|------|------|------|
+| 에이전트 간 전달 | 비구조적 텍스트 | 5-field 구조 (scope/findings/recommendation/validation_status/residual_risk) |
+| 에이전트 실패 | "재시도/중단?" 매번 질문 | 탐색/리뷰 → 자동 재시도, 구현 → PM 에스컬레이션 |
+| 연속 실패 | 계속 시도 | 3회 연속 → 자동 중단 → 사용자 판단 |
+
+---
+
+## 6. 작업 유형별 실전 패턴
+
+### 패턴 A: 일상 개발
+```
+/run {작업}
+/check-code {모듈}
+/stage
+```
+
+### 패턴 B: 중요 기능 개발
+```
+/analyze --thorough {기능}
+/spec --thorough
+/run
+/check-code --thorough {모듈}
+/stage
+```
+
+### 패턴 C: 대규모 기능 (팀 에이전트)
+```
+/analyze --team {기능}
+/spec --team
+/workflow {기능}
+/check-code --team {모듈}
+```
+
+### 패턴 D: 배포 전 보안 감사
+```
+/check-code --team {모듈}
+  → Security Sentinel + Performance Prophet + Code Reviewer + API Arbiter
+  → Tiebreaker로 의견 충돌 자동 중재
+```
+
+---
+
+## 7. 피해야 할 안티패턴
+
+| 안티패턴 | 이유 | 대안 |
+|---------|------|------|
+| 버그 수정에 --team | 토큰 3~5배 낭비 | 단일 에이전트 |
+| 모든 검수에 --team | 30분 소요, 비용 높음 | standard 사용 |
+| --thorough를 매번 사용 | 20분 소요 | 배포 전에만 |
+| 수동으로 모델 지정 | Model Routing이 더 효율적 | 자동에 위임 |
+| 구현 후에만 검수 | 설계 오류가 전파됨 | **앞단(analyze/spec)에 투자** |
+
+---
+
+## 8. 새 에이전트 추가 시
+
+1. `templates/prompts/TEMPLATE.md` 복사
+2. 5-Section 작성 (Opening/Working Mode/Focus On/Quality Checks/Return/Boundary)
+3. `templates/agents-v3.yaml`의 agents 섹션에 등록
+4. 필요 시 team_templates에 새 조합 추가
+
+---
+
+## 관련 문서
+
+- [프리셋 시스템 상세](docs/14-preset-system.md)
+- [에이전트 페르소나](docs/05-agent-personas.md)
+- [코드 리뷰 시스템](docs/10-code-review-system.md)
+- [v3.0 아키텍처](docs/12-v3-architecture.md)

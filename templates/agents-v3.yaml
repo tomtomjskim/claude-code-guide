@@ -86,7 +86,139 @@ agents:
       produces: [security-review]
       requires_from_upstream: [scope, changed_files]
 
-  # ... 나머지 에이전트는 프로젝트 필요에 따라 추가
+  # 나머지 Core Agents - 프로젝트 필요에 따라 활성화
+  dba:
+    name: "DBA"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/dba.md"
+    handoff:
+      accepts: [architect, pm]
+      produces: [schema-sql, column-verification, index-recommendation]
+      requires_from_upstream: [scope, schema_changes]
+
+  reviewer:
+    name: "Reviewer"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/reviewer.md"
+    handoff:
+      accepts: [developer]
+      produces: [review-report]
+      requires_from_upstream: [scope, changed_files]
+
+  designer:
+    name: "Designer"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/designer.md"
+    handoff:
+      accepts: [architect, pm]
+      produces: [ui-spec, component-structure]
+      requires_from_upstream: [scope, design_doc]
+
+  documenter:
+    name: "Documenter"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/documenter.md"
+    handoff:
+      accepts: [developer, pm]
+      produces: [docs-complete, docs-history]
+      requires_from_upstream: [scope, changed_files]
+
+  # Specialist Reviewers - 나머지
+  performance-reviewer:
+    name: "Performance Prophet"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/performance-prophet.md"
+    perspective: "트래픽 10배 증가 시?"
+    handoff:
+      accepts: [developer]
+      produces: [performance-review]
+      requires_from_upstream: [scope, changed_files]
+
+  test-guardian:
+    name: "Test Guardian"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/test-guardian.md"
+    perspective: "이 코드가 6개월 후에도 안전한가?"
+    handoff:
+      accepts: [developer]
+      produces: [test-quality-review]
+      requires_from_upstream: [scope, changed_files]
+
+  access-advocate:
+    name: "Access Advocate"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/access-advocate.md"
+    perspective: "권한 없는 사용자가 접근하면?"
+    handoff:
+      accepts: [developer]
+      produces: [access-review]
+      requires_from_upstream: [scope, changed_files]
+
+  ux-harmonizer:
+    name: "UX Harmonizer"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/ux-harmonizer.md"
+    perspective: "사용자가 처음 접하면?"
+    handoff:
+      accepts: [developer, designer]
+      produces: [ux-review]
+      requires_from_upstream: [scope, changed_files]
+
+  api-arbiter:
+    name: "API Arbiter"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/api-arbiter.md"
+    perspective: "외부 시스템이 이 API를 소비하면?"
+    handoff:
+      accepts: [developer]
+      produces: [api-review]
+      requires_from_upstream: [scope, changed_files]
+
+  code-reviewer:
+    name: "Code Reviewer"
+    type: "general-purpose"
+    model: "sonnet"
+    prompt: "prompts/code-reviewer.md"
+    perspective: "6개월 후 다른 개발자가 유지보수하면?"
+    handoff:
+      accepts: [developer]
+      produces: [code-quality-review]
+      requires_from_upstream: [scope, changed_files]
+
+# ============================================================
+# 팀 구성 템플릿 (업무 유형별)
+# ============================================================
+team_templates:
+  type_a_bugfix:
+    name: "버그 수정 (3명)"
+    agents: [pm, explorer, developer]
+    model_override: { explorer: "haiku" }
+
+  type_b_improvement:
+    name: "기능 개선 (4명)"
+    agents: [pm, explorer, developer, reviewer]
+
+  type_c_new_module:
+    name: "신규 모듈 (5명)"
+    agents: [pm, explorer, architect, dba, developer]
+
+  type_d_full:
+    name: "대규모 기능 (6명 + 리뷰)"
+    agents: [pm, explorer, architect, dba, developer, reviewer]
+
+  type_e_thorough_review:
+    name: "종합 코드 리뷰 (PM + Specialist Reviewers)"
+    agents: [pm, security-reviewer, performance-reviewer, code-reviewer, api-arbiter]
+    model_override: { security-reviewer: "opus" }
 
 # 품질 게이트
 quality_gates:
