@@ -27,6 +27,7 @@ quick → standard → thorough → 팀 리뷰
 |------|------|------------|
 | `/analyze` | 코드베이스 분석, 영향도, 실행 전략 | depth + mode |
 | `/spec` (또는 `/design`) | 기술 명세서 작성 | depth + mode |
+| `/check-spec` | 설계문서 검수 | depth + mode |
 | `/check-code` (또는 `/review`) | 코드 품질 검수 | depth + mode |
 
 ---
@@ -166,6 +167,28 @@ standard에 추가:
 ├─ Architect: 구조 설계, API 설계
 ├─ DBA: DB 스키마 설계, 인덱스 계획
 └─ Designer: UI 구조 설계, 컴포넌트 패턴 (해당 시)
+```
+
+### /check-spec 프리셋
+
+#### --quick 깊이
+1. 문서 파일 존재 여부 (architecture.md, api_design.md, database_schema.md)
+2. 필수 섹션 헤더 존재 여부
+3. 명백한 누락 항목 식별
+
+#### --thorough 깊이
+standard에 추가:
+1. **요구사항 완전성 심층**: 비즈니스 로직, 엣지 케이스, 상태 전이 검증
+2. **대안 검토**: 설계 대안의 장단점이 충분히 비교되었는지
+3. **보안/성능 설계**: 공격 벡터, N+1, 인덱스 계획이 포함되었는지
+4. **마이그레이션 리스크**: 기존 데이터 영향, 롤백 전략 유무
+
+#### --team 모드
+```
+┌─ PM (Lead): 검수 조율, 결과 종합
+├─ Architect: 설계 일관성, 레이어 분리, 패턴 준수
+├─ DBA: DB 스키마 정합성, 인덱스 계획, 쿼리 최적화 전략
+└─ Explorer: 코드베이스 대조, 유사 패턴 비교, 영향 범위 확인
 ```
 
 ### /check-code 프리셋

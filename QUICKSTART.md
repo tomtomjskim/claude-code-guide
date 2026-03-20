@@ -46,6 +46,15 @@ v3.0 기능을 실전에서 바로 활용하기 위한 실전 가이드.
 | 외부 연동, 복잡 기능 | `--thorough` | `/spec --thorough` |
 | 대규모 신규 모듈 | `--team` | `/spec --team` |
 
+### /check-spec 프리셋
+
+| 상황 | 프리셋 | 명령어 |
+|------|--------|--------|
+| 구조만 빠르게 확인 | `--quick` | `/check-spec --quick {모듈}` |
+| 일반 설계 검수 (기본) | standard | `/check-spec {모듈}` |
+| 요구사항 완전성 심층 | `--thorough` | `/check-spec --thorough {모듈}` |
+| Architect+DBA 다관점 검수 | `--team` | `/check-spec --team {모듈}` |
+
 ### /check-code 프리셋
 
 | 상황 | 프리셋 | 명령어 |
