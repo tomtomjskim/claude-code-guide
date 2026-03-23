@@ -21,6 +21,7 @@
 - **v3.0 신규**: Failure Recovery (retry/escalate/rollback/circuit-breaker)
 - **v3.0 신규**: Model Routing (opus/sonnet/haiku 동적 선택)
 - **v3.0 신규**: Tiebreaker Protocol (리뷰어 충돌 시 4단계 중재)
+- **v3.1 신규**: Cognitive Operations, Confidence Scoring, Token Budget, Event-Driven Hooks, Progressive Escalation, Adversarial Pair Review → **[claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)** 참조
 
 ---
 
@@ -342,6 +343,12 @@ docs/
 |---------|------|------|
 | [Agent Orchestra Monitor](https://github.com/tomtomjskim/agent-orchestra-monitor) | 실시간 에이전트 모니터링 대시보드 | 에이전트 활동 시각화, 태스크 추적 |
 
+### 팀 시스템 (Production-Ready)
+
+| 프로젝트 | 설명 | 용도 |
+|---------|------|------|
+| **[claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)** | **16 에이전트 + 8 워크플로우 프로덕션 오케스트레이션 (v3.1)** | **이 가이드의 에이전트/워크플로우를 즉시 사용 가능한 설정 파일로 제공. Token Budget, Adversarial Review, Cognitive Ops 포함** |
+
 ### 참조 자료
 
 | 프로젝트 | 설명 | 용도 |
@@ -386,6 +393,16 @@ docs/
 │  │  Handoff Protocol  - 에이전트 간 구조화된 컨텍스트 전달           │  │
 │  │  Failure Recovery  - retry/escalate/rollback/circuit-breaker     │  │
 │  │  Model Routing     - opus/sonnet/haiku 동적 선택                  │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌──────────────────────────────────────────────────────────────────┐  │
+│  │  v3.1 (claude-code-team-system)                                  │  │
+│  │  Cognitive Ops    - 에이전트별 고유 추론 전략                     │  │
+│  │  Confidence Score - 신뢰도 기반 발견사항 필터링                   │  │
+│  │  Token Budget     - 비용 한도 + 서킷 브레이커                    │  │
+│  │  Adversarial Pair - 상충 관점 교차 검증                          │  │
+│  │  Event Hooks      - 고위험 파일 변경 시 자동 리뷰                │  │
+│  │  Retrospective    - PM 자기 개선 피드백 루프                     │  │
 │  └──────────────────────────────────────────────────────────────────┘  │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
