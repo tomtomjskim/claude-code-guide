@@ -4,6 +4,23 @@ v3.0 기능을 실전에서 바로 활용하기 위한 실전 가이드.
 
 ---
 
+## 0. 스킬 설치
+
+```bash
+git clone https://github.com/tomtomjskim/claude-code-guide.git
+cd claude-code-guide
+
+# 프로젝트에 워크플로우 스킬 설치
+bash scripts/install-skills.sh /path/to/your-project
+
+# (선택) 팀 에이전트까지 포함
+bash scripts/install-skills.sh --team /path/to/your-project
+```
+
+설치 후 아래 커맨드를 바로 사용할 수 있습니다. 기술 스택에 맞게 커스터마이징하려면 [skills/README.md](skills/README.md)를 참조하세요.
+
+---
+
 ## 1. 일상 코딩 (변경 없음)
 
 기존과 동일하게 사용. v3.0 기능은 기존 워크플로우를 **확장**한 것이지 대체가 아님.
@@ -163,6 +180,7 @@ v3.0 기능을 실전에서 바로 활용하기 위한 실전 가이드.
 
 ## 관련 문서
 
+- [Skills 설치/커스터마이징](skills/README.md)
 - [프리셋 시스템 상세](docs/14-preset-system.md)
 - [에이전트 페르소나](docs/05-agent-personas.md)
 - [코드 리뷰 시스템](docs/10-code-review-system.md)
