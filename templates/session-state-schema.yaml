@@ -1,0 +1,74 @@
+# Session State Schema v1.0
+# 파일 기반 워크플로우 상태 관리 스키마
+# 위치: ~/.claude/team/context/sessions/{YYYY-MM-DD}_{task_id}/
+
+version: "1.0"
+description: "세션 간 워크플로우 연속성을 위한 파일 기반 상태 관리"
+
+# 디렉토리 구조
+directory_structure:
+  root: "~/.claude/team/context/sessions/"
+  naming: "{YYYY-MM-DD}_{task_id}/"
+  contents:
+    - file: "session.yaml"
+      purpose: "세션 메타데이터 (기계 파싱용)"
+    - dir: "handoffs/"
+      purpose: "에이전트 핸드오프 페이로드 체인"
+      naming: "{순번}_{agent}.yaml"
+    - dir: "artifacts/"
+      purpose: "에이전트 생성 파일 (인간 가독)"
+    - file: "session.log"
+      purpose: "실행 이벤트 로그 (append-only)"
+
+# session.yaml 스키마
+session_schema:
+  task_id: string
+  workflow: string          # quick-fix | standard | refactor | migration | ...
+  blast_radius: string      # single_file | single_module | cross_module | cross_service
+  started_at: iso8601
+  completed_at: iso8601     # null이면 미완료
+  status: enum              # running | completed | failed | abandoned
+  current_phase: string     # 현재 진행 중인 phase ID
+  phases_completed: string[] # 완료된 phase ID 목록
+  total_cost_usd: float     # 누적 비용 추정
+  agent_count: int          # 스폰된 에이전트 수
+
+# handoff 파일 스키마
+handoff_file_schema:
+  protocol_version: "2.0"
+  from_agent: string
+  to_agent: string
+  completion_status: enum   # DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+  completion_detail: string
+  payload:
+    scope: string
+    findings: string[]
+    recommendation: string
+    residual_risk: string[]
+    artifacts: string[]
+
+# TTL 및 클린업 정책
+cleanup_policy:
+  rules:
+    - status: completed
+      ttl_days: 90
+      description: "완료된 세션 90일 보관 (code-review retention과 일치)"
+    - status: failed
+      ttl_days: 14
+      description: "실패 세션 14일 보관 (디버깅용)"
+    - status: abandoned
+      ttl_days: 1
+      description: "버려진 세션 1일 후 삭제"
+    - status: running
+      ttl_days: 7
+      description: "7일 초과 running 세션은 abandoned으로 전환"
+  max_total_mb: 500
+  on_limit_exceeded: "delete_oldest_completed"
+  description: "총 500MB 초과 시 가장 오래된 completed 세션부터 삭제"
+
+# NightOps 역할 분리
+nightops_integration:
+  description: "야간 자율 루프(M6-M9)는 nightops DB 스키마 사용, 대화형 워크플로우는 파일 기반"
+  nightops_storage: "PostgreSQL nightops 스키마 (13 테이블)"
+  interactive_storage: "파일 기반 (~/.claude/team/context/sessions/)"
+  sync_policy: "M9가 sessions/ 디렉토리를 주기적으로 스캔하여 미완료 워크플로우 감지"

@@ -248,6 +248,38 @@ bash ~/.claude/team/scripts/validate-system.sh
 └── CLAUDE.md                  # 글로벌 설정 (v3.0)
 ```
 
+---
+
+## v3.2 Architecture Updates (2026-03-25)
+
+### Materialization Layer
+
+v3.2 bridges the gap between YAML declarations and actual enforcement:
+
+| Layer | Before (v3.1) | After (v3.2) |
+|-------|--------------|--------------|
+| Safety | failure-policy rollback (post-hoc) | PreToolUse hooks (preventive) |
+| Review triggers | PM reads YAML manually | PostToolUse hook writes trigger log |
+| Workflow state | PM memory (lost on session end) | File-based sessions/ directory |
+| Blast-radius | PM estimates from text | Structured 4-level classification |
+
+### New Components
+
+- **Safety Hooks**: 3 shell scripts registered in settings.json (`templates/hooks/`)
+- **Autonomy Levels**: 5-tier (L0 safe → L4 forbidden)
+- **Blast-Radius Classification**: single_file/module/cross_module/cross_service
+- **Diff-Aware Phase 0**: Automatic diff categorization before review
+- **Session Resume**: File-based workflow continuity across sessions
+- **Handoff Protocol v2.0**: 4-state completion status (DONE/DONE_WITH_CONCERNS/BLOCKED/NEEDS_CONTEXT)
+
+### Reference: gstack
+
+Design patterns borrowed from [gstack](https://github.com/garrytan/gstack) (Garry Tan's AI workflow platform):
+- Completion Status Protocol → structured handoff state
+- Safety Hooks (careful/freeze) → PreToolUse enforcement
+- File-based state chain → session resume
+- Diff-aware scoping → Phase 0
+
 ## 다음 단계
 - [에이전트 페르소나 v3.0](05-agent-personas.md)
 - [코드 리뷰 시스템 v3.0](10-code-review-system.md)

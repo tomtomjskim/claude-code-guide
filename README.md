@@ -1,4 +1,4 @@
-# Claude Code 셋업 가이드 v3.0
+# Claude Code 셋업 가이드 v3.2
 
 **Claude Code를 효과적으로 사용하기 위한 종합 가이드 및 템플릿**
 
@@ -21,7 +21,14 @@
 - **v3.0 신규**: Failure Recovery (retry/escalate/rollback/circuit-breaker)
 - **v3.0 신규**: Model Routing (opus/sonnet/haiku 동적 선택)
 - **v3.0 신규**: Tiebreaker Protocol (리뷰어 충돌 시 4단계 중재)
-- **v3.1 신규**: Cognitive Operations, Confidence Scoring, Token Budget, Event-Driven Hooks, Progressive Escalation, Adversarial Pair Review → **[claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)** 참조
+- **v3.1 신규**: Cognitive Operations, Confidence Scoring, Token Budget, Event-Driven Hooks, Progressive Escalation, Adversarial Pair Review
+- **v3.2 신규**: Safety Hooks 실체화 (careful/freeze/event-trigger → settings.json 등록)
+- **v3.2 신규**: Completion Status Protocol (4상태 핸드오프 v2.0)
+- **v3.2 신규**: Autonomy Levels (5단계 L0~L4, NightOps trusted context)
+- **v3.2 신규**: Blast-Radius Classification (4단계) + Diff-Aware Phase 0
+- **v3.2 신규**: Session Resume (파일 기반 워크플로우 상태 관리)
+- **v3.2 참조**: [gstack](https://github.com/garrytan/gstack) (Garry Tan's AI workflow platform) 실체화 패턴
+- **상세**: **[claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)** 참조
 
 ---
 

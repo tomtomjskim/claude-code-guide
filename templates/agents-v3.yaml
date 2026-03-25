@@ -1,25 +1,256 @@
-# Multi-Agent Team Configuration v3.0
-# ~/.claude/team/agents.yaml 에 배치
+# Multi-Agent Team Configuration
+# 멀티 에이전트 팀 설정
 
-version: "3.0"
-team_name: "my-team"
+version: "3.2"
+team_name: "jsnwcorp-dev-team"
 
 # 모델 라우팅 전략
 model_routing:
   default_model: "sonnet"
   routing_rules:
     - condition: "cross_service_architecture"
+      threshold: "3+ services affected OR 2+ database schemas touched"
       agent: architect
       model: "opus"
     - condition: "critical_security_issue"
+      threshold: "CRITICAL severity per security-reviewer classification (즉시 악용 가능: SQLi, RCE, hardcoded secrets)"
       agent: security-reviewer
       model: "opus"
     - condition: "large_change_set"
+      threshold: "10+ files changed OR 500+ lines added/modified"
       agent: code-reviewer
       model: "opus"
+    - condition: "db_migration"
+      threshold: "any ALTER TABLE, CREATE TABLE, or DROP operation on production schemas"
+      agent: dba
+      model: "opus"
     - condition: "simple_scan"
+      threshold: "read-only exploration with no expected code changes, single-service scope"
       agent: explorer
       model: "haiku"
+    - condition: "trivial_fix"
+      threshold: "1-3 files changed, <50 lines modified, no architectural impact, no security implications"
+      agent: all
+      model: "haiku"
+  conflict_resolution: "when multiple conditions match, use highest-tier model (opus > sonnet > haiku)"
+
+  # v3.2: Blast-Radius 분류 기준
+  blast_radius:
+    description: "변경 영향 범위 4단계 분류. PM이 워크플로우 선택과 모델 라우팅에 활용"
+    levels:
+      - level: single_file
+        criteria: "1 file, <=100 lines, import_depth=0, 1 service"
+        workflow: quick-fix
+        model_hint: haiku
+      - level: single_module
+        criteria: "2-5 files, <=300 lines, import_depth<=1, 1 service"
+        workflow: quick-fix
+        model_hint: sonnet
+      - level: cross_module
+        criteria: "6-15 files, <=1000 lines, import_depth<=3, 1 service"
+        workflow: standard
+        model_hint: sonnet
+      - level: cross_service
+        criteria: ">15 files OR >1000 lines OR import_depth>3 OR 2+ services OR schema_changes"
+        workflow: standard
+        model_hint: opus
+    override_policy:
+      upgrade_allowed: true
+      upgrade_notification: true
+      downgrade_allowed: false
+
+# 토큰 예산 및 비용 관리
+token_budget:
+  version: "1.0"
+  description: "에이전트별 토큰 사용량 한도 및 비용 제어"
+
+  # 에이전트 유형별 기본 예산
+  defaults:
+    reviewer:
+      max_input_tokens: 30000
+      max_output_tokens: 8000
+      max_cost_usd: 0.50
+    core:
+      max_input_tokens: 50000
+      max_output_tokens: 15000
+      max_cost_usd: 1.00
+    explorer:
+      max_input_tokens: 20000
+      max_output_tokens: 5000
+      max_cost_usd: 0.20
+
+  # 모델별 비용 기준 (1K tokens)
+  model_costs:
+    opus:
+      input: 0.015
+      output: 0.075
+    sonnet:
+      input: 0.003
+      output: 0.015
+    haiku:
+      input: 0.0008
+      output: 0.004
+
+  # 워크플로우 전체 예산
+  workflow_budgets:
+    quick-fix:
+      max_total_usd: 2.00
+      description: "빠른 수정 — 최소 비용"
+    standard:
+      max_total_usd: 5.00
+      description: "일반 개발 — 표준 예산"
+    thorough:
+      max_total_usd: 10.00
+      description: "심층 리뷰 — 확장 예산"
+    code-review:
+      quick: 1.00
+      standard: 3.00
+      thorough: 8.00
+
+  # 서킷 브레이커 설정
+  circuit_breaker:
+    enabled: true
+    triggers:
+      - condition: "agent exceeds max_cost_usd"
+        action: "pause_and_compact"
+        description: "에이전트 비용 한도 초과 시 컨텍스트 압축 후 재시도"
+      - condition: "workflow exceeds max_total_usd"
+        action: "pause_and_escalate"
+        description: "워크플로우 전체 비용 한도 초과 시 사용자에게 에스컬레이션"
+      - condition: "3 consecutive agent failures"
+        action: "halt_workflow"
+        description: "연속 3회 에이전트 실패 시 워크플로우 중단"
+
+    # PM 대응 절차
+    on_trigger:
+      pause_and_compact:
+        steps:
+          - "에이전트의 현재 컨텍스트를 요약하여 크기 축소"
+          - "축소된 컨텍스트로 에이전트 재스폰"
+          - "재시도 후에도 초과 시 escalate로 전환"
+      pause_and_escalate:
+        steps:
+          - "현재 워크플로우 진행 상황 저장"
+          - "사용자에게 비용 현황 보고"
+          - "계속/중단/예산 증가 선택지 제공"
+      halt_workflow:
+        steps:
+          - "모든 활성 에이전트 중단"
+          - "부분 완료 상태 보존"
+          - "사용자에게 상황 보고 및 복구 옵션 제시"
+
+# 인지 전략 (Cognitive Operations)
+# 에이전트별 추론 전략 — Working Mode에서 활성화
+cognitive_operations:
+  version: "1.0"
+  description: "에이전트별 고유 추론 전략. PM이 스폰 시 해당 전략을 프롬프트에 주입"
+
+  operations:
+    architect:
+      strategies: ["cross-domain analogy", "systems thinking", "first-principles reasoning"]
+      description: "다른 도메인(분산 시스템, 물리학)의 패턴을 현재 설계에 적용. 근본 원리에서 출발"
+
+    developer:
+      strategies: ["incremental composition", "contract-first thinking"]
+      description: "작은 단위를 조합하여 복잡한 기능 구성. 인터페이스 계약을 먼저 정의"
+
+    security-reviewer:
+      strategies: ["adversarial falsification", "threat modeling", "attack tree analysis"]
+      description: "공격자 관점에서 모든 가정을 반증 시도. 위협 트리로 체계적 분석"
+
+    performance-reviewer:
+      strategies: ["bottleneck hypothesis", "load projection", "resource contention analysis"]
+      description: "병목 가설 수립 → 증거 기반 검증. 10배 부하 시나리오 시뮬레이션"
+
+    test-coverage-reviewer:
+      strategies: ["mutation thinking", "boundary enumeration", "invariant identification"]
+      description: "코드에 의도적 결함 주입 시 테스트가 잡는가? 불변식을 먼저 정의"
+
+    accessibility-reviewer:
+      strategies: ["persona simulation", "sensory deprivation testing"]
+      description: "시각/청각/운동 장애 사용자 페르소나로 전환하여 경험 시뮬레이션"
+
+    ux-reviewer:
+      strategies: ["cognitive load estimation", "progressive disclosure", "recognition over recall"]
+      description: "사용자 인지 부하를 정량적으로 추정. 정보를 단계적으로 노출"
+
+    api-reviewer:
+      strategies: ["consumer-first design", "temporal reasoning", "Hyrum's Law awareness"]
+      description: "소비자 관점에서 API 사용성 평가. 시간 경과에 따른 호환성 영향 분석"
+
+    explorer:
+      strategies: ["structural decomposition", "dependency tracing", "pattern recognition"]
+      description: "코드를 구조적으로 분해하고 의존성을 추적. 반복 패턴 식별"
+
+    code-reviewer:
+      strategies: ["devil's advocate", "blast radius estimation", "regression prediction"]
+      description: "모든 변경의 반대 논거를 구성. 변경 영향 범위를 적극적으로 추정"
+
+    qa-engineer:
+      strategies: ["equivalence partitioning", "state transition analysis", "exploratory thinking"]
+      description: "입력을 동치 그룹으로 분류. 상태 전이 모델 기반 테스트 설계"
+
+    dba:
+      strategies: ["data flow tracing", "cardinality reasoning", "temporal consistency"]
+      description: "데이터 흐름을 엔드투엔드 추적. 카디널리티 기반 성능 예측"
+
+    designer:
+      strategies: ["gestalt principles", "affordance mapping", "emotional design"]
+      description: "게슈탈트 원리로 시각 구조 검증. 어포던스가 의도된 행동을 유도하는지 확인"
+
+    publisher:
+      strategies: ["rollback-first thinking", "blast radius containment"]
+      description: "배포 전 롤백 경로를 먼저 확보. 장애 영향 범위를 최소화"
+
+    documenter:
+      strategies: ["audience modeling", "progressive complexity"]
+      description: "독자 수준을 모델링하고 복잡도를 단계적으로 증가"
+
+# 적대적 페어 리뷰 (Adversarial Pair Review)
+# 상충하는 관점의 리뷰어를 쌍으로 배정하여 맹점 보완
+adversarial_pairs:
+  version: "1.0"
+  description: "독립 리뷰의 맹점을 보완하기 위해 상충 관점의 리뷰어를 쌍으로 교차 검증"
+
+  pairs:
+    - pair: [security-reviewer, performance-reviewer]
+      tension: "보안 강화 ↔ 성능 오버헤드"
+      trigger: "보안 조치가 성능에 영향을 주거나, 성능 최적화가 보안을 약화시킬 때"
+      resolution: "PM이 security > performance 원칙 적용 (단, 성능 영향 >30%일 때 사용자 확인)"
+
+    - pair: [architect, developer]
+      tension: "이상적 설계 ↔ 실용적 제약"
+      trigger: "설계가 구현 복잡도를 과도하게 높이거나, 구현이 설계 원칙을 위반할 때"
+      resolution: "PM이 YAGNI 원칙 기반 판정. 현재 요구사항 충족이 미래 확장성보다 우선"
+
+    - pair: [ux-reviewer, api-reviewer]
+      tension: "사용자 경험 ↔ API 일관성"
+      trigger: "UX 개선이 API 하위 호환성을 깨거나, API 규약이 UX를 저해할 때"
+      resolution: "PM이 기존 소비자 수 기반 판정. 소비자 >10명이면 API 우선, 아니면 UX 우선"
+
+    - pair: [test-coverage-reviewer, developer]
+      tension: "테스트 완전성 ↔ 구현 속도"
+      trigger: "테스트 요구사항이 구현 범위를 초과하거나, 구현이 테스트 없이 진행될 때"
+      resolution: "PM이 변경 위험도 기반 판정. CRITICAL 경로는 테스트 필수, LOW 위험은 유연"
+
+  # 실행 방식
+  execution:
+    mode: sequential  # 첫 번째 리뷰어 완료 → 결과를 두 번째에게 전달 → 교차 검증
+    challenge_format: |
+      ### 교차 검증 요청
+      {{first_reviewer}}가 다음과 같이 평가했습니다:
+      {{first_review_summary}}
+
+      {{second_reviewer}}로서, 이 평가에서 놓친 점이나 과대평가된 부분을 지적하세요.
+      특히 {{tension}} 관점에서 검토하세요.
+
+    output_merge: |
+      ### 적대적 페어 리뷰 결과
+      - **1차 리뷰어**: {{first_reviewer}} — {{first_verdict}}
+      - **2차 리뷰어 (교차 검증)**: {{second_reviewer}} — {{challenge_verdict}}
+      - **합의점**: {{agreed_findings}}
+      - **이견**: {{disagreed_findings}}
+      - **PM 판정**: {{pm_resolution}}
 
 # 핸드오프 프로토콜
 handoff_protocol:
@@ -28,211 +259,483 @@ handoff_protocol:
   validation: true
   on_validation_fail: "retry_once_then_escalate"
 
-# 에이전트 정의 (간략 버전 - 필요한 에이전트만 활성화)
+# 에이전트 역할 정의
 agents:
   pm:
-    name: "PM"
+    name: "PM (Project Manager)"
     type: "orchestrator"
+    responsibilities:
+      - 요청 분석 및 태스크 분해
+      - 에이전트 할당 및 스케줄링
+      - 의존성 관리 (DAG)
+      - 진행 상황 모니터링
+      - 최종 보고서 작성
+      - 코드 리뷰 종합 판정
     handoff:
       accepts: [all]
       produces: [task-breakdown, progress-report, final-report]
       requires_from_upstream: [user_request]
+    can_spawn:
+      - architect
+      - developer
+      - qa-engineer
+      - dba
+      - designer
+      - publisher
+      - documenter
+      - explorer
+      - security-reviewer
+      - performance-reviewer
+      - test-coverage-reviewer
+      - accessibility-reviewer
+      - ux-reviewer
+      - api-reviewer
+      - code-reviewer
 
   architect:
     name: "Architect"
     type: "Plan"
-    model: "sonnet"
+    responsibilities:
+      - 시스템 아키텍처 설계
+      - 기술 스택 결정
+      - 구현 전략 수립
+      - 코드 리뷰 (구조적 관점)
     handoff:
       accepts: [explorer, pm]
       produces: [design-doc, adr]
       requires_from_upstream: [scope, requirements]
+    outputs:
+      - design-doc.md
+      - architecture-diagram.md
+    expertise:
+      - system-design
+      - scalability
+      - security
 
   developer:
     name: "Developer"
     type: "general-purpose"
-    model: "sonnet"
     handoff:
       accepts: [architect, designer, dba]
       produces: [source-code, implementation-report]
       requires_from_upstream: [scope, design_doc]
+    subtypes:
+      frontend:
+        expertise: [React, Next.js, TypeScript, Tailwind]
+        responsibilities:
+          - UI 컴포넌트 구현
+          - 클라이언트 로직
+          - 상태 관리
+      backend:
+        expertise: [Node.js, Python, FastAPI, Express]
+        responsibilities:
+          - API 개발
+          - 비즈니스 로직
+          - 서버 사이드 처리
+    outputs:
+      - source-code
+      - unit-tests
 
   qa-engineer:
     name: "QA Engineer"
     type: "general-purpose"
-    model: "sonnet"
+    responsibilities:
+      - 테스트 케이스 작성
+      - 버그 검증 및 재현
+      - 품질 기준 검토
+      - 회귀 테스트
     handoff:
       accepts: [developer]
       produces: [test-report, bug-report]
       requires_from_upstream: [scope, changed_files]
+    outputs:
+      - test-report.md
+      - bug-report.md
+    tools:
+      - jest
+      - playwright
+      - curl
+
+  dba:
+    name: "Database Administrator"
+    type: "Bash"
+    responsibilities:
+      - DB 스키마 설계/변경
+      - 마이그레이션 스크립트
+      - 쿼리 최적화
+      - 백업/복구 전략
+    handoff:
+      accepts: [architect]
+      produces: [schema-sql, migration-sql]
+      requires_from_upstream: [scope, schema_changes]
+    outputs:
+      - schema.sql
+      - migration.sql
+    tools:
+      - psql
+      - pg_dump
+
+  designer:
+    name: "UI/UX Designer"
+    type: "general-purpose"
+    responsibilities:
+      - UI 컴포넌트 설계
+      - UX 플로우 정의
+      - 디자인 시스템 관리
+      - 접근성 검토
+    handoff:
+      accepts: [architect]
+      produces: [component-spec, ux-flow]
+      requires_from_upstream: [scope, requirements]
+    outputs:
+      - component-spec.md
+      - ux-flow.md
+
+  publisher:
+    name: "Publisher/DevOps"
+    type: "Bash"
+    responsibilities:
+      - 빌드 및 배포
+      - Docker 이미지 관리
+      - CI/CD 파이프라인
+      - 서버 설정
+    handoff:
+      accepts: [qa-engineer, developer]
+      produces: [deployment-log]
+      requires_from_upstream: [scope, approval_status, changed_files]
+    outputs:
+      - deployment-log.md
+    tools:
+      - docker
+      - docker-compose
+      - npm
+      - git
+
+  documenter:
+    name: "Technical Writer"
+    type: "general-purpose"
+    responsibilities:
+      - API 문서화
+      - README 작성/업데이트
+      - 변경 로그 관리
+      - 사용자 가이드
+    handoff:
+      accepts: [developer, publisher, api-reviewer]
+      produces: [readme, changelog, api-docs]
+      requires_from_upstream: [scope, changed_files]
+    outputs:
+      - README.md
+      - CHANGELOG.md
+      - API-docs.md
 
   explorer:
     name: "Code Explorer"
     type: "Explore"
-    model: "sonnet"  # PM이 haiku로 오버라이드 가능
+    model: "sonnet"  # PM이 haiku로 오버라이드 가능 (초기 탐색 시)
+    responsibilities:
+      - 코드베이스 분석
+      - 영향도 파악
+      - 의존성 추적
+      - 패턴 식별
     handoff:
       accepts: [pm]
-      produces: [analysis-report]
+      produces: [analysis-report, impact-report]
       requires_from_upstream: [scope]
+    outputs:
+      - analysis-report.md
 
-  # Specialist Reviewers
+  # === 전문 리뷰어 에이전트 (v2.0) ===
+
   security-reviewer:
     name: "Security Sentinel"
     type: "general-purpose"
     model: "sonnet"
     persona: "보안 전문 코드 리뷰어"
     perspective: "공격자에게 노출되면?"
-    handoff:
-      accepts: [developer]
-      produces: [security-review]
-      requires_from_upstream: [scope, changed_files]
-
-  # 나머지 Core Agents - 프로젝트 필요에 따라 활성화
-  dba:
-    name: "DBA"
-    type: "general-purpose"
-    model: "sonnet"
-    prompt: "prompts/dba.md"
-    handoff:
-      accepts: [architect, pm]
-      produces: [schema-sql, column-verification, index-recommendation]
-      requires_from_upstream: [scope, schema_changes]
-
-  reviewer:
-    name: "Reviewer"
-    type: "general-purpose"
-    model: "sonnet"
-    prompt: "prompts/reviewer.md"
+    prompt: "prompts/security-reviewer.md"
     handoff:
       accepts: [developer]
       produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - OWASP Top 10 취약점 탐지
+      - 인증/인가 로직 검증
+      - 시크릿 및 민감 데이터 관리
+      - CSP/CORS/보안 헤더 검토
+      - 의존성 보안 감사
+    outputs:
+      - security-review.md
+    expertise:
+      - owasp-top-10
+      - authentication
+      - authorization
+      - secrets-management
+      - dependency-audit
 
-  designer:
-    name: "Designer"
-    type: "general-purpose"
-    model: "sonnet"
-    prompt: "prompts/designer.md"
-    handoff:
-      accepts: [architect, pm]
-      produces: [ui-spec, component-structure]
-      requires_from_upstream: [scope, design_doc]
-
-  documenter:
-    name: "Documenter"
-    type: "general-purpose"
-    model: "sonnet"
-    prompt: "prompts/documenter.md"
-    handoff:
-      accepts: [developer, pm]
-      produces: [docs-complete, docs-history]
-      requires_from_upstream: [scope, changed_files]
-
-  # Specialist Reviewers - 나머지
   performance-reviewer:
     name: "Performance Prophet"
     type: "general-purpose"
     model: "sonnet"
-    prompt: "prompts/performance-prophet.md"
-    perspective: "트래픽 10배 증가 시?"
+    persona: "성능 전문 코드 리뷰어"
+    perspective: "트래픽 10배면?"
+    prompt: "prompts/performance-reviewer.md"
     handoff:
       accepts: [developer]
-      produces: [performance-review]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - 알고리즘 복잡도 분석
+      - DB 쿼리 최적화 (N+1, 인덱스)
+      - 메모리 관리 및 누수 탐지
+      - 프론트엔드 번들/렌더링 성능
+      - 캐싱 전략 검토
+    outputs:
+      - performance-review.md
+    expertise:
+      - algorithm-complexity
+      - database-optimization
+      - memory-management
+      - bundle-analysis
+      - caching-strategy
 
-  test-guardian:
+  test-coverage-reviewer:
     name: "Test Guardian"
     type: "general-purpose"
     model: "sonnet"
-    prompt: "prompts/test-guardian.md"
-    perspective: "이 코드가 6개월 후에도 안전한가?"
+    persona: "테스트 품질 전문 리뷰어"
+    perspective: "이 테스트가 진짜 검증하나?"
+    prompt: "prompts/test-coverage-reviewer.md"
     handoff:
       accepts: [developer]
-      produces: [test-quality-review]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - 테스트 품질 및 assertion 유효성
+      - 뮤테이션 테스팅 관점 분석
+      - 테스트 격리 및 독립성
+      - 테스트 피라미드 균형
+      - 엣지 케이스 검증
+    outputs:
+      - test-coverage-review.md
+    expertise:
+      - assertion-quality
+      - mutation-testing
+      - test-isolation
+      - test-pyramid
+      - boundary-testing
 
-  access-advocate:
+  accessibility-reviewer:
     name: "Access Advocate"
     type: "general-purpose"
     model: "sonnet"
-    prompt: "prompts/access-advocate.md"
-    perspective: "권한 없는 사용자가 접근하면?"
+    persona: "접근성 전문 코드 리뷰어"
+    perspective: "장애인도 쓸 수 있나?"
+    prompt: "prompts/accessibility-reviewer.md"
+    condition: has_ui_changes  # UI 변경 시에만 실행
     handoff:
       accepts: [developer]
-      produces: [access-review]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - WCAG 2.1 AA 준수 검증
+      - 키보드 내비게이션 및 포커스 관리
+      - 스크린 리더 호환성
+      - 색상 대비 및 시각적 접근성
+      - ARIA 속성 적절성
+    outputs:
+      - accessibility-review.md
+    expertise:
+      - wcag-2-1
+      - keyboard-navigation
+      - screen-reader
+      - color-contrast
+      - aria
 
-  ux-harmonizer:
+  ux-reviewer:
     name: "UX Harmonizer"
     type: "general-purpose"
     model: "sonnet"
-    prompt: "prompts/ux-harmonizer.md"
-    perspective: "사용자가 처음 접하면?"
+    persona: "UX 전문 코드 리뷰어"
+    perspective: "사용자가 혼란스럽지 않나?"
+    prompt: "prompts/ux-reviewer.md"
+    condition: has_ui_changes  # UI 변경 시에만 실행
     handoff:
-      accepts: [developer, designer]
-      produces: [ux-review]
+      accepts: [developer]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - 디자인 시스템 준수 검증
+      - 반응형 디자인 및 모바일 대응
+      - UI 패턴 일관성
+      - 사용자 피드백 및 상태 처리
+      - 로딩/에러/빈 상태 처리
+    outputs:
+      - ux-review.md
+    expertise:
+      - design-system
+      - responsive-design
+      - ui-patterns
+      - state-handling
+      - user-feedback
 
-  api-arbiter:
+  api-reviewer:
     name: "API Arbiter"
     type: "general-purpose"
     model: "sonnet"
-    prompt: "prompts/api-arbiter.md"
-    perspective: "외부 시스템이 이 API를 소비하면?"
+    persona: "API 설계 전문 코드 리뷰어"
+    perspective: "1년 후에도 호환되나?"
+    prompt: "prompts/api-reviewer.md"
+    condition: has_api_changes  # API 변경 시에만 실행
     handoff:
       accepts: [developer]
-      produces: [api-review]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - REST API 규약 검증
+      - API 버전 관리
+      - 에러 응답 표준화
+      - 하위 호환성 보장
+      - API 문서화 검토
+    outputs:
+      - api-review.md
+    expertise:
+      - rest-conventions
+      - api-versioning
+      - error-handling
+      - backward-compatibility
+      - api-documentation
 
   code-reviewer:
     name: "Code Reviewer"
     type: "general-purpose"
     model: "sonnet"
+    persona: "코드 리뷰 전문가"
+    perspective: "생산 준비 상태인가?"
     prompt: "prompts/code-reviewer.md"
-    perspective: "6개월 후 다른 개발자가 유지보수하면?"
     handoff:
       accepts: [developer]
-      produces: [code-quality-review]
+      produces: [review-report]
       requires_from_upstream: [scope, changed_files]
+    responsibilities:
+      - 코드 품질 검토 (구조, 에러 처리, 타입 안전성)
+      - 아키텍처 검토 (설계 패턴, 확장성)
+      - 보안 검토 (OWASP Top 10)
+      - 요구사항 대비 구현 검증
+      - 생산 준비도 판정
+    outputs:
+      - code-review.md
+    expertise:
+      - code-quality
+      - architecture
+      - security
+      - requirements-validation
+      - production-readiness
 
-# ============================================================
-# 팀 구성 템플릿 (업무 유형별)
-# ============================================================
-team_templates:
-  type_a_bugfix:
-    name: "버그 수정 (3명)"
-    agents: [pm, explorer, developer]
-    model_override: { explorer: "haiku" }
-
-  type_b_improvement:
-    name: "기능 개선 (4명)"
-    agents: [pm, explorer, developer, reviewer]
-
-  type_c_new_module:
-    name: "신규 모듈 (5명)"
-    agents: [pm, explorer, architect, dba, developer]
-
-  type_d_full:
-    name: "대규모 기능 (6명 + 리뷰)"
-    agents: [pm, explorer, architect, dba, developer, reviewer]
-
-  type_e_thorough_review:
-    name: "종합 코드 리뷰 (PM + Specialist Reviewers)"
-    agents: [pm, security-reviewer, performance-reviewer, code-reviewer, api-arbiter]
-    model_override: { security-reviewer: "opus" }
-
-# 품질 게이트
+# 품질 게이트 정의
 quality_gates:
   before_deploy:
-    required_approvals: [qa-engineer]
-    checks: [all_tests_pass, no_critical_bugs]
+    required_approvals:
+      - qa-engineer
+      - architect
+    checks:
+      - all_tests_pass
+      - no_critical_bugs
+      - documentation_updated
+
+  before_schema_change:
+    required_approvals:
+      - dba
+      - architect
+    checks:
+      - migration_tested
+      - rollback_plan_exists
+
   before_code_review_approve:
-    required_approvals: [security-reviewer, performance-reviewer]
-    checks: [no_critical_security_issues, no_critical_performance_issues]
+    required_approvals:
+      - security-reviewer
+      - performance-reviewer
+    checks:
+      - no_critical_security_issues
+      - no_critical_performance_issues
+    description: "보안 및 성능 리뷰어의 CRITICAL 이슈 없음 필수"
+
+  # v3.2: Completion Status 기반 게이트 통과 기준
+  completion_status_criteria:
+    DONE: "게이트 통과"
+    DONE_WITH_CONCERNS: "concerns가 LOW/MEDIUM이면 통과, HIGH면 PM 판단"
+    BLOCKED: "게이트 차단"
+    NEEDS_CONTEXT: "게이트 차단"
+
+# 보고 설정
+reporting:
+  realtime:
+    enabled: true
+    format: "spinner"  # spinner, progress, verbose
+  checkpoints:
+    enabled: true
+    triggers:
+      - phase_complete
+      - blocker_found
+      - approval_needed
+  final:
+    enabled: true
+    include:
+      - summary
+      - changes_made
+      - files_modified
+      - next_steps
+  review:
+    enabled: true
+    format: "structured-markdown"
+    history_dir: "artifacts/reviews/"
+    retention_days: 90
+
+# v3.2: 자율성 레벨 정의
+autonomy_levels:
+  version: "1.0"
+  description: "작업 위험도에 따른 5단계 자율성 제어"
+  levels:
+    - level: 0
+      name: "safe"
+      description: "파일 읽기, 코드 분석, 린트, 테스트 실행"
+      autonomy: "완전 자율"
+      enforcement: "없음"
+    - level: 1
+      name: "reversible"
+      description: "소스 코드 수정, 설정 파일 변경"
+      autonomy: "자율 + 사후 검증"
+      enforcement: "PostToolUse hook으로 변경 기록"
+    - level: 2
+      name: "semi-reversible"
+      description: "Docker 컨테이너 재시작, 서비스 배포"
+      autonomy: "자율 + 사전 스냅샷 + 사후 헬스체크"
+      enforcement: "PreToolUse + PostToolUse hook (Deploy Guard)"
+    - level: 3
+      name: "caution"
+      description: "DB 스키마 변경, Docker 컨테이너 삭제"
+      autonomy: "사용자 승인 필수"
+      enforcement: "PreToolUse hook에서 패턴 감지 시 경고"
+    - level: 4
+      name: "forbidden"
+      description: "프로덕션 데이터 삭제, git push --force, DROP DATABASE"
+      autonomy: "절대 자율 불가"
+      enforcement: "PreToolUse hook에서 무조건 차단"
+  nightops_exception:
+    trusted_paths: ["/home/ubuntu/nightops/", "/home/ubuntu/scripts/"]
+    description: "NightOps M8 Self-Heal 자동복구 명령은 Level 2까지 자율 허용"
 
 # 시스템 메타데이터
 system_meta:
-  version: "3.0"
+  version: "3.2"
+  agent_count: 16
   template_version: "5-section-v1"
-  handoff_protocol: "v1.0"
+  handoff_protocol: "v2.0"
   failure_policy: "v1.0"
   model_routing: "v1.0"
+  token_budget: "v1.0"
+  cognitive_operations: "v1.0"
+  adversarial_pairs: "v1.0"
+  blast_radius: "v1.0"
+  autonomy_levels: "v1.0"
+  last_validated: "2026-03-25"
+  upgrade_from: "3.0"

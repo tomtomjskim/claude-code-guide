@@ -1,16 +1,21 @@
-# Failure Recovery Policy Template v1.0
-# ~/.claude/team/workflows/failure-policy.yaml 에 배치
+# Failure Recovery Policy v1.0
+# 에이전트 워크플로우 실패 시 복구 정책
 
 version: "1.0"
 
 # 재시도 정책
 retry_policy:
   max_attempts: 2
-  strategy: "different_approach"
+  strategy: "different_approach"  # 동일 방법 재시도가 아닌 다른 접근법 시도
   on_retry: |
-    이전 시도가 실패했습니다. 다른 접근 방식으로 시도하세요.
+    이전 시도가 실패했습니다. 태스크와 이전 컨텍스트를 다시 읽고,
+    다른 접근 방식으로 시도하세요.
     이전 실패 원인: {{FAILURE_REASON}}
-  applicable_tasks: [exploration, documentation, review, testing]
+  applicable_tasks:
+    - exploration     # 탐색/분석 (멱등)
+    - documentation  # 문서화 (멱등)
+    - review         # 코드 리뷰 (멱등)
+    - testing        # 테스트 실행 (멱등)
 
 # 에스컬레이션 정책
 escalation_policy:
@@ -21,49 +26,111 @@ escalation_policy:
     - partial_output
     - suggested_alternatives
   pm_actions:
-    reassign: "다른 에이전트에게 재할당"
-    decompose: "더 작은 태스크로 분해"
-    manual_intervention: "사용자에게 판단 요청"
-  applicable_tasks: [implementation, schema_change, architecture]
+    reassign: "다른 에이전트에게 태스크 재할당"
+    decompose: "태스크를 더 작은 단위로 분해"
+    manual_intervention: "사용자에게 직접 보고 및 판단 요청"
+  applicable_tasks:
+    - implementation  # 코드 구현
+    - schema_change   # DB 스키마 변경
+    - architecture    # 아키텍처 설계
 
-# 롤백 정책 - 프로젝트에 맞게 수정하세요
+# 롤백 정책
 rollback_policy:
   triggers:
-    - critical_bug_found
-    - deployment_failed
-    - health_check_failed
-    - tests_regression
+    - critical_bug_found       # 테스트에서 CRITICAL 버그 발견
+    - deployment_failed        # 배포 실패
+    - health_check_failed      # 헬스체크 3회 연속 실패
+    - tests_regression         # 기존 테스트 회귀 발생
+
   strategies:
     code_rollback:
       command: "git revert HEAD --no-edit"
-      verify: "npm test"
+      when: "코드 변경이 문제를 일으킨 경우"
+      verify: "git log -1 && npm test"
+
     container_rollback:
-      command: "docker compose stop {{SERVICE}} && docker compose up -d {{SERVICE}}"
+      command: |
+        docker compose -f /home/ubuntu/docker-compose.yml stop {{SERVICE}}
+        docker compose -f /home/ubuntu/docker-compose.yml up -d {{SERVICE}}
+      when: "컨테이너 배포가 실패한 경우"
       verify: "curl -sf http://{{SERVICE_IP}}:{{PORT}}/health"
+
     schema_rollback:
-      command: "psql -f rollback.sql"
-      prerequisite: "롤백 스크립트 사전 준비 필수"
+      command: "docker exec -it postgres psql -U appuser -d maindb -f /tmp/rollback.sql"
+      when: "DB 마이그레이션이 실패한 경우"
+      verify: "docker exec postgres psql -U appuser -d maindb -c '\\dt {{SCHEMA}}.*'"
+      prerequisite: "반드시 마이그레이션 전 롤백 스크립트가 준비되어 있어야 함"
+
+  post_rollback:
+    - "롤백 사유와 상태를 PM에게 보고"
+    - "영향 받은 서비스 헬스체크 확인"
+    - "사용자에게 롤백 사실 통보"
 
 # 서킷 브레이커
 circuit_breaker:
   consecutive_failures: 3
   action: pause_workflow
   resume_condition: "PM의 명시적 승인 또는 사용자 개입"
+  notification: |
+    워크플로우 일시 중단
+    연속 {{FAILURE_COUNT}}회 실패 발생.
+    원인: {{LAST_FAILURE_REASON}}
 
-# 태스크별 실패 매핑
+    재개하려면 사용자 확인이 필요합니다.
+
+# 태스크 유형별 실패 처리 매핑
 task_failure_mapping:
-  exploration: { on_fail: retry, fallback: escalate }
-  design: { on_fail: escalate }
-  implementation: { on_fail: escalate }
-  testing: { on_fail: retry, fallback: escalate }
-  review: { on_fail: retry, fallback: escalate }
-  deployment: { on_fail: rollback, fallback: escalate }
-  schema_change: { on_fail: rollback, prerequisite: "rollback script", fallback: escalate }
+  exploration:
+    on_fail: retry
+    fallback: escalate
+
+  design:
+    on_fail: escalate
+    note: "설계 결정은 재시도보다 에스컬레이션이 적합"
+
+  implementation:
+    on_fail: escalate
+    note: "코드 구현 실패는 요구사항 재검토 필요"
+
+  testing:
+    on_fail: retry
+    fallback: escalate
+    note: "테스트 환경 이슈일 수 있으므로 1회 재시도"
+
+  review:
+    on_fail: retry
+    fallback: escalate
+
+  deployment:
+    on_fail: rollback
+    strategy: container_rollback
+    fallback: escalate
+
+  schema_change:
+    on_fail: rollback
+    strategy: schema_rollback
+    prerequisite: "rollback script must exist"
+    fallback: escalate
 
 # 부분 완료 보존
 partial_completion:
   strategy: "preserve_and_report"
   actions:
-    - "완료된 아티팩트 보존"
-    - "진행 상태 PM 보고"
-    - "미완료 항목 새 태스크 생성"
+    - "완료된 부분의 아티팩트 보존"
+    - "진행 상태를 PM에게 보고"
+    - "미완료 항목을 새 태스크로 생성"
+    - "원인 분석 결과 기록"
+
+# v3.2: Completion Status 연동
+partial_success:
+  description: "completion_status=DONE_WITH_CONCERNS 처리 정책"
+  strategy: "pass_with_concerns"
+  actions:
+    - "completion_status=DONE_WITH_CONCERNS로 핸드오프"
+    - "PM이 concerns를 다음 에이전트의 주의사항에 포함"
+    - "concerns 심각도가 HIGH면 BLOCKED로 격상"
+  mapping:
+    DONE: "정상 진행"
+    DONE_WITH_CONCERNS: "진행하되 concerns 전달"
+    BLOCKED: "진행 차단 — PM이 unblock 조치"
+    NEEDS_CONTEXT: "진행 차단 — PM이 추가 정보 수집"
