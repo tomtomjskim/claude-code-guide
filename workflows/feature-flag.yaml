@@ -1,0 +1,159 @@
+# Feature Flag Development Workflow
+# 기능 플래그 기반 개발 워크플로우
+
+name: feature-flag
+description: 기능 플래그를 통한 점진적 기능 배포
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 기능 분석
+  analysis:
+    parallel: true
+    tasks:
+      - id: explore
+        agent: explorer
+        action: analyze_feature_scope
+        outputs:
+          - feature_scope.md
+        on_fail: retry
+
+      - id: design_flag
+        agent: architect
+        action: design_feature_flag
+        inputs:
+          - feature_description
+        outputs:
+          - flag_design.md
+        on_fail: escalate
+
+  # Phase 2: 기반 작업
+  foundation:
+    parallel: true
+    depends_on: [analysis]
+    tasks:
+      - id: create_flag
+        agent: developer-backend
+        action: implement_flag
+        inputs:
+          - flag_design.md
+        outputs:
+          - flag_implementation
+        on_fail: escalate
+
+      - id: flag_config
+        agent: dba
+        action: setup_flag_storage
+        inputs:
+          - flag_design.md
+        outputs:
+          - flag_schema.sql
+        condition: requires_persistent_flags
+        on_fail: escalate
+
+  # Phase 3: 기능 구현 (플래그 뒤에)
+  implementation:
+    parallel: true
+    depends_on: [foundation]
+    tasks:
+      - id: backend
+        agent: developer-backend
+        action: implement_behind_flag
+        inputs:
+          - feature_scope.md
+          - flag_implementation
+        outputs:
+          - backend_code
+        on_fail: escalate
+
+      - id: frontend
+        agent: developer-frontend
+        action: implement_behind_flag
+        inputs:
+          - feature_scope.md
+          - flag_implementation
+        outputs:
+          - frontend_code
+        on_fail: escalate
+
+  # Phase 4: 테스트
+  testing:
+    parallel: true
+    depends_on: [implementation]
+    tasks:
+      - id: test_flag_off
+        agent: qa
+        action: test_with_flag
+        inputs:
+          - flag_state: "off"
+        outputs:
+          - test_off_result.md
+        on_fail: retry
+
+      - id: test_flag_on
+        agent: qa
+        action: test_with_flag
+        inputs:
+          - flag_state: "on"
+        outputs:
+          - test_on_result.md
+        on_fail: retry
+
+  # Phase 5: 배포 (플래그 OFF 상태)
+  deploy_dark:
+    parallel: false
+    depends_on: [testing]
+    tasks:
+      - id: deploy
+        agent: publisher
+        action: deploy
+        inputs:
+          - flag_default: "off"
+        outputs:
+          - deployment_result.md
+        on_fail: rollback
+        rollback_on_fail: true
+
+  # Phase 6: 점진적 활성화
+  gradual_rollout:
+    parallel: false
+    depends_on: [deploy_dark]
+    tasks:
+      - id: enable_internal
+        agent: publisher
+        action: enable_flag
+        inputs:
+          - target: "internal_users"
+        outputs:
+          - rollout_status.md
+        on_fail: escalate
+
+      - id: monitor
+        agent: qa
+        action: monitor_metrics
+        outputs:
+          - metrics_report.md
+        on_fail: retry
+
+checkpoints:
+  - after: foundation
+    report: flag_ready
+  - after: testing
+    report: all_tests_passed
+  - after: deploy_dark
+    report: deployed_dark
+  - after: gradual_rollout
+    report: rollout_status
+
+rollout_stages:
+  - name: internal
+    percentage: 0
+    criteria: internal_users_only
+  - name: canary
+    percentage: 5
+    criteria: random_sample
+  - name: beta
+    percentage: 25
+    criteria: opt_in_users
+  - name: general
+    percentage: 100
+    criteria: all_users

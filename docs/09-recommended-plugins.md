@@ -196,6 +196,81 @@ claude plugin install skill-creator@claude-plugins-official
 
 ---
 
+## 추천 마켓플레이스 스킬 (6개)
+
+커뮤니티 마켓플레이스에서 설치할 수 있는 검증된 스킬입니다.
+
+### UI/UX Pro Max
+
+> 50 스타일, 21 팔레트, 50 폰트 페어링, 20 차트, 9 스택 지원 UI/UX 디자인 인텔리전스
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | UI/UX 코드 작성, 리뷰, 디자인 시스템 관련 요청 시 |
+| **스택** | React, Next.js, Vue, Svelte, SwiftUI, React Native, Flutter, Tailwind, shadcn/ui |
+| **스타일** | glassmorphism, minimalism, brutalism, neumorphism, bento grid 등 50종 |
+| **연동** | shadcn/ui MCP 서버 컴포넌트 검색 |
+
+### Frontend Design
+
+> 생산 수준의 프론트엔드 인터페이스를 높은 디자인 품질로 생성
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | 웹 컴포넌트, 페이지, 대시보드, 랜딩 페이지 빌드 요청 시 |
+| **특징** | AI 미학 회피 (제네릭 패턴 거부), 창의적 + 정교한 코드 생성 |
+
+### Web Design Guidelines
+
+> Vercel의 Web Interface Guidelines 기반 UI 코드 리뷰
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | "review my UI", "check accessibility", "audit design" 요청 시 |
+| **원본** | [Vercel Web Interface Guidelines](https://vercel.com/blog/web-interface-guidelines) |
+
+### SEO Audit
+
+> SEOmator CLI 기반 251개 규칙, 20개 카테고리 웹사이트 감사
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | 웹사이트 분석, SEO 디버깅, 사이트 헬스 체크 요청 시 |
+| **요구사항** | Node.js 18+, Chrome/Chromium (선택, Core Web Vitals용) |
+| **출력** | LLM 최적화 리포트, 헬스 스코어 |
+
+### Webapp Testing
+
+> Playwright 기반 로컬 웹 앱 상호작용 및 테스트
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | 프론트엔드 기능 검증, UI 디버깅, 브라우저 스크린샷, 로그 확인 시 |
+| **특징** | 브라우저 직접 제어, 스크린샷 캡처, 콘솔 로그 수집 |
+
+### Supabase Postgres Best Practices
+
+> Supabase의 Postgres 성능 최적화 및 모범 사례
+
+| 항목 | 내용 |
+|------|------|
+| **발동** | Postgres 쿼리 작성/리뷰/최적화, 스키마 설계, DB 설정 시 |
+| **범위** | 인덱스 전략, 쿼리 플래닝, RLS, 파티셔닝, 커넥션 풀링 |
+
+### 설치 (전체)
+
+```bash
+# 마켓플레이스별 스킬 설치
+claude skill install ui-ux-pro-max
+claude skill install frontend-design
+claude skill install web-design-guidelines
+claude skill install seo-audit
+claude skill install webapp-testing
+claude skill install supabase-postgres-best-practices
+```
+
+---
+
 ## 추천 플러그인 (추가 검토)
 
 ### Context7

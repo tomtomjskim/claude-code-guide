@@ -1,0 +1,138 @@
+# Incident Response Workflow
+# 장애 대응 워크플로우
+
+name: incident-response
+description: 프로덕션 장애 신속 대응
+priority: critical
+timeout: 30m
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 즉시 대응 (병렬, 최우선)
+  immediate:
+    parallel: true
+    timeout: 5m
+    tasks:
+      - id: assess
+        agent: explorer
+        action: quick_assess
+        inputs:
+          - incident_description
+          - error_logs
+        outputs:
+          - initial_assessment.md
+        priority: critical
+        on_fail: retry
+
+      - id: check_health
+        agent: publisher
+        action: check_all_services
+        outputs:
+          - health_status.md
+        priority: critical
+        on_fail: retry
+
+  # Phase 2: 원인 분석
+  diagnosis:
+    parallel: true
+    depends_on: [immediate]
+    timeout: 10m
+    tasks:
+      - id: log_analysis
+        agent: explorer
+        action: analyze_logs
+        inputs:
+          - health_status.md
+        outputs:
+          - log_analysis.md
+        on_fail: retry
+
+      - id: db_check
+        agent: dba
+        action: check_db_status
+        outputs:
+          - db_status.md
+        on_fail: retry
+
+      - id: recent_changes
+        agent: explorer
+        action: find_recent_changes
+        outputs:
+          - recent_changes.md
+        on_fail: retry
+
+  # Phase 3: 복구 결정
+  decision:
+    parallel: false
+    depends_on: [diagnosis]
+    tasks:
+      - id: determine_action
+        agent: architect
+        action: decide_recovery
+        inputs:
+          - initial_assessment.md
+          - log_analysis.md
+          - db_status.md
+          - recent_changes.md
+        outputs:
+          - recovery_plan.md
+        options:
+          - rollback
+          - hotfix
+          - restart
+          - scale
+        on_fail: escalate
+
+  # Phase 4: 복구 실행
+  recovery:
+    parallel: false
+    depends_on: [decision]
+    tasks:
+      - id: execute_recovery
+        agent: publisher
+        action: execute_recovery_plan
+        inputs:
+          - recovery_plan.md
+        outputs:
+          - recovery_result.md
+        on_fail: rollback
+        rollback_on_fail: true
+
+      - id: verify_recovery
+        agent: qa
+        action: verify_service
+        depends_on_tasks: [execute_recovery]
+        outputs:
+          - verification.md
+        on_fail: retry
+
+  # Phase 5: 사후 분석 (장애 해결 후)
+  postmortem:
+    parallel: false
+    depends_on: [recovery]
+    condition: incident_resolved
+    tasks:
+      - id: write_postmortem
+        agent: documenter
+        action: create_postmortem
+        inputs:
+          - all_phase_outputs
+        outputs:
+          - postmortem.md
+        on_fail: retry
+
+checkpoints:
+  - after: immediate
+    report: initial_status
+    notify: always
+  - after: diagnosis
+    report: root_cause_identified
+  - after: recovery
+    report: service_restored
+    notify: always
+
+escalation:
+  - condition: timeout_exceeded
+    action: notify_pm
+  - condition: recovery_failed
+    action: escalate_to_manual

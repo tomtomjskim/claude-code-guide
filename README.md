@@ -28,53 +28,89 @@
 - **v3.2 신규**: Blast-Radius Classification (4단계) + Diff-Aware Phase 0
 - **v3.2 신규**: Session Resume (파일 기반 워크플로우 상태 관리)
 - **v3.2 참조**: [gstack](https://github.com/garrytan/gstack) (Garry Tan's AI workflow platform) 실체화 패턴
-- **상세**: **[claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)** 참조
+> v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
+
+---
+
+## 레포 구조
+
+```
+claude-code-guide/
+├── agents.yaml           # 16 에이전트 설정 (모델 라우팅, 토큰 예산, blast-radius)
+├── agents/               # 15 서브에이전트 frontmatter 정의 (.md)
+├── prompts/              # 16 에이전트 상세 프롬프트 (v3.2, 200줄+)
+├── workflows/            # 9 워크플로우 (standard, quick-fix, code-review 등)
+├── context/              # 핸드오프 v2.0, 세션 스키마, digest 포맷
+├── hooks/                # Safety hooks + event-driven-review
+│   ├── event-driven-review.yaml
+│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh
+├── scripts/              # validate-system.sh (18 카테고리)
+├── docs/                 # 15편 가이드 문서
+├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
+├── QUICKSTART.md
+└── README.md
+```
 
 ---
 
 ## 빠른 시작
 
-### 1. 글로벌 설정
+### 1. 팀 시스템 설치
 
 ```bash
-# ~/.claude/settings.json
+# 클론
+git clone https://github.com/tomtomjskim/claude-code-guide.git
+cd claude-code-guide
+
+# 팀 설정 복사
+mkdir -p ~/.claude/team
+cp agents.yaml ~/.claude/team/
+cp -r prompts/ ~/.claude/team/prompts/
+cp -r workflows/ ~/.claude/team/workflows/
+cp -r context/ ~/.claude/team/context/
+cp -r hooks/ ~/.claude/team/hooks/
+cp -r scripts/ ~/.claude/team/scripts/
+
+# 서브에이전트 정의 복사
+cp -r agents/ ~/.claude/agents/
+
+# hook 실행 권한
+chmod +x ~/.claude/team/hooks/scripts/*.sh
+chmod +x ~/.claude/team/scripts/*.sh
+```
+
+### 2. settings.json 설정
+
+```json
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "alwaysThinkingEnabled": true,
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-careful.sh" }] },
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-freeze.sh" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] }
+    ]
+  },
   "mcpServers": {
-    "serena": {
-      "command": "uvx",
-      "args": ["--from", "serena-mcp", "serena", "--project", "."]
-    }
+    "serena": { "command": "uvx", "args": ["--from", "serena-mcp", "serena", "--project", "."] }
   }
 }
 ```
 
-### 2. 프로젝트 초기화
+### 3. 검증
 
 ```bash
-# 이 레포의 템플릿 사용
+bash ~/.claude/team/scripts/validate-system.sh
+# 18 categories, 0 errors expected
+```
+
+### 4. 프로젝트 초기화
+
+```bash
 cp -r templates/project-structure/* /your/project/
-
-# 또는 수동 생성
-mkdir -p .claude/commands
-mkdir -p docs/{prd,todo,spec,history,qa-reports,complete}
-```
-
-### 3. CLAUDE.md 설정
-
-```bash
-# 템플릿 복사
 cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
-
-# 프로젝트에 맞게 수정
-```
-
-### 4. 워크플로우 가이드 배치
-
-```bash
-# 워크플로우 가이드를 프로젝트 .claude/에 복사
-cp .claude/workflow-commands-guide.md /your/project/.claude/
 ```
 
 ---

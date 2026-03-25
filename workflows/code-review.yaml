@@ -1,0 +1,540 @@
+# Code Review Workflow v2.0
+# 확장된 코드 리뷰 워크플로우 (6단계, 3프리셋)
+
+name: code-review
+version: "2.0"
+description: 전문 리뷰어 팀 기반 체계적 코드 리뷰 프로세스
+failure_policy: "workflows/failure-policy.yaml"
+
+# ===== 리뷰 프리셋 =====
+presets:
+  quick:
+    description: "자동 분석만 (린트, 보안스캔, 커버리지)"
+    phases: [automated]
+    estimated_time: "~2분"
+    use_case: "단순 수정, 설정 변경, 문서 업데이트"
+
+  standard:
+    description: "일반 PR 리뷰 (보안+성능+아키+판정)"
+    phases: [automated, security_performance, architecture_api, verdict]
+    estimated_time: "~10분"
+    use_case: "일반 기능 추가, 버그 수정"
+
+  thorough:
+    description: "전체 7단계 심층 리뷰 (적대적 교차 검증 포함)"
+    phases: [automated, security_performance, architecture_api, functional_ux, test_quality, adversarial_review, verdict]
+    estimated_time: "~25분"
+    use_case: "중요 변경, 릴리즈 전, 보안 관련"
+
+# ===== 프로그레시브 에스컬레이션 =====
+# quick에서 시작하여 발견사항에 따라 자동 승격
+escalation:
+  enabled: true
+  description: "자동 분석 결과에 따라 리뷰 깊이를 동적으로 조정"
+
+  # 에스컬레이션 규칙
+  rules:
+    # quick → standard 승격 조건
+    quick_to_standard:
+      triggers:
+        - condition: "security_scan finds HIGH or CRITICAL"
+          reason: "보안 이슈 발견 → 심층 보안/성능 리뷰 필요"
+        - condition: "complexity_report shows cyclomatic > 15"
+          reason: "높은 복잡도 → 아키텍처 리뷰 필요"
+        - condition: "test_coverage < 60%"
+          reason: "낮은 커버리지 → 테스트 품질 평가 필요"
+        - condition: "changed_files >= 8"
+          reason: "대규모 변경 → 구조적 리뷰 필요"
+      escalate_to: standard
+      notify: true
+      message: "자동 분석에서 이슈 감지 → standard 프리셋으로 승격합니다"
+
+    # standard → thorough 승격 조건
+    standard_to_thorough:
+      triggers:
+        - condition: "security_review finds CRITICAL"
+          reason: "CRITICAL 보안 취약점 → 전체 심층 리뷰 필요"
+        - condition: "architecture_review finds structural_issue"
+          reason: "구조적 문제 → UX/테스트 품질까지 전체 검증 필요"
+        - condition: "3+ reviewers report HIGH severity"
+          reason: "다수 리뷰어 HIGH 발견 → 전체 심층 분석 필요"
+        - condition: "api_review finds breaking_change"
+          reason: "하위 호환성 파괴 → 전체 영향도 분석 필요"
+      escalate_to: thorough
+      notify: true
+      message: "심층 리뷰에서 중대 이슈 감지 → thorough 프리셋으로 승격합니다"
+
+  # 에스컬레이션 제한
+  limits:
+    max_escalations: 1  # 워크플로우당 최대 1회 승격
+    skip_completed_phases: true  # 이미 완료된 phase는 재실행하지 않음
+    cost_guard: true  # token_budget 한도 내에서만 승격 (초과 시 사용자 확인)
+
+  # 에스컬레이션 로그
+  logging:
+    enabled: true
+    format: |
+      ### 에스컬레이션 기록
+      - **시점**: {{timestamp}}
+      - **원래 프리셋**: {{original_preset}}
+      - **승격 프리셋**: {{escalated_preset}}
+      - **트리거**: {{trigger_condition}}
+      - **사유**: {{reason}}
+
+default_preset: standard  # escalation.enabled=true 시 quick에서 시작하여 자동 승격 가능
+
+# ===== 프로젝트 타입 템플릿 =====
+project_types:
+  nextjs:
+    focus: [frontend_performance, ssr, accessibility, api_routes]
+    skip: []
+    template: "templates/review-nextjs.md"
+
+  fastapi:
+    focus: [api_contract, db_queries, input_validation]
+    skip: [accessibility, ux]
+    template: "templates/review-fastapi.md"
+
+  static-pwa:
+    focus: [bundle_size, service_worker, offline, accessibility]
+    skip: [db, api_contract]
+    template: "templates/review-static-pwa.md"
+
+# ===== 7단계 워크플로우 (v3.2: Phase 0 추가) =====
+phases:
+
+  # ──── Phase 0: Diff 분류 + Blast-Radius 측정 (v3.2 신규) ────
+  diff_analysis:
+    name: "변경 분류 및 영향 범위 측정"
+    parallel: true
+    must_precede_all: true
+    description: "D(Diff-Aware) + E(Blast-Radius) 직교 분석"
+    tasks:
+      - id: blast_radius_measure
+        agent: explorer
+        action: measure_blast_radius
+        model_hint: haiku
+        description: "변경 파일 수, 줄 수, import_depth, 서비스 수 기반 blast-radius 측정"
+        outputs:
+          - blast_radius.yaml
+        result_schema:
+          level: "single_file | single_module | cross_module | cross_service"
+          changed_files: int
+          lines_modified: int
+          affected_services: string[]
+          import_depth: int
+        on_fail: retry
+        fallback: "실패 시 PM이 수동 판단, 기본값 single_module"
+
+      - id: diff_categorize
+        agent: explorer
+        action: categorize_changes
+        model_hint: haiku
+        description: "변경 파일을 security/api/ui/performance/infra/tests/docs/general 카테고리로 분류"
+        outputs:
+          - change_categories.yaml
+        result_schema:
+          categories: string[]  # security, api, ui, performance, infra, tests, docs, general
+          security_files: string[]
+          api_files: string[]
+          ui_files: string[]
+        on_fail: retry
+        fallback: "실패 시 모든 카테고리 활성화 (안전 기본값)"
+
+    # Phase 0 결과로 후속 phase 조건 동적 갱신
+    post_processing:
+      update_conditions:
+        has_ui_changes: "categories includes ui"
+        has_api_changes: "categories includes api"
+        has_db_changes: "categories includes performance AND schema files detected"
+        has_security_findings: "categories includes security"
+      reviewer_routing:
+        security: [security-reviewer]
+        api: [api-reviewer]
+        ui: [ux-reviewer, accessibility-reviewer]
+        performance: [performance-reviewer]
+        infra: [publisher]
+        general: [code-reviewer]
+      preset_override:
+        cross_service_and_security: "standard → thorough (자동 승격, 사용자 통보)"
+        cross_service: "quick → standard (자동 승격, 사용자 통보)"
+
+  # ──── Phase 1: 자동 분석 (모든 프리셋) ────
+  automated:
+    name: "자동 분석"
+    parallel: true
+    tasks:
+      - id: static_analysis
+        agent: qa
+        action: run_linters
+        description: "린트 분석 (ESLint, Prettier, TypeScript)"
+        outputs:
+          - lint_report.md
+        on_fail: retry
+
+      - id: security_scan
+        agent: security-reviewer
+        action: automated_security_scan
+        description: "자동 보안 스캔 + 의존성 감사 (npm audit)"
+        outputs:
+          - security_scan.md
+        on_fail: retry
+
+      - id: test_coverage
+        agent: qa
+        action: check_coverage
+        description: "테스트 커버리지 측정"
+        outputs:
+          - coverage_report.md
+        on_fail: retry
+
+      - id: complexity
+        agent: explorer
+        action: analyze_complexity
+        description: "코드 복잡도 분석 + 변경 영향도"
+        outputs:
+          - complexity_report.md
+        on_fail: retry
+
+  # ──── Phase 2: 보안 & 성능 심층 리뷰 ────
+  security_performance:
+    name: "보안 & 성능 심층 리뷰"
+    parallel: true
+    depends_on: [automated]
+    tasks:
+      - id: security_review
+        agent: security-reviewer
+        action: deep_security_review
+        description: "OWASP Top 10, 인증/인가, 입력검증, 시크릿"
+        inputs:
+          - changed_files
+          - security_scan.md
+        outputs:
+          - security-review.md
+        criteria:
+          - owasp_top_10
+          - authentication
+          - authorization
+          - input_validation
+          - secrets_management
+        on_fail: retry
+
+      - id: performance_review
+        agent: performance-reviewer
+        action: performance_review
+        description: "알고리즘 복잡도, N+1 쿼리, 번들 사이즈, 메모리"
+        inputs:
+          - changed_files
+          - complexity_report.md
+        outputs:
+          - performance-review.md
+        criteria:
+          - algorithm_complexity
+          - database_queries
+          - bundle_impact
+          - memory_management
+          - caching_strategy
+        on_fail: retry
+
+  # ──── Phase 3: 아키텍처 & API 리뷰 ────
+  architecture_api:
+    name: "아키텍처 & API 리뷰"
+    parallel: true
+    depends_on: [security_performance]
+    tasks:
+      - id: code_organization_analysis
+        agent: explorer
+        action: analyze_code_organization
+        description: "코드 구조 분석 — 모듈 경계, 순환 의존성, 레이어 분리, 파일 크기 분포"
+        inputs:
+          - changed_files
+          - complexity_report.md
+        outputs:
+          - code_organization_report.md
+        criteria:
+          - module_boundaries
+          - circular_dependencies
+          - layer_separation
+          - file_size_distribution
+        on_fail: retry
+
+      - id: architecture_review
+        agent: architect
+        action: review_architecture
+        description: "설계 패턴, SoC, 확장성, 코드 구조"
+        inputs:
+          - changed_files
+          - complexity_report.md
+          - code_organization_report.md
+        outputs:
+          - architecture_review.md
+        criteria:
+          - design_patterns
+          - separation_of_concerns
+          - scalability
+          - code_organization
+        on_fail: retry
+
+      - id: api_review
+        agent: api-reviewer
+        action: review_api
+        condition: has_api_changes
+        description: "REST 규약, 버전 관리, 에러 처리, 하위 호환성"
+        inputs:
+          - changed_files
+        outputs:
+          - api-review.md
+        criteria:
+          - rest_conventions
+          - versioning
+          - error_handling
+          - backward_compatibility
+        on_fail: retry
+
+  # ──── Phase 4: 기능 & UX 리뷰 ────
+  functional_ux:
+    name: "기능 & UX 리뷰"
+    parallel: true
+    depends_on: [architecture_api]
+    tasks:
+      - id: logic_review
+        agent: developer
+        action: review_logic
+        description: "비즈니스 로직, 엣지 케이스, 에러 처리"
+        inputs:
+          - changed_files
+        outputs:
+          - logic_review.md
+        criteria:
+          - correctness
+          - edge_cases
+          - error_handling
+        on_fail: retry
+
+      - id: accessibility_review
+        agent: accessibility-reviewer
+        action: review_accessibility
+        condition: has_ui_changes
+        description: "WCAG 2.1 AA, 키보드, 스크린리더, 색상 대비"
+        inputs:
+          - changed_files
+        outputs:
+          - accessibility-review.md
+        criteria:
+          - wcag_2_1_aa
+          - keyboard_navigation
+          - screen_reader
+          - color_contrast
+        on_fail: retry
+
+      - id: ux_review
+        agent: ux-reviewer
+        action: review_ux
+        condition: has_ui_changes
+        description: "디자인 시스템 준수, 반응형, 상태 처리"
+        inputs:
+          - changed_files
+        outputs:
+          - ux-review.md
+        criteria:
+          - design_system
+          - responsive_design
+          - state_handling
+          - interaction_patterns
+        on_fail: retry
+
+      - id: db_review
+        agent: dba
+        action: review_queries
+        condition: has_db_changes
+        description: "쿼리 성능, 인덱스, 트랜잭션 안전성"
+        outputs:
+          - db_review.md
+        criteria:
+          - query_performance
+          - index_usage
+          - transaction_safety
+        on_fail: retry
+
+  # ──── Phase 5: 테스트 품질 평가 ────
+  test_quality:
+    name: "테스트 품질 평가"
+    parallel: false
+    depends_on: [functional_ux]
+    tasks:
+      - id: test_quality_review
+        agent: test-coverage-reviewer
+        action: review_test_quality
+        description: "assertion 품질, 테스트 격리, 피라미드 균형, 뮤테이션 관점"
+        inputs:
+          - changed_files
+          - coverage_report.md
+        outputs:
+          - test-coverage-review.md
+        criteria:
+          - assertion_quality
+          - test_isolation
+          - test_pyramid
+          - mutation_testing_perspective
+          - edge_case_coverage
+        on_fail: retry
+
+  # ──── Phase 5b: 적대적 교차 검증 (thorough만) ────
+  adversarial_review:
+    name: "적대적 교차 검증"
+    parallel: false
+    depends_on: [test_quality]
+    description: "상충 관점 리뷰어 쌍이 상대방의 결론에 도전하여 맹점 보완"
+
+    # v3.2: 조건부 opus 업그레이드 (gstack cross-tier 패턴 축소 적용)
+    model_upgrade:
+      condition: "blast_radius == cross_service OR security_critical == true"
+      action: "Phase 5b의 교차 검증을 sonnet 대신 opus로 실행"
+      description: "크로스 서비스 변경 또는 보안 중대 이슈 시 모델 티어 승격하여 심층 반박"
+      cost_guard: true  # token_budget 한도 내에서만 승격
+      fallback: "예산 초과 시 sonnet으로 유지, 사용자에게 통보"
+
+    tasks:
+      - id: security_vs_performance
+        agent: performance-reviewer
+        action: challenge_review
+        description: "Security Reviewer의 보안 조치가 성능에 미치는 영향 교차 검증"
+        condition: has_security_findings
+        inputs:
+          - security-review.md
+          - performance-review.md
+        outputs:
+          - adversarial-security-performance.md
+        on_fail: retry
+
+      - id: architect_vs_developer
+        agent: developer
+        action: challenge_review
+        description: "Architect의 설계가 실용적 구현 제약과 충돌하는지 교차 검증"
+        condition: has_architecture_findings
+        inputs:
+          - architecture_review.md
+          - logic_review.md
+        outputs:
+          - adversarial-design-implementation.md
+        on_fail: retry
+
+  # ──── Phase 6: 종합 판정 ────
+  verdict:
+    name: "종합 판정"
+    parallel: false
+    depends_on_dynamic: true  # 프리셋에 따라 의존 단계 변경
+    tasks:
+      - id: compile_review
+        agent: pm
+        action: compile_reviews
+        description: "전체 리뷰 종합, 품질 게이트 확인, 판정, PR 코멘트 생성"
+        inputs:
+          - all_reviews
+        outputs:
+          - final_review.md
+        verdict_options:
+          - approved
+          - approved_with_comments
+          - request_changes
+          - rejected
+        quality_gate: before_code_review_approve
+        on_fail: escalate
+
+# ===== 리뷰 기준 =====
+review_criteria:
+  must_pass:
+    - no_critical_security_issues
+    - no_critical_performance_issues
+    - tests_pass
+    - no_lint_errors
+  should_pass:
+    - coverage_threshold: 80%
+    - complexity_threshold: 10
+    - no_high_severity_issues
+  nice_to_have:
+    - documentation_updated
+    - changelog_updated
+    - accessibility_pass
+
+# ===== 증분 리뷰 설정 =====
+incremental_review:
+  enabled: true
+  analysis_depth: 2  # 변경 파일 + 2단계 영향도까지
+  description: "변경 파일과 직접 영향 받는 파일까지 분석"
+
+# ===== 자동 수정 연동 =====
+auto_fix:
+  enabled: true
+  categories:
+    - lint_format  # ESLint, Prettier 자동 수정
+    - missing_alt_text  # 누락된 alt 텍스트 제안
+    - import_sorting  # import 정렬
+  requires_approval: true
+  description: "자동 수정 가능한 항목 식별 및 제안"
+
+# ===== 리뷰 히스토리 =====
+history:
+  enabled: true
+  directory: "artifacts/reviews/"
+  retention_days: 90
+  template: "templates/review-history-entry.md"
+  trend_analysis: true
+  description: "리뷰 결과 90일 보관 및 추세 분석"
+
+# ===== 하이브리드 실행 모드 =====
+execution_mode:
+  default: "subagent"
+  modes:
+    subagent:
+      description: "PM이 Task()로 순차/병렬 스폰 (기본, 비용 효율)"
+      max_parallel: 4
+      trigger: "default"
+
+    agent_teams:
+      description: "Agent Teams 모드 (최대 병렬, 독립 컨텍스트)"
+      trigger: "팀 리뷰"
+      teammate_config:
+        - name: "T1-Security"
+          roles: [security-reviewer]
+        - name: "T2-Performance"
+          roles: [performance-reviewer, dba]
+        - name: "T3-Architecture"
+          roles: [architect, api-reviewer]
+        - name: "T4-Logic"
+          roles: [developer, test-coverage-reviewer]
+        - name: "T5-UX"
+          roles: [accessibility-reviewer, ux-reviewer]
+
+# ===== PR 코멘트 포맷 =====
+output_format:
+  pr_comment: |
+    ## Code Review Summary
+
+    ### Preset: {{preset}} | Mode: {{execution_mode}}
+
+    ### Automated Checks
+    | Check | Status | Details |
+    |-------|--------|---------|
+    | Lint | {{lint_status}} | {{lint_details}} |
+    | Security Scan | {{security_scan_status}} | {{security_scan_details}} |
+    | Coverage | {{coverage_percent}}% | Target: 80% |
+    | Complexity | {{complexity_avg}} | Threshold: 10 |
+
+    ### Review Results
+    | Reviewer | Severity | Verdict |
+    |----------|----------|---------|
+    {{#each reviews}}
+    | {{reviewer_name}} | C:{{critical}} H:{{high}} M:{{medium}} L:{{low}} | {{verdict}} |
+    {{/each}}
+
+    ### Critical Issues
+    {{critical_issues}}
+
+    ### Required Changes
+    {{required_changes}}
+
+    ### Verdict: {{final_verdict}}
+
+    ---
+    *Reviewed by jsnwcorp-dev-team v2.0*

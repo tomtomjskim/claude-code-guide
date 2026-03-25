@@ -1,0 +1,113 @@
+# Event-Driven Review Hooks v1.0
+# 파일 변경 시 자동 트리거되는 경량 리뷰 규칙
+# PM이 PostToolUse(Edit/Write) 이벤트에서 참조
+
+version: "1.0"
+description: "고위험 파일 변경 감지 시 전문 리뷰어 자동 트리거"
+
+# 트리거 규칙: 파일 패턴 → 리뷰어 매핑
+triggers:
+  # 보안 관련 파일
+  security:
+    patterns:
+      - "nginx/conf.d/*.conf"
+      - "nginx/nginx.conf"
+      - ".env*"
+      - "**/auth/**"
+      - "**/middleware/auth*"
+      - "**/cors*"
+      - "docker-compose.yml"
+    reviewer: security-reviewer
+    model: sonnet
+    severity_threshold: HIGH
+    description: "보안 설정 변경 감지 → Security Sentinel 자동 스캔"
+
+  # 성능 관련 파일
+  performance:
+    patterns:
+      - "**/migration*.sql"
+      - "**/queries/**"
+      - "**/db/**"
+      - "**/*index*.ts"
+      - "**/*cache*"
+    reviewer: performance-reviewer
+    model: sonnet
+    severity_threshold: MEDIUM
+    description: "DB/쿼리/캐시 변경 감지 → Performance Prophet 자동 스캔"
+
+  # API 호환성
+  api:
+    patterns:
+      - "**/routes/**"
+      - "**/api/**"
+      - "**/controllers/**"
+      - "**/*.openapi.*"
+      - "**/*.swagger.*"
+    reviewer: api-reviewer
+    model: sonnet
+    severity_threshold: HIGH
+    description: "API 엔드포인트 변경 감지 → API Arbiter 호환성 체크"
+
+  # 인프라 변경
+  infrastructure:
+    patterns:
+      - "docker-compose.yml"
+      - "Dockerfile*"
+      - "scripts/*.sh"
+      - "nginx/**"
+    reviewer: publisher
+    model: haiku
+    severity_threshold: LOW
+    description: "인프라 설정 변경 감지 → 배포 영향도 경고"
+
+  # 접근성 관련
+  accessibility:
+    patterns:
+      - "**/*.tsx"
+      - "**/*.jsx"
+      - "**/components/**"
+    reviewer: accessibility-reviewer
+    model: haiku
+    severity_threshold: MEDIUM
+    condition: "file contains JSX/HTML elements"
+    description: "UI 컴포넌트 변경 감지 → WCAG AA 빠른 스캔"
+
+# 실행 모드
+execution:
+  mode: background  # 메인 워크플로우를 차단하지 않음
+  max_concurrent: 2  # 동시 최대 2개 리뷰
+  dedup_window: 300  # 5분 내 동일 파일 재트리거 방지 (초)
+  notification: inline  # 결과를 현재 대화에 인라인으로 표시
+
+# 결과 처리
+on_finding:
+  CRITICAL:
+    action: block_and_notify  # 즉시 알림 + 워크플로우 일시 중단
+    message: "⚠️ CRITICAL 발견: {{finding}} in {{file}}"
+  HIGH:
+    action: notify  # 알림만 (워크플로우 계속)
+    message: "🔍 HIGH 발견: {{finding}} in {{file}}"
+  MEDIUM:
+    action: log  # 로그만 기록
+  LOW:
+    action: silent  # 무시
+
+# v3.2: NightOps Trusted Context 예외
+trusted_contexts:
+  description: "NightOps 자율 루프 스크립트는 이벤트 리뷰 트리거에서 제외"
+  paths:
+    - "/home/ubuntu/nightops/"
+    - "/home/ubuntu/scripts/backup.sh"
+    - "/home/ubuntu/scripts/health-check.sh"
+    - "/home/ubuntu/scripts/lotto-fetch.sh"
+  reason: "M8 Self-Heal, M9 Continuous Quality 등 자율 루프의 파일 수정은 사전 검증 완료 상태"
+
+# PM 연동
+pm_integration:
+  inject_findings: true  # PM이 에이전트 스폰 시 이벤트 리뷰 결과를 컨텍스트에 포함
+  finding_format: |
+    ### 자동 감지된 이슈 (Event-Driven Review)
+    - **트리거**: {{trigger_name}} ({{file_pattern}})
+    - **리뷰어**: {{reviewer}}
+    - **발견**: {{findings_summary}}
+    - **신뢰도**: {{confidence}}/100

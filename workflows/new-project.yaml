@@ -1,0 +1,169 @@
+# New Project Setup Workflow
+# 새 프로젝트 셋업 워크플로우
+
+name: new-project
+description: 새 프로젝트 초기 설정 및 구조 생성
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 요구사항 정의
+  requirements:
+    parallel: false
+    tasks:
+      - id: gather_requirements
+        agent: pm
+        action: define_requirements
+        inputs:
+          - project_description
+          - target_users
+          - key_features
+        outputs:
+          - requirements.md
+        on_fail: escalate
+
+  # Phase 2: 기술 설계
+  design:
+    parallel: false
+    depends_on: [requirements]
+    tasks:
+      - id: tech_stack
+        agent: architect
+        action: select_tech_stack
+        inputs:
+          - requirements.md
+        outputs:
+          - tech_stack.md
+        approval_required: true
+        on_fail: escalate
+
+      - id: architecture
+        agent: architect
+        action: design_architecture
+        inputs:
+          - requirements.md
+          - tech_stack.md
+        outputs:
+          - architecture.md
+        on_fail: escalate
+
+  # Phase 3: 프로젝트 구조 생성
+  scaffold:
+    parallel: true
+    depends_on: [design]
+    tasks:
+      - id: create_structure
+        agent: developer
+        action: scaffold_project
+        inputs:
+          - tech_stack.md
+          - architecture.md
+        outputs:
+          - project_structure
+        on_fail: escalate
+
+      - id: setup_db
+        agent: dba
+        action: create_schema
+        inputs:
+          - architecture.md
+        outputs:
+          - init_schema.sql
+        condition: requires_database
+        on_fail: escalate
+
+      - id: setup_docker
+        agent: publisher
+        action: create_docker_config
+        inputs:
+          - tech_stack.md
+        outputs:
+          - Dockerfile
+          - docker-compose.yml
+        on_fail: escalate
+
+  # Phase 4: 기본 설정
+  configuration:
+    parallel: true
+    depends_on: [scaffold]
+    tasks:
+      - id: setup_linting
+        agent: developer
+        action: configure_linting
+        outputs:
+          - eslint.config.js
+          - .prettierrc
+        on_fail: escalate
+
+      - id: setup_testing
+        agent: qa
+        action: configure_testing
+        outputs:
+          - jest.config.js
+          - test_setup
+        on_fail: escalate
+
+      - id: setup_ci
+        agent: publisher
+        action: configure_ci
+        outputs:
+          - .github/workflows/
+        on_fail: escalate
+
+  # Phase 5: 문서화
+  documentation:
+    parallel: true
+    depends_on: [configuration]
+    tasks:
+      - id: create_readme
+        agent: documenter
+        action: write_readme
+        inputs:
+          - requirements.md
+          - tech_stack.md
+        outputs:
+          - README.md
+        on_fail: retry
+
+      - id: create_claude_md
+        agent: documenter
+        action: write_claude_config
+        inputs:
+          - architecture.md
+        outputs:
+          - CLAUDE.md
+        on_fail: retry
+
+  # Phase 6: 검증
+  verify:
+    parallel: false
+    depends_on: [documentation]
+    tasks:
+      - id: verify_setup
+        agent: qa
+        action: verify_project_setup
+        outputs:
+          - setup_verification.md
+        on_fail: retry
+
+      - id: initial_commit
+        agent: publisher
+        action: create_initial_commit
+        depends_on_tasks: [verify_setup]
+        on_fail: escalate
+
+checkpoints:
+  - after: design
+    report: tech_stack_approval
+  - after: scaffold
+    report: structure_created
+  - after: verify
+    report: project_ready
+
+templates:
+  nextjs:
+    command: "npx create-next-app@latest"
+    options: "--typescript --tailwind --app --src-dir"
+  fastapi:
+    command: "mkdir -p src && touch src/main.py"
+  static:
+    command: "npm create vite@latest -- --template react-ts"

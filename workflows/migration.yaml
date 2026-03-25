@@ -1,0 +1,161 @@
+# Database Migration Workflow
+# 데이터베이스 마이그레이션 워크플로우
+
+name: migration
+description: 안전한 DB 스키마 변경 및 데이터 마이그레이션
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 영향도 분석
+  impact_analysis:
+    parallel: true
+    tasks:
+      - id: schema_analysis
+        agent: dba
+        action: analyze_current_schema
+        inputs:
+          - target_tables
+          - migration_description
+        outputs:
+          - current_schema.md
+          - affected_queries.md
+        on_fail: retry
+
+      - id: code_impact
+        agent: explorer
+        action: find_db_usage
+        inputs:
+          - target_tables
+        outputs:
+          - code_references.md
+        on_fail: retry
+
+  # Phase 2: 마이그레이션 설계
+  design:
+    parallel: false
+    depends_on: [impact_analysis]
+    tasks:
+      - id: migration_design
+        agent: dba
+        action: design_migration
+        inputs:
+          - current_schema.md
+          - migration_description
+        outputs:
+          - migration.sql
+          - rollback.sql
+        approval_required: true
+        on_fail: escalate
+
+      - id: code_changes
+        agent: architect
+        action: plan_code_changes
+        inputs:
+          - code_references.md
+          - migration.sql
+        outputs:
+          - code_change_plan.md
+        condition: requires_code_changes
+        on_fail: escalate
+
+  # Phase 3: 테스트 환경 검증
+  test_validation:
+    parallel: false
+    depends_on: [design]
+    tasks:
+      - id: test_migration
+        agent: dba
+        action: test_migration
+        inputs:
+          - migration.sql
+          - rollback.sql
+        outputs:
+          - migration_test_result.md
+        environment: test
+        on_fail: escalate
+
+      - id: test_rollback
+        agent: dba
+        action: test_rollback
+        inputs:
+          - rollback.sql
+        outputs:
+          - rollback_test_result.md
+        on_fail: escalate
+
+  # Phase 4: 코드 변경 (필요시)
+  code_update:
+    parallel: true
+    depends_on: [test_validation]
+    condition: requires_code_changes
+    tasks:
+      - id: update_backend
+        agent: developer-backend
+        action: update_db_code
+        inputs:
+          - code_change_plan.md
+        outputs:
+          - updated_code
+        on_fail: escalate
+
+      - id: update_queries
+        agent: dba
+        action: optimize_queries
+        inputs:
+          - migration.sql
+        outputs:
+          - optimized_queries.md
+        on_fail: escalate
+
+  # Phase 5: 프로덕션 마이그레이션
+  production:
+    parallel: false
+    depends_on: [code_update]
+    approval_required: true
+    tasks:
+      - id: backup
+        agent: dba
+        action: backup_database
+        outputs:
+          - backup_info.md
+        on_fail: escalate
+
+      - id: execute_migration
+        agent: dba
+        action: run_migration
+        inputs:
+          - migration.sql
+        outputs:
+          - migration_result.md
+        depends_on_tasks: [backup]
+        on_fail: rollback
+        rollback_on_fail: true
+
+      - id: verify
+        agent: qa
+        action: verify_migration
+        outputs:
+          - verification_result.md
+        depends_on_tasks: [execute_migration]
+        on_fail: rollback
+        rollback_on_fail: true
+
+checkpoints:
+  - after: impact_analysis
+    report: impact_summary
+  - after: design
+    report: migration_plan_review
+  - after: test_validation
+    report: test_results
+  - after: production
+    report: migration_complete
+
+rollback:
+  strategy: execute_rollback_script
+  triggers:
+    - migration_failed
+    - verification_failed
+  actions:
+    - execute: rollback.sql
+    - notify: pm
+    - restore_backup: if_rollback_fails

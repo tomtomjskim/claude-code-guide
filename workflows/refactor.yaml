@@ -1,0 +1,118 @@
+# Refactoring Workflow
+# 코드 리팩토링 워크플로우
+
+name: refactor
+description: 코드 품질 개선 및 구조 변경
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 현황 분석
+  analysis:
+    parallel: true
+    tasks:
+      - id: code_analysis
+        agent: explorer
+        action: analyze_target
+        inputs:
+          - refactor_target
+          - refactor_goals
+        outputs:
+          - current_state.md
+          - dependency_map.md
+        on_fail: retry
+
+      - id: test_coverage
+        agent: qa
+        action: check_coverage
+        inputs:
+          - refactor_target
+        outputs:
+          - coverage_report.md
+        on_fail: retry
+
+  # Phase 2: 리팩토링 계획
+  planning:
+    parallel: false
+    depends_on: [analysis]
+    tasks:
+      - id: refactor_plan
+        agent: architect
+        action: plan_refactor
+        inputs:
+          - current_state.md
+          - dependency_map.md
+          - coverage_report.md
+        outputs:
+          - refactor_plan.md
+        approval_required: true
+        on_fail: escalate
+
+  # Phase 3: 테스트 보강 (필요시)
+  test_preparation:
+    parallel: false
+    depends_on: [planning]
+    condition: coverage_below_threshold
+    tasks:
+      - id: add_tests
+        agent: qa
+        action: write_tests
+        inputs:
+          - refactor_target
+          - refactor_plan.md
+        outputs:
+          - new_tests
+        on_fail: retry
+
+  # Phase 4: 리팩토링 실행
+  execution:
+    parallel: false
+    depends_on: [test_preparation]
+    tasks:
+      - id: refactor_code
+        agent: developer
+        action: refactor
+        inputs:
+          - refactor_plan.md
+        outputs:
+          - refactored_code
+        checkpoints:
+          - after_each_step  # 단계별 테스트 실행
+        on_fail: escalate
+
+  # Phase 5: 검증
+  verification:
+    parallel: true
+    depends_on: [execution]
+    tasks:
+      - id: run_tests
+        agent: qa
+        action: run_all_tests
+        outputs:
+          - test_results.md
+        on_fail: retry
+
+      - id: review
+        agent: architect
+        action: review_refactor
+        inputs:
+          - refactored_code
+          - refactor_plan.md
+        outputs:
+          - review_result.md
+        on_fail: retry
+
+checkpoints:
+  - after: analysis
+    report: analysis_complete
+  - after: planning
+    report: plan_ready_for_approval
+  - after: execution
+    report: refactor_complete
+  - after: verification
+    report: verification_result
+
+rollback:
+  strategy: git_revert
+  triggers:
+    - tests_failed
+    - review_rejected

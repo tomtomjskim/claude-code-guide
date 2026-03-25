@@ -1,0 +1,183 @@
+# Standard Development Workflow (DAG-based)
+# 표준 개발 워크플로우 (의존성 기반 병렬 실행)
+
+name: standard-development
+description: 일반적인 기능 개발 워크플로우
+failure_policy: "workflows/failure-policy.yaml"
+
+# 워크플로우 단계 정의
+phases:
+  # Phase 1: 분석 (병렬)
+  analysis:
+    parallel: true
+    tasks:
+      - id: explore
+        agent: explorer
+        action: analyze_codebase
+        inputs:
+          - project_path
+          - feature_description
+        outputs:
+          - codebase_analysis.md
+        on_fail: retry
+
+      - id: requirements
+        agent: pm
+        action: define_requirements
+        inputs:
+          - user_request
+        outputs:
+          - requirements.md
+        on_fail: retry
+
+  # Phase 2: 설계 (순차)
+  design:
+    parallel: false
+    depends_on: [analysis]
+    tasks:
+      - id: architecture
+        agent: architect
+        action: create_design
+        inputs:
+          - requirements.md
+          - codebase_analysis.md
+        outputs:
+          - design_doc.md
+        approval_required: true
+        on_fail: escalate
+
+  # Phase 3: 준비 (병렬)
+  preparation:
+    parallel: true
+    depends_on: [design]
+    tasks:
+      - id: schema
+        agent: dba
+        action: design_schema
+        inputs:
+          - design_doc.md
+        outputs:
+          - schema.sql
+          - migration.sql
+        condition: requires_db_changes
+        on_fail: escalate
+
+      - id: ui_design
+        agent: designer
+        action: design_components
+        inputs:
+          - design_doc.md
+        outputs:
+          - component_specs.md
+        condition: requires_ui_changes
+        on_fail: escalate
+
+  # Phase 4: 구현 (의존성 기반 병렬)
+  implementation:
+    parallel: true
+    depends_on: [preparation]
+    tasks:
+      - id: backend
+        agent: developer-backend
+        action: implement
+        inputs:
+          - design_doc.md
+          - schema.sql
+        outputs:
+          - backend_code
+        depends_on_tasks: [schema]
+        on_fail: escalate
+
+      - id: frontend
+        agent: developer-frontend
+        action: implement
+        inputs:
+          - design_doc.md
+          - component_specs.md
+        outputs:
+          - frontend_code
+        depends_on_tasks: [ui_design]
+        on_fail: escalate
+
+  # Phase 5: 검증 (병렬)
+  verification:
+    parallel: true
+    depends_on: [implementation]
+    tasks:
+      - id: testing
+        agent: qa
+        action: run_tests
+        inputs:
+          - backend_code
+          - frontend_code
+        outputs:
+          - test_report.md
+        approval_required: true
+        on_fail: retry
+
+      - id: code_review
+        agent: architect
+        action: review_code
+        inputs:
+          - backend_code
+          - frontend_code
+        outputs:
+          - review_comments.md
+        on_fail: retry
+
+  # Phase 6: 배포 (순차)
+  deployment:
+    parallel: false
+    depends_on: [verification]
+    conditions:
+      - testing.approved == true
+      - code_review.passed == true
+    tasks:
+      - id: deploy
+        agent: publisher
+        action: deploy
+        inputs:
+          - backend_code
+          - frontend_code
+        outputs:
+          - deployment_report.md
+        on_fail: rollback
+        rollback_on_fail: true
+
+  # Phase 7: 문서화 (순차)
+  documentation:
+    parallel: false
+    depends_on: [deployment]
+    tasks:
+      - id: update_docs
+        agent: documenter
+        action: update_documentation
+        inputs:
+          - design_doc.md
+          - deployment_report.md
+        outputs:
+          - changelog_entry.md
+          - updated_readme.md
+        on_fail: retry
+
+# 보고 체크포인트
+checkpoints:
+  - after: analysis
+    report: analysis_summary
+  - after: design
+    report: design_review_request
+  - after: verification
+    report: qa_status
+  - after: deployment
+    report: deployment_status
+  - after: documentation
+    report: final_summary
+
+# 롤백 정책
+rollback:
+  triggers:
+    - deployment.failed
+    - testing.critical_bugs > 0
+  actions:
+    - restore_previous_version
+    - notify_pm

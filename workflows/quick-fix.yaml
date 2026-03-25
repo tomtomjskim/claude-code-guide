@@ -1,0 +1,71 @@
+# Quick Fix Workflow
+# 긴급 버그 수정 워크플로우
+
+name: quick-fix
+description: 긴급 버그 수정을 위한 간소화된 워크플로우
+failure_policy: "workflows/failure-policy.yaml"
+
+phases:
+  # Phase 1: 분석 (순차, 빠르게)
+  analysis:
+    parallel: false
+    tasks:
+      - id: investigate
+        agent: explorer
+        action: find_bug_source
+        inputs:
+          - bug_description
+          - error_logs
+        outputs:
+          - bug_analysis.md
+        on_fail: retry
+
+  # Phase 2: 수정 (순차)
+  fix:
+    parallel: false
+    depends_on: [analysis]
+    tasks:
+      - id: implement_fix
+        agent: developer
+        action: fix_bug
+        inputs:
+          - bug_analysis.md
+        outputs:
+          - fix_code
+        on_fail: escalate
+
+  # Phase 3: 검증 (순차)
+  verify:
+    parallel: false
+    depends_on: [fix]
+    tasks:
+      - id: test_fix
+        agent: qa
+        action: verify_fix
+        inputs:
+          - fix_code
+          - bug_description
+        outputs:
+          - verification_result
+        on_fail: retry
+
+  # Phase 4: 배포 (순차)
+  deploy:
+    parallel: false
+    depends_on: [verify]
+    conditions:
+      - verification_result.passed == true
+    tasks:
+      - id: hotfix_deploy
+        agent: publisher
+        action: deploy_hotfix
+        outputs:
+          - deployment_status
+        on_fail: rollback
+        rollback_on_fail: true
+
+checkpoints:
+  - after: fix
+    report: fix_ready_for_review
+  - after: deploy
+    report: hotfix_complete
