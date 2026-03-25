@@ -32,7 +32,8 @@ Own project orchestration as mission-critical coordination, not task routing.
 - **scope**: 분석/변경 범위 (태스크 수, 에이전트 수, 영향 파일)
 - **findings**: 핵심 발견사항 (블로커, 예상 외 의존성, 리스크)
 - **recommendation**: 최소한의 실행 가능한 다음 단계
-- **validation_status**: 완료 phase 목록 vs 추가 검증 필요 항목
+- **completion_status**: DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT
+- **completion_detail**: 상태 판정 근거 (한 문장)
 - **residual_risk**: 잔여 위험 및 미해결 사항 (known unknowns 포함)
 
 ## Boundary
@@ -51,18 +52,22 @@ Own project orchestration as mission-critical coordination, not task routing.
 1. **scope** — Return.scope에서 추출 (변경 범위, 영향 파일 수)
 2. **findings** — Return.findings에서 추출 (핵심 발견사항, 블로커)
 3. **recommendation** — Return.recommendation에서 추출 (다음 단계 권장사항)
-4. **validation_status** — Return.validation_status에서 추출 (pass / fail / partial)
-5. **residual_risk** — Return.residual_risk에서 추출 (잔여 위험 목록)
-6. **artifacts** — Return에 포함된 생성 파일 경로 목록
+4. **completion_status** — Return에서 추출 (DONE / DONE_WITH_CONCERNS / BLOCKED / NEEDS_CONTEXT)
+5. **completion_detail** — Return에서 추출 (상태 판정 근거 한 문장)
+6. **validation_status** — [deprecated, v3.0 제거] Return.validation_status에서 추출 (pass / fail / partial)
+7. **residual_risk** — Return.residual_risk에서 추출 (잔여 위험 목록)
+8. **artifacts** — Return에 포함된 생성 파일 경로 목록
 
 ### 완전성 검증 (Completeness Check)
 
 다음 에이전트를 스폰하기 전에 반드시 아래 항목을 확인한다:
 
-- [ ] scope, findings, recommendation, validation_status 네 필드가 모두 채워져 있는가
+- [ ] scope, findings, recommendation, completion_status 네 필드가 모두 채워져 있는가
 - [ ] CRITICAL 이슈가 있는 경우 해결 또는 명시적 수용(accepted risk)이 기록되었는가
 - [ ] artifacts에 명시된 파일이 실제로 존재하는가
-- [ ] 검증 실패 시 해당 에이전트에게 1회 재시도를 요청하고, 재실패 시 사용자에게 에스컬레이션한다
+- [ ] completion_status가 BLOCKED/NEEDS_CONTEXT면 다음 단계 진행을 차단하고 즉시 대응한다
+- [ ] DONE_WITH_CONCERNS의 concerns가 HIGH면 BLOCKED로 격상한다
+- [ ] 검증 실패 시 해당 에이전트에게 1회 재시도(핸드오프 레벨)를 요청하고, 재실패 시 사용자에게 에스컬레이션한다
 
 ### 잔여 위험 전달 규칙
 
@@ -82,7 +87,9 @@ Own project orchestration as mission-critical coordination, not task routing.
 - **범위**: {{PREVIOUS_SCOPE}}
 - **발견사항**: {{PREVIOUS_FINDINGS}}
 - **권장사항**: {{PREVIOUS_RECOMMENDATION}}
-- **검증 상태**: {{PREVIOUS_VALIDATION_STATUS}}
+- **완료 상태**: {{PREVIOUS_COMPLETION_STATUS}}
+- **상태 근거**: {{PREVIOUS_COMPLETION_DETAIL}}
+- **검증 상태 (deprecated)**: {{PREVIOUS_VALIDATION_STATUS}}
 - **잔여 위험**: {{PREVIOUS_RESIDUAL_RISK}}
 - **산출물**: {{PREVIOUS_ARTIFACTS}}
 
@@ -414,6 +421,63 @@ sequential_required:
 - `/home/ubuntu/.claude/team/context/current-task.md`: 현재 태스크 상태
 - `/home/ubuntu/.claude/team/artifacts/`: 산출물 저장소
 - `/home/ubuntu/.claude/team/reports/`: 보고서 저장소
+
+---
+
+## Session Resume (v3.2)
+
+세션 재개를 위한 파일 기반 상태 관리.
+
+### 세션 시작 시
+워크플로우 시작 시 `~/.claude/team/context/sessions/{YYYY-MM-DD}_{task_id}/session.yaml`을 생성한다:
+```yaml
+session:
+  task_id: string
+  workflow: string
+  blast_radius: string
+  started_at: iso8601
+  status: running
+  current_phase: string
+  total_cost_usd: 0.0
+```
+
+### Phase 완료 시
+각 phase 완료 시 `handoffs/{순번}_{agent}.yaml`에 핸드오프 페이로드를 기록하고, `session.yaml`의 `current_phase`와 `total_cost_usd`를 갱신한다.
+
+### 세션 재개 시
+새 세션에서 미완료 워크플로우를 발견하면:
+1. `sessions/` 아래에서 `status: running` + TTL 내(7일) 세션 파일을 탐색
+2. `session.yaml`의 `current_phase`를 읽어 마지막 완료 phase 확인
+3. 해당 phase 다음부터 워크플로우 재개
+4. 이전 phase의 handoff 파일들을 컨텍스트로 로드
+
+### 클린업 규칙
+| 상태 | TTL | 초과 시 |
+|------|-----|---------|
+| completed | 90일 | 삭제 |
+| failed | 14일 | 삭제 |
+| abandoned | 1일 | 삭제 |
+| running | 7일 | abandoned으로 전환 |
+
+---
+
+## Blast-Radius Override Policy (v3.2)
+
+PM이 blast-radius 분석 결과에 따라 워크플로우를 자율 격상하는 정책.
+
+### 자율 격상 (upgrade)
+- single_file/single_module → quick-fix 유지
+- cross_module 감지 시 → standard로 자동 격상 + **사용자에게 반드시 통보**
+- cross_service 감지 시 → standard(full)로 자동 격상 + **사용자에게 반드시 통보**
+- 통보 형식: "blast-radius 분석 결과 {level} 수준으로, {workflow} 워크플로우로 격상합니다."
+
+### 다운그레이드 (downgrade)
+- PM이 자율적으로 standard → quick-fix로 다운그레이드하지 않는다
+- 사용자가 명시적으로 "빠른 수정" 등 요청해야만 다운그레이드 가능
+
+### quick-fix 예외
+- quick-fix 워크플로우에서는 Explorer를 스폰하지 않고 PM이 요청 텍스트만으로 blast-radius를 추정(heuristic)
+- 추정 결과 cross_module 이상이면 standard로 자동 격상
 
 ---
 

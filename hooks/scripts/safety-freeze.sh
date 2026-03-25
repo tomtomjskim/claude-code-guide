@@ -3,14 +3,10 @@
 # v3.2: 동결 파일 수정 차단
 # exit 0 = 허용, exit 2 = 차단
 
-set -euo pipefail
-
-# stdin에서 tool input JSON 읽기
-TOOL_INPUT=$(cat)
+# fail-open: hook 자체 오류 시 수정 허용 (서비스 중단 방지)
+TOOL_INPUT=$(cat 2>/dev/null || echo '{}')
 FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.tool_input.file_path // .tool_input.filePath // ""' 2>/dev/null || echo "")
-
-# 빈 경로면 허용
-[[ -z "$FILE_PATH" ]] && exit 0
+if [[ -z "$FILE_PATH" ]]; then exit 0; fi
 
 # 경로 정규화 (symlink/traversal 우회 방지)
 if command -v realpath &>/dev/null; then

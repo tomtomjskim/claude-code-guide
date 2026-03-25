@@ -148,6 +148,7 @@ phases:
         has_api_changes: "categories includes api"
         has_db_changes: "categories includes performance AND schema files detected"
         has_security_findings: "categories includes security"
+        has_architecture_findings: "blast_radius >= cross_module OR categories includes infra"
       reviewer_routing:
         security: [security-reviewer]
         api: [api-reviewer]

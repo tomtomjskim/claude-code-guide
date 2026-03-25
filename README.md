@@ -136,6 +136,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | **14** | **[프리셋 시스템](docs/14-preset-system.md)** | **깊이(depth) x 실행(mode) 2축 체계. analyze/spec/check-code 프리셋** |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
 | -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |
+| -- | **[v3 Changelog](docs/v3-changelog.md)** | **v3.0→v3.2 전체 변경 이력 (릴리즈 노트)** |
 
 ---
 

@@ -3,25 +3,23 @@
 # v3.2: 파괴적 명령 사전 차단
 # exit 0 = 허용, exit 2 = 차단
 
-set -euo pipefail
-
-# stdin에서 tool input JSON 읽기
-TOOL_INPUT=$(cat)
+# fail-open: hook 자체 오류 시 명령 허용 (서비스 중단 방지)
+TOOL_INPUT=$(cat 2>/dev/null || echo '{}')
 COMMAND=$(echo "$TOOL_INPUT" | jq -r '.tool_input.command // ""' 2>/dev/null || echo "")
-
-# 빈 명령이면 허용
-[[ -z "$COMMAND" ]] && exit 0
+if [[ -z "$COMMAND" ]]; then exit 0; fi
 
 # ── NightOps Trusted Context 예외 ──
-# NightOps 스크립트 경로에서 실행되는 명령은 통과
+# NightOps 스크립트: 명령이 신뢰 경로로 시작하는 경우만 허용 (포함 매칭 금지)
 NIGHTOPS_TRUSTED=(
   "/home/ubuntu/nightops/"
   "/home/ubuntu/scripts/lotto-fetch.sh"
   "/home/ubuntu/scripts/backup.sh"
   "/home/ubuntu/scripts/health-check.sh"
 )
+# 첫 번째 토큰(실행 파일 경로)만 추출하여 비교
+FIRST_TOKEN=$(echo "$COMMAND" | awk '{print $1}')
 for pattern in "${NIGHTOPS_TRUSTED[@]}"; do
-  if [[ "$COMMAND" == *"$pattern"* ]]; then
+  if [[ "$FIRST_TOKEN" == "$pattern"* ]]; then
     exit 0
   fi
 done

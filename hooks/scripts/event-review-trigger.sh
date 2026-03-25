@@ -3,14 +3,10 @@
 # v3.2: 파일 변경 후 리뷰어 트리거 정보 기록
 # 항상 exit 0 (PostToolUse는 워크플로우를 차단하지 않음)
 
-set -euo pipefail
-
-# stdin에서 tool input JSON 읽기
-TOOL_INPUT=$(cat)
+# fail-open: hook 자체 오류 시 허용 (PostToolUse는 차단 불가)
+TOOL_INPUT=$(cat 2>/dev/null || echo '{}')
 FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.tool_input.file_path // .tool_input.filePath // ""' 2>/dev/null || echo "")
-
-# 빈 경로면 종료
-[[ -z "$FILE_PATH" ]] && exit 0
+if [[ -z "$FILE_PATH" ]]; then exit 0; fi
 
 # 트리거 기록 파일
 TRIGGER_FILE="/home/ubuntu/.claude/team/context/review-triggers.log"
