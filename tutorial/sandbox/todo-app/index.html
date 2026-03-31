@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Todo App</h1>
+      <p>Claude Code 개발자 튜토리얼용 프로젝트</p>
+    </header>
+
+    <div class="input-area">
+      <input type="text" id="todoInput" placeholder="할 일을 입력하세요...">
+      <button id="addBtn" onclick="addTodo()">추가</button>
+    </div>
+
+    <div class="filters">
+      <button class="filter active" onclick="filterTodos('all')">전체</button>
+      <button class="filter" onclick="filterTodos('active')">진행중</button>
+      <button class="filter" onclick="filterTodos('done')">완료</button>
+    </div>
+
+    <ul id="todoList"></ul>
+
+    <div class="stats">
+      <span id="totalCount">0</span>개 중 <span id="doneCount">0</span>개 완료
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -2,11 +2,14 @@
 
 **Claude Code를 효과적으로 사용하기 위한 종합 가이드 및 템플릿**
 
+> **처음이신가요?** → `/tutorial` 명령으로 인터랙티브 튜토리얼을 시작하세요. [튜토리얼 상세 보기](#-튜토리얼-시스템)
+
 ---
 
 ## 개요
 
 이 레포지토리는 Claude Code 초기 설정부터 팀 워크플로우까지 모든 것을 다룹니다.
+비개발자부터 전문가까지, 수준별 학습 경로와 실습 환경을 제공합니다.
 
 ### 주요 내용
 - PDARR 워크플로우 커맨드 시스템 (/dispatch, /prd, /run, /workflow 등)
@@ -159,6 +162,63 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | -- | **[Skills README](skills/README.md)** | **17개 커스텀 스킬 설치/커스터마이징 가이드** |
 | -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |
 | -- | **[v3 Changelog](docs/v3-changelog.md)** | **v3.0→v3.2 전체 변경 이력 (릴리즈 노트)** |
+
+---
+
+## 튜토리얼 시스템
+
+비개발자부터 전문가까지, **실습 중심**의 단계별 학습 코스.
+
+### 시작하기
+```
+/tutorial              # 레벨 자동 판별 (3가지 질문)
+/tutorial beginner     # 초보자 코스 직행
+/tutorial developer    # 개발자 코스 직행
+/tutorial expert       # 전문가 코스 직행
+```
+
+### 학습 경로
+
+| 코스 | 대상 | 미션 수 | 소요 시간 | 실습 프로젝트 |
+|------|------|--------|----------|-------------|
+| **초보자** | 비개발자, Claude Code 처음 | 5개 | ~15분 | `hello-world` (HTML) |
+| **개발자** | 개발 경험 있음, 워크플로우 학습 | 5개 | ~35분 | `todo-app` (JS) |
+| **전문가** | PDARR 숙지, 고급 활용 | 3개 | ~50분 | `api-service` (Node.js) |
+
+### 초보자 코스 미리보기
+```
+1. 첫 대화       — "이 파일이 뭐예요?" (파일 읽기)
+2. CSS 버그 수정  — "이거 왜 안 보여요?" (문제 설명 → 자동 수정)
+3. 내용 바꿔보기  — "내 걸로 만들기" (여러 파일 수정)
+4. 새 파일 만들기 — "이런 페이지 만들어줘" (파일 생성)
+5. Git 저장      — "작업 기록 남기기" (버전 관리)
+```
+
+### 추가 도구
+```
+/tutorial cheatsheet   # 수준별 치트시트
+/tutorial glossary     # 용어 사전 (일상 비유)
+/tutorial status       # 전체 학습 경로 보기
+/tutorial next         # 다음 미션 안내
+```
+
+### 튜토리얼 구조
+```
+tutorial/
+├── sandbox/              # 실습 프로젝트 (안전하게 실험 가능)
+│   ├── hello-world/      # 초보자: HTML 페이지 (의도적 버그 포함)
+│   ├── todo-app/         # 개발자: 할 일 관리 앱
+│   └── api-service/      # 전문가: REST API 서버
+├── missions/             # 단계별 미션 가이드
+│   ├── beginner/         # 5개 미션
+│   ├── developer/        # 5개 미션
+│   └── expert/           # 3개 미션
+├── cheatsheets/          # 수준별 한 장 요약
+│   ├── beginner-cheatsheet.md
+│   ├── developer-cheatsheet.md
+│   └── expert-cheatsheet.md
+└── glossary.md           # 용어 사전
+```
 
 ---
 
