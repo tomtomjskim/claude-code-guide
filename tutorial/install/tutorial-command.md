@@ -1,5 +1,11 @@
 # /tutorial — 인터랙티브 학습 가이드
 
+> 이 파일을 프로젝트의 `.claude/commands/tutorial.md`에 복사하면 `/tutorial` 커맨드로 사용 가능합니다.
+> ```bash
+> mkdir -p .claude/commands
+> cp tutorial/install/tutorial-command.md .claude/commands/tutorial.md
+> ```
+
 사용자의 수준을 파악하고 적절한 튜토리얼 경로로 안내하는 커맨드.
 
 ## 입력
