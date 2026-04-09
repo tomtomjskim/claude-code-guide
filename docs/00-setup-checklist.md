@@ -82,6 +82,16 @@ claude --mcp-test
   claude plugin install superpowers@superpowers-marketplace
   ```
 
+### 권장 플러그인: Codex (OpenAI)
+- [ ] **Codex** - 코드 리뷰, 디버깅 위임, Review Gate
+  ```bash
+  claude plugin marketplace add openai/codex-plugin-cc
+  claude plugin install codex@openai-codex
+  /reload-plugins
+  /codex:setup --enable-review-gate
+  # 미인증 시: !codex login
+  ```
+
 ### 플러그인 설정 확인
 ```bash
 # 설치된 플러그인 확인
@@ -91,7 +101,7 @@ claude plugin list
 # "enabledPlugins": { "superpowers@superpowers-marketplace": true }
 ```
 
-자세한 내용은 [추천 플러그인 가이드](09-recommended-plugins.md)를 참조하세요.
+자세한 내용은 [추천 플러그인 가이드](09-recommended-plugins.md) 및 [Codex 플러그인 가이드](15-codex-plugin.md)를 참조하세요.
 
 ---
 

@@ -196,6 +196,52 @@ claude plugin install skill-creator@claude-plugins-official
 
 ---
 
+## 필수 플러그인: Codex (OpenAI)
+
+> Claude Code 내에서 OpenAI Codex CLI를 통합 사용. 코드 리뷰, 디버깅 위임, Review Gate 지원.
+
+| 항목 | 내용 |
+|------|------|
+| **개발자** | OpenAI |
+| **GitHub** | [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) |
+| **마켓플레이스** | openai-codex |
+| **요구사항** | Node.js 18+, Codex CLI (`npm install -g @openai/codex`), OpenAI 인증 |
+
+#### 설치
+
+```bash
+# 1. 마켓플레이스 등록
+claude plugin marketplace add openai/codex-plugin-cc
+
+# 2. 플러그인 설치
+claude plugin install codex@openai-codex
+
+# 3. 플러그인 로드
+/reload-plugins
+
+# 4. 셋업 확인 + Review Gate 활성화
+/codex:setup --enable-review-gate
+
+# 5. Codex 인증 (미인증 시)
+!codex login
+```
+
+#### 슬래시 커맨드
+
+| 커맨드 | 설명 |
+|--------|------|
+| `/codex:setup` | 셋업 확인 및 Review Gate 토글 |
+| `/codex:review` | Codex 코드 리뷰 |
+| `/codex:adversarial-review` | 도전적 설계/구현 리뷰 |
+| `/codex:rescue` | Codex에게 디버깅/구현 위임 |
+| `/codex:status` | 작업 상태 확인 |
+| `/codex:result` | 완료된 작업 결과 조회 |
+| `/codex:cancel` | 백그라운드 작업 취소 |
+
+자세한 내용은 [Codex 플러그인 가이드](15-codex-plugin.md)를 참조하세요.
+
+---
+
 ## 추천 마켓플레이스 스킬 (6개)
 
 커뮤니티 마켓플레이스에서 설치할 수 있는 검증된 스킬입니다.

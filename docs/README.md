@@ -22,6 +22,8 @@ Claude Code를 효과적으로 사용하기 위한 종합 가이드입니다.
 | 11 | [Workflow Commands](11-workflow-commands.md) | PDARR 워크플로우 커맨드 요약 |
 | 12 | [v3.0 시스템 아키텍처](12-v3-architecture.md) | 5-section 템플릿, Handoff Protocol, 모델 라우팅, Tiebreaker 등 v3.0 전체 설계 |
 | 13 | [핸드오프 & 실패 복구](13-handoff-and-failure.md) | Handoff Protocol 설정, failure-policy.yaml, 실전 예시, PM/에스컬레이션 템플릿 |
+| 14 | [프리셋 시스템](14-preset-system.md) | 깊이(Depth) x 실행(Mode) 2축 프리셋 체계 |
+| 15 | [Codex 플러그인](15-codex-plugin.md) | OpenAI Codex CLI 통합 — 코드 리뷰, 디버깅 위임, Review Gate |
 
 ### 소스 분석 기반 심화 가이드 (v2.1.88)
 
