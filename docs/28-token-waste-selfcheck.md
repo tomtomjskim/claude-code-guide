@@ -260,7 +260,22 @@ find ~/.claude/projects -name "*.md" -path "*/memory/*" -exec wc -c {} \; | sort
 
 ## 6. settings.json 종합 점검
 
+### 6.0 settings.json vs settings.local.json — 어디에 설정할 것인가
+
+토큰 최적화 설정은 **개인 선호**이므로 `settings.local.json`에 넣는 것을 권장합니다.
+
+| 파일 | 용도 | git 커밋 | 권장 설정 |
+|------|------|---------|----------|
+| `.claude/settings.json` | 프로젝트 공용 | ✅ 커밋 | hooks, allowedTools, MCP 서버 |
+| `.claude/settings.local.json` | 개인 전용 | ❌ .gitignore | 토큰 최적화, Cloud AI MCP 비활성화 |
+| `~/.claude/settings.json` | 글로벌 공용 | — | 공통 MCP, 테마 |
+| `~/.claude/settings.local.json` | 글로벌 개인 | — | **토큰 최적화 (권장 위치)** |
+
+> **핵심**: `settings.local.json`은 동일 레이어의 `settings.json`과 같은 우선순위이며 `.gitignore`에 포함됩니다. 팀원에게 영향을 주지 않으면서 개인 최적화를 적용할 수 있습니다.
+
 ### 6.1 토큰 절감 필수 설정
+
+**권장 위치**: `~/.claude/settings.local.json` (글로벌 개인)
 
 ```json
 {
@@ -269,13 +284,20 @@ find ~/.claude/projects -name "*.md" -path "*/memory/*" -exec wc -c {} \; | sort
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "150000"
   },
+  "fastMode": false,
   "memory": {
     "enabled": true,
     "maxFiles": 3
   },
   "maxSkillsPerTurn": 3,
   "showTokenUsage": true,
-  "autoCompact": true
+  "autoCompact": true,
+  "mcpServers": {
+    "claude_ai_Canva": { "disabled": true },
+    "claude_ai_Gmail": { "disabled": true },
+    "claude_ai_Google_Calendar": { "disabled": true },
+    "claude_ai_Magic_Patterns": { "disabled": true }
+  }
 }
 ```
 
@@ -369,6 +391,8 @@ bash scripts/selfcheck-token-waste.sh
 ---
 
 ## 8. 시나리오별 최적화 프로필
+
+> 아래 프로필은 모두 `~/.claude/settings.local.json` 또는 `.claude/settings.local.json`에 넣는 것을 권장합니다. 팀 공유용 `.claude/settings.json`에는 hooks, allowedTools 등 프로젝트 규칙만 유지하세요.
 
 ### 8.1 Pro 사용자 (비용 민감)
 

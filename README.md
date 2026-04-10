@@ -35,7 +35,9 @@
 - **v3.3 신규**: 스킬 경량화 가이드 — 스킬 크기 기준, 본체/참조 분리 전략, 경량 템플릿
 - **v3.3 신규**: 토큰 낭비 자가진단 — Cloud AI MCP 자동 활성화 감지, 7대 낭비 요소, 시나리오별 프로필
 - **v3.3 신규**: `selfcheck-token-waste.sh` 자동 진단 스크립트 — 7항목 자동 점검
-- **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a)
+- **v3.3 신규**: 하네스 엔지니어링 가이드 — settings/hooks/CLAUDE.md/skills/memory 5컴포넌트 통합 설계
+- **v3.3 신규**: Advisor Strategy 가이드 — executor+advisor 모델 패턴, API 구현, PDARR 연계
+- **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a), settings.local.json 개인 설정 분리 권장
 > v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
 
 ---

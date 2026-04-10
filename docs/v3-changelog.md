@@ -550,3 +550,42 @@ Key theme: **"토큰이 어디서 새는지 알고, 막아라"**
 2. **Cloud AI MCP 비활성화는 settings.json disabled 방식**: MCP 서버를 삭제하면 향후 사용 시 재설정이 필요하므로 `disabled: true`로 토글 방식 채택.
 3. **진단 스크립트는 jq 없이도 동작**: python3 fallback으로 jq 미설치 환경 지원.
 4. **시나리오별 프로필 3종**: Pro(비용 민감)/Max(균형)/NightOps(최소 비용) — 사용자가 자신의 플랜에 맞는 설정을 즉시 복사 적용 가능.
+
+### 5. 하네스 엔지니어링 가이드 (docs/29-harness-engineering.md)
+
+- **5컴포넌트 통합 아키텍처**: settings.json, Hooks, CLAUDE.md, Skills, Memory의 상호 관계와 데이터 플로우
+- **Hook 패턴 라이브러리 4종**: 위험 명령 차단, 파일 보호, 구문 검증, 감사 로그
+- **시나리오별 하네스 설계 3종**: 개인 개발자, 팀 프로젝트, 자동화/NightOps
+- **settings.json vs settings.local.json 분리 원칙**: 팀 공유(hooks, 권한) vs 개인(토큰 최적화)
+- **경로 스코프 규칙**: `.claude/rules/*.md`로 CLAUDE.md 비대화 방지
+- **하네스 진화 4단계**: 시작 → 성장 → 팀 → 자동화
+
+### 6. Advisor Strategy 가이드 (docs/30-advisor-strategy.md)
+
+- **Anthropic 2026-04-09 발표 Beta**: executor+advisor 모델 협업 패턴
+- **벤치마크**: Sonnet+Opus Advisor = Sonnet 대비 +2.7pp, 11.9% 비용 절감
+- **API 구현**: Python/TypeScript 코드 예제, 도구 파라미터, 비용 구조
+- **Best Practices**: 작업당 2~3회 호출, 시스템 프롬프트 가이드, 출력 토큰 절감
+- **PDARR 워크플로우 연계**: Plan→advisor, Act→advisor(막힐 때), Review→advisor(검증)
+- **고급 기능**: 프롬프트 캐싱, multi-turn, effort 설정 조합
+
+### 7. settings.local.json 개인 설정 분리
+
+- docs/28 토큰 낭비 자가진단에 `settings.local.json` 권장 위치 안내 추가
+- 시나리오별 프로필을 `settings.local.json` 기준으로 업데이트
+- frecto_web 프로젝트에 토큰 최적화 `settings.local.json` 실제 적용
+
+### 추가 New Files
+
+| File | Description |
+|------|-------------|
+| `docs/29-harness-engineering.md` | 하네스 엔지니어링 종합 가이드 |
+| `docs/30-advisor-strategy.md` | Advisor Strategy 가이드 |
+
+### 추가 Modified Files
+
+| File | Changes |
+|------|---------|
+| `docs/28-token-waste-selfcheck.md` | settings.local.json 권장 안내, 시나리오별 프로필 업데이트 |
+| `docs/README.md` | #29, #30 문서 인덱스 추가 |
+| `README.md` | v3.3 하네스/Advisor 항목 추가 |
