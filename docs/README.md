@@ -23,7 +23,7 @@ Claude Code를 효과적으로 사용하기 위한 종합 가이드입니다.
 | 12 | [v3.0 시스템 아키텍처](12-v3-architecture.md) | 5-section 템플릿, Handoff Protocol, 모델 라우팅, Tiebreaker 등 v3.0 전체 설계 |
 | 13 | [핸드오프 & 실패 복구](13-handoff-and-failure.md) | Handoff Protocol 설정, failure-policy.yaml, 실전 예시, PM/에스컬레이션 템플릿 |
 | 14 | [프리셋 시스템](14-preset-system.md) | 깊이(Depth) x 실행(Mode) 2축 프리셋 체계 |
-| 15 | [Codex 플러그인](15-codex-plugin.md) | OpenAI Codex CLI 통합 — 코드 리뷰, 디버깅 위임, Review Gate |
+| 15 | [Codex 플러그인](15a-codex-plugin.md) | OpenAI Codex CLI 통합 — 코드 리뷰, 디버깅 위임, Review Gate |
 
 ### 소스 분석 기반 심화 가이드 (v2.1.88)
 
@@ -43,6 +43,8 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 24 | [Retry & 에러 복구](24-retry-error-recovery.md) | 재시도 상수, 에러 분류, 에스컬레이션 |
 | 25 | [Permission 결정 트리](25-permission-system.md) | 5모드, AST 파싱, ML 분류기 |
 | 26 | [Coordinator Mode](26-coordinator-mode.md) | 멀티에이전트 오케스트레이션 |
+| 27 | [스킬 경량화 가이드](27-skill-lightweight-guide.md) | 스킬 크기 기준, 본체/참조 분리, 경량 템플릿 |
+| 28 | [토큰 낭비 자가진단](28-token-waste-selfcheck.md) | Cloud AI MCP, 7대 낭비 요소, 자동 진단, 시나리오별 프로필 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |

@@ -1,4 +1,4 @@
-# Claude Code 셋업 가이드 v3.2
+# Claude Code 셋업 가이드 v3.3
 
 **Claude Code를 효과적으로 사용하기 위한 종합 가이드 및 템플릿**
 
@@ -32,6 +32,10 @@
 - **v3.2 신규**: Session Resume (파일 기반 워크플로우 상태 관리)
 - **v3.2 참조**: [gstack](https://github.com/garrytan/gstack) (Garry Tan's AI workflow platform) 실체화 패턴
 - **v3.2 신규**: **17개 Custom Skills** — PDARR 워크플로우를 실제 슬래시 커맨드(`.claude/skills/`)로 제공. 설치 스크립트로 프로젝트에 즉시 적용.
+- **v3.3 신규**: 스킬 경량화 가이드 — 스킬 크기 기준, 본체/참조 분리 전략, 경량 템플릿
+- **v3.3 신규**: 토큰 낭비 자가진단 — Cloud AI MCP 자동 활성화 감지, 7대 낭비 요소, 시나리오별 프로필
+- **v3.3 신규**: `selfcheck-token-waste.sh` 자동 진단 스크립트 — 7항목 자동 점검
+- **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a)
 > v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
 
 ---
@@ -57,8 +61,8 @@ claude-code-guide/
 ├── hooks/                # Safety hooks + event-driven-review
 │   ├── event-driven-review.yaml
 │   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh
-├── scripts/              # validate-system.sh + install-skills.sh
-├── docs/                 # 15편 가이드 문서
+├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh
+├── docs/                 # 28편 가이드 문서 (v3.3: 스킬 경량화, 토큰 자가진단 추가)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
 ├── QUICKSTART.md
 └── README.md

@@ -238,7 +238,7 @@ claude plugin install codex@openai-codex
 | `/codex:result` | 완료된 작업 결과 조회 |
 | `/codex:cancel` | 백그라운드 작업 취소 |
 
-자세한 내용은 [Codex 플러그인 가이드](15-codex-plugin.md)를 참조하세요.
+자세한 내용은 [Codex 플러그인 가이드](15a-codex-plugin.md)를 참조하세요.
 
 ---
 

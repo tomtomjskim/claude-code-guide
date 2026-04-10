@@ -101,7 +101,7 @@ claude plugin list
 # "enabledPlugins": { "superpowers@superpowers-marketplace": true }
 ```
 
-자세한 내용은 [추천 플러그인 가이드](09-recommended-plugins.md) 및 [Codex 플러그인 가이드](15-codex-plugin.md)를 참조하세요.
+자세한 내용은 [추천 플러그인 가이드](09-recommended-plugins.md) 및 [Codex 플러그인 가이드](15a-codex-plugin.md)를 참조하세요.
 
 ---
 

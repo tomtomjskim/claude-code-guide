@@ -446,3 +446,107 @@ NightOps paths added to event-driven-review.yaml exemption list.
 3. **realpath normalization mandatory**: Security reviewer flagged path traversal via `rm -rf node_modules/../../../etc/passwd`.
 4. **PM override asymmetry**: Upgrade (quick→standard) is autonomous because it's conservative. Downgrade requires user approval because it risks under-review.
 5. **gstack patterns adopted**: Completion Status, Safety Hooks, Diff-Aware scoping, file-based state chains. Rejected: MANUAL TRIGGER ONLY, Preamble tiers, Supabase telemetry.
+
+---
+
+# v3.3 Changelog — 스킬 경량화 & 토큰 낭비 방지
+
+**Release Date**: 2026-04-10
+**Upgraded From**: v3.2 (2026-03-25)
+
+---
+
+## Summary
+
+v3.3은 "비용 최적화(cost optimization)" 업그레이드입니다. 스킬 비대화로 인한 컨텍스트 낭비, Cloud AI MCP 자동 활성화로 인한 시스템 프롬프트 비대화, 설정 미비로 인한 토큰 낭비 등 실제 비용에 영향을 미치는 문제를 체계적으로 진단하고 해결하는 가이드와 도구를 추가합니다.
+
+Key theme: **"토큰이 어디서 새는지 알고, 막아라"**
+
+---
+
+## Changes
+
+### 1. 스킬 경량화 가이드 (docs/27-skill-lightweight-guide.md)
+
+- **스킬 크기 4등급 기준**: 🟢 경량(≤5KB) / 🟡 보통(5~8KB) / 🟠 비대(8~12KB) / 🔴 과대(>12KB)
+- **경량화 4대 전략**:
+  - A: 본체/참조 분리 (SKILL.md + references/) — 67% 토큰 절감
+  - B: 조건부 섹션 제거 (기본 모드만 본체)
+  - C: 예제 최소화 (3개→1개)
+  - D: 공통 참조 추출 (_shared/)
+- **경량 스킬 템플릿**: 100~200줄, 3~5KB 이내 목표
+- **settings.json 스킬 최적화**: `maxSkillsPerTurn`, `autoLoadSkills` 제어
+- **현재 프로젝트 감사**: 17개 스킬 중 3개 과대(>12KB), 4개 비대(8~12KB) 식별
+
+### 2. 토큰 낭비 자가진단 가이드 (docs/28-token-waste-selfcheck.md)
+
+- **7대 토큰 낭비 요소** 체계화:
+  1. Cloud AI MCP 자동 활성화 (매 턴 4,500~7,000 토큰)
+  2. Deferred Tools 목록 주입 (매 턴 1,500~2,000 토큰)
+  3. 스킬 비대화 (호출 시 3,000~5,000 토큰)
+  4. CLAUDE.md 비대화 (매 턴 1,500~3,000 토큰)
+  5. 메모리 과다 주입 (매 턴 1,000~2,000 토큰)
+  6. Fast Mode 미차단 (비용 6x)
+  7. 서브에이전트 모델 미지정 (비용 40% 추가)
+- **Cloud AI MCP 비활성화 가이드**: Canva, Figma, Gmail, Google Calendar, Magic Patterns
+- **시나리오별 최적화 프로필 3종**: Pro 사용자, Max 사용자, 자동화/NightOps
+- **settings.json 위험 설정 체크리스트**
+- **정기 점검 일정**: 세션/주/월/업데이트 후
+
+### 3. 토큰 낭비 자동 진단 스크립트 (scripts/selfcheck-token-waste.sh)
+
+7항목 자동 점검 스크립트:
+
+| # | 점검 항목 | 판정 기준 |
+|---|----------|----------|
+| 1 | Fast Mode 차단 | 환경변수 + settings.json 이중 차단 |
+| 2 | 서브에이전트 모델 | SUBAGENT_MODEL 환경변수/설정 존재 |
+| 3 | Cloud AI MCP | 활성화된 Cloud AI MCP 서버 수 |
+| 4 | 스킬 크기 | 12KB 초과 SKILL.md 존재 여부 |
+| 5 | CLAUDE.md 크기 | 글로벌 2KB / 프로젝트 5KB 초과 |
+| 6 | 메모리 파일 | 파일 수 및 합산 크기 |
+| 7 | settings.json 위험 설정 | maxSkillsPerTurn, memory.maxFiles 등 |
+
+출력: PASS/WARN/FAIL 요약, 예상 턴당 낭비 토큰 수, 권장 조치
+
+### 4. docs 넘버링 충돌 해소
+
+- `15-codex-plugin.md` → `15a-codex-plugin.md` 리네임
+- `15-token-pricing-optimization.md` 유지
+- 참조 문서 3곳(00-setup-checklist, 09-recommended-plugins, README) 업데이트
+
+---
+
+## New Files
+
+| File | Description |
+|------|-------------|
+| `docs/27-skill-lightweight-guide.md` | 스킬 경량화 가이드 |
+| `docs/28-token-waste-selfcheck.md` | 토큰 낭비 자가진단 가이드 |
+| `scripts/selfcheck-token-waste.sh` | 토큰 낭비 자동 진단 스크립트 |
+
+## Modified Files
+
+| File | Changes |
+|------|---------|
+| `README.md` | v3.3 버전 범프, v3.3 신규 항목 4건 추가 |
+| `docs/README.md` | 문서 인덱스에 #27, #28 추가, 15a 리네임 반영 |
+| `docs/v3-changelog.md` | v3.3 섹션 추가 |
+| `docs/15-codex-plugin.md` → `docs/15a-codex-plugin.md` | 넘버링 충돌 해소 |
+| `docs/00-setup-checklist.md` | 15a 참조 업데이트 |
+| `docs/09-recommended-plugins.md` | 15a 참조 업데이트 |
+
+## Renamed Files
+
+| Before | After | Reason |
+|--------|-------|--------|
+| `docs/15-codex-plugin.md` | `docs/15a-codex-plugin.md` | 15-token-pricing-optimization.md와 번호 충돌 |
+
+---
+
+## Design Decisions
+
+1. **스킬 분리 전략은 references/ 사용**: `.claude/skills/스킬명/references/` 패턴은 Claude Code가 기본 지원하므로 추가 설정 불필요.
+2. **Cloud AI MCP 비활성화는 settings.json disabled 방식**: MCP 서버를 삭제하면 향후 사용 시 재설정이 필요하므로 `disabled: true`로 토글 방식 채택.
+3. **진단 스크립트는 jq 없이도 동작**: python3 fallback으로 jq 미설치 환경 지원.
+4. **시나리오별 프로필 3종**: Pro(비용 민감)/Max(균형)/NightOps(최소 비용) — 사용자가 자신의 플랜에 맞는 설정을 즉시 복사 적용 가능.
