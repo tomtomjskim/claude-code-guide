@@ -37,6 +37,8 @@
 - **v3.3 신규**: `selfcheck-token-waste.sh` 자동 진단 스크립트 — 7항목 자동 점검
 - **v3.3 신규**: 하네스 엔지니어링 가이드 — settings/hooks/CLAUDE.md/skills/memory 5컴포넌트 통합 설계
 - **v3.3 신규**: Advisor Strategy 가이드 — executor+advisor 모델 패턴, API 구현, PDARR 연계
+- **v3.3 신규**: 듀얼 모드 디자인 전략 — SYSTEMATIC/CREATIVE 모드 자동 판별, design-gate.sh 자동 검사, `/design-creative` 스킬
+- **v3.3 신규**: 디자인 시스템 확장 규칙 — 토큰 추가/변경 절차, 폰트 수정 규칙, 체크리스트
 - **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a), settings.local.json 개인 설정 분리 권장
 > v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
 
@@ -54,17 +56,19 @@ claude-code-guide/
 │   ├── run/              # 구현 (Orchestrator-Worker)
 │   ├── check-code/       # 코드 검수 (6단계)
 │   ├── workflow/         # PDARR 오케스트레이터
+│   ├── design-creative/  # 🆕 CREATIVE 모드 디자인 스킬
 │   └── ...               # + 10개 더 (test, reflect, stage 등)
 ├── agents.yaml           # 16 에이전트 설정 (모델 라우팅, 토큰 예산, blast-radius)
 ├── agents/               # 15 서브에이전트 frontmatter 정의 (.md)
 ├── prompts/              # 16 에이전트 상세 프롬프트 (v3.2, 200줄+)
 ├── workflows/            # 9 워크플로우 (standard, quick-fix, code-review 등)
 ├── context/              # 핸드오프 v2.0, 세션 스키마, digest 포맷
+├── .claude/rules/        # 🆕 경로 기반 규칙 (design-mode.md 등)
 ├── hooks/                # Safety hooks + event-driven-review
 │   ├── event-driven-review.yaml
-│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh
+│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh, design-gate.sh
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh
-├── docs/                 # 28편 가이드 문서 (v3.3: 스킬 경량화, 토큰 자가진단 추가)
+├── docs/                 # 32편 가이드 문서 (v3.3: 디자인 전략, 스킬 경량화, 토큰 자가진단 등)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
 ├── QUICKSTART.md
 └── README.md
@@ -120,7 +124,8 @@ chmod +x ~/.claude/team/scripts/*.sh
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-freeze.sh" }] }
     ],
     "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] },
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "bash hooks/scripts/design-gate.sh" }] }
     ]
   },
   "mcpServers": {
@@ -187,6 +192,18 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 24 | [Retry & 에러 복구](docs/24-retry-error-recovery.md) | 재시도 상수, 에러 분류, 에스컬레이션 |
 | 25 | [Permission 결정 트리](docs/25-permission-system.md) | 5모드, AST 파싱, ML 분류기 |
 | 26 | [Coordinator Mode](docs/26-coordinator-mode.md) | 멀티에이전트 오케스트레이션 |
+
+### v3.3 가이드
+
+| # | 문서 | 설명 |
+|---|------|------|
+| 15a | [Codex 플러그인](docs/15a-codex-plugin.md) | Codex CLI 통합 — 리뷰/디버깅/태스크 핸드오프 |
+| 27 | [스킬 경량화](docs/27-skill-lightweight-guide.md) | 스킬 크기 기준, 본체/참조 분리 전략 |
+| 28 | [토큰 낭비 자가진단](docs/28-token-waste-selfcheck.md) | 7대 낭비 요소, 자동 진단 스크립트 |
+| 29 | [하네스 엔지니어링](docs/29-harness-engineering.md) | settings/hooks/CLAUDE.md/skills/memory 5컴포넌트 통합 설계 |
+| 30 | [Advisor Strategy](docs/30-advisor-strategy.md) | executor+advisor 모델 패턴, API 구현 |
+| 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, design-gate 자동 검사 |
+| 32 | [디자인 시스템 확장 규칙](docs/32-design-system-extension.md) | 토큰 추가/변경 절차, 폰트 수정 규칙 |
 
 ---
 
@@ -350,7 +367,7 @@ docs/
 | Developer | 구현 | 코드, 테스트 |
 | QA | 검수 | 검수 리포트 |
 | DBA | DB 스키마, 마이그레이션 | schema.sql |
-| Designer | UI/UX 설계 | component-spec.md |
+| Designer | UI/UX 설계 (SYSTEMATIC/CREATIVE 듀얼 모드) | component-spec.md |
 | Publisher | 빌드/배포 | deployment-log.md |
 | Documenter | 문서화 | DONE-XXX.md |
 
