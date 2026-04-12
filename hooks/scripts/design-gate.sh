@@ -23,7 +23,7 @@ esac
 VIOLATIONS=""
 
 # 1. 하드코딩된 hex 색상 감지 (CSS 변수 내 정의, 주석, token-override 표시 제외)
-HEX_COUNT=$(grep -Pn '#[0-9a-fA-F]{3,8}' "$FILE" 2>/dev/null | grep -v 'var(--' | grep -v '//' | grep -v 'token-override' | grep -v '^\s*\*' | grep -v '^\s*--' | wc -l | tr -d ' ')
+HEX_COUNT=$(grep -P '#[0-9a-fA-F]{3,8}' "$FILE" 2>/dev/null | grep -v 'var(--' | grep -v '//' | grep -v 'token-override' | grep -v '^\s*\*' | grep -v '^\s*--' | wc -l | tr -d ' ')
 
 if [ "$HEX_COUNT" -gt 0 ]; then
   VIOLATIONS="${VIOLATIONS}하드코딩 색상 ${HEX_COUNT}건 감지. CSS 변수 토큰(var(--primary) 등) 사용 권장. "
