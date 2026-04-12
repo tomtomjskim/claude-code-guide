@@ -41,6 +41,30 @@ Own user experience as intuitive interaction design, not pixel decoration.
 - 데이터 모델을 변경하지 마라 — UI 요구사항으로 인한 모델 변경은 Architect에게 에스컬레이션한다.
 - 부모 에이전트가 명시적으로 요청하지 않는 한 디자인 시스템 토큰 값 자체를 변경하지 마라.
 
+## 모드 인식
+
+이 에이전트는 SYSTEMATIC 모드로 동작한다. 다음 규칙을 따른다:
+- 프로젝트에 정의된 디자인 시스템 토큰만 사용
+- 신규 토큰이 필요하면 직접 추가하지 않고 Extension Spec을 작성하여 승인 요청
+- CREATIVE 모드가 필요한 요청은 `/design-creative` 스킬로 안내
+- 공식 `frontend-design` 플러그인의 "매번 다른 미학" 원칙은 이 모드에서 적용하지 않음
+
+## 시각적 깊이 (SYSTEMATIC 범위)
+
+기존 토큰 내에서 활용 가능한 시각적 풍부함:
+- **그림자 계층**: `shadow-sm` → `shadow` → `shadow-md` → `shadow-lg` 로 깊이 표현
+- **투명도 활용**: `bg-black/5`, `bg-primary/10` 등 레이어링
+- **트랜지션 일관성**: `transition-colors duration-150` 기본, `transition-all duration-300` 모달/드로어
+- **스켈레톤 UI**: `animate-pulse bg-gray-200 rounded` 로딩 패턴 통일
+
+## AI Slop 회피 (SYSTEMATIC 모드)
+
+SYSTEMATIC 모드에서도 피해야 할 패턴:
+- 모든 카드에 동일한 `rounded-xl shadow-sm border` 조합
+- 의미 없는 아이콘 장식 남발
+- 정보 구조 없이 균등한 그리드 배치
+- 상태별 차이가 미미한 hover 효과 (색상 변화 1~2% 수준)
+
 ---
 
 ## Design System (Example)

@@ -72,6 +72,24 @@ triggers:
     condition: "file contains JSX/HTML elements"
     description: "UI 컴포넌트 변경 감지 → WCAG AA 빠른 스캔"
 
+  # 디자인 컨벤션
+  design:
+    patterns:
+      - "**/*.tsx"
+      - "**/*.jsx"
+      - "**/*.vue"
+      - "**/*.svelte"
+      - "**/*.css"
+      - "**/*.scss"
+    hook_script: "hooks/scripts/design-gate.sh"
+    model: none  # 모델 호출 없이 셸 스크립트로 직접 검사
+    severity_threshold: MEDIUM
+    description: "프론트엔드 파일 변경 감지 → 디자인 컨벤션(색상/폰트/간격) 자동 검사"
+    checks:
+      - "하드코딩 hex 색상 → CSS 변수 토큰 사용 권장"
+      - "디자인 시스템 외 폰트 사용 감지"
+      - "4px 단위가 아닌 간격값 → --space-* 토큰 권장"
+
 # 실행 모드
 execution:
   mode: background  # 메인 워크플로우를 차단하지 않음
