@@ -50,24 +50,6 @@
             "command": "/home/ubuntu/.claude/team/hooks/scripts/event-review-trigger.sh"
           }
         ]
-      },
-      {
-        "matcher": "Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash hooks/scripts/design-gate.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash hooks/scripts/design-gate.sh"
-          }
-        ]
       }
     ]
   },

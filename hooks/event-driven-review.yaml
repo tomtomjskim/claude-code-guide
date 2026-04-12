@@ -72,23 +72,23 @@ triggers:
     condition: "file contains JSX/HTML elements"
     description: "UI 컴포넌트 변경 감지 → WCAG AA 빠른 스캔"
 
-  # 디자인 컨벤션
-  design:
-    patterns:
-      - "**/*.tsx"
-      - "**/*.jsx"
-      - "**/*.vue"
-      - "**/*.svelte"
-      - "**/*.css"
-      - "**/*.scss"
-    hook_script: "hooks/scripts/design-gate.sh"
-    model: none  # 모델 호출 없이 셸 스크립트로 직접 검사
-    severity_threshold: MEDIUM
-    description: "프론트엔드 파일 변경 감지 → 디자인 컨벤션(색상/폰트/간격) 자동 검사"
-    checks:
-      - "하드코딩 hex 색상 → CSS 변수 토큰 사용 권장"
-      - "디자인 시스템 외 폰트 사용 감지"
-      - "4px 단위가 아닌 간격값 → --space-* 토큰 권장"
+  # 디자인 컨벤션 (프로젝트별 커스텀 필요)
+  # ──────────────────────────────────────────────────────────
+  # 디자인 게이트는 프로젝트마다 컨벤션이 다르므로 (그리드 단위, 허용 폰트,
+  # 토큰 네이밍 등) 이 가이드에서 구체적 구현을 제공하지 않습니다.
+  # 프로젝트별로 아래 패턴을 참고하여 커스텀 게이트를 작성하세요.
+  #
+  # design:
+  #   patterns:
+  #     - "**/*.tsx"
+  #     - "**/*.css"
+  #   hook_script: "hooks/scripts/your-project-design-gate.sh"
+  #   model: none
+  #   severity_threshold: MEDIUM
+  #   description: "프로젝트 디자인 컨벤션 검사"
+  #
+  # 커스텀 게이트 작성법: docs/31-design-strategy.md § 프로젝트별 Design Gate 가이드
+  # ──────────────────────────────────────────────────────────
 
 # 실행 모드
 execution:

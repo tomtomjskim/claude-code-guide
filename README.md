@@ -66,7 +66,7 @@ claude-code-guide/
 ├── .claude/rules/        # 🆕 경로 기반 규칙 (design-mode.md 등)
 ├── hooks/                # Safety hooks + event-driven-review
 │   ├── event-driven-review.yaml
-│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh, design-gate.sh
+│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh
 ├── docs/                 # 32편 가이드 문서 (v3.3: 디자인 전략, 스킬 경량화, 토큰 자가진단 등)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
@@ -124,8 +124,7 @@ chmod +x ~/.claude/team/scripts/*.sh
       { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-freeze.sh" }] }
     ],
     "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] },
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "bash hooks/scripts/design-gate.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] }
     ]
   },
   "mcpServers": {
@@ -202,7 +201,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 28 | [토큰 낭비 자가진단](docs/28-token-waste-selfcheck.md) | 7대 낭비 요소, 자동 진단 스크립트 |
 | 29 | [하네스 엔지니어링](docs/29-harness-engineering.md) | settings/hooks/CLAUDE.md/skills/memory 5컴포넌트 통합 설계 |
 | 30 | [Advisor Strategy](docs/30-advisor-strategy.md) | executor+advisor 모델 패턴, API 구현 |
-| 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, design-gate 자동 검사 |
+| 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, 프로젝트별 커스텀 게이트 가이드 |
 | 32 | [디자인 시스템 확장 규칙](docs/32-design-system-extension.md) | 토큰 추가/변경 절차, 폰트 수정 규칙 |
 
 ---

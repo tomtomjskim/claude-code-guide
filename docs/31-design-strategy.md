@@ -40,8 +40,8 @@ SYSTEMATIC                CREATIVE
     │                       │
     └───────────┬───────────┘
                 ▼
-        Design Gate Hook
-        (컨벤션 위반 검증)
+    프로젝트별 Design Gate (선택)
+      (커스텀 컨벤션 검증)
 ```
 
 ---
@@ -74,14 +74,70 @@ SYSTEMATIC                CREATIVE
 
 `.claude/rules/design-mode.md`가 프론트엔드 파일 수정 시 자동 로드되어 모드 규칙을 주입합니다.
 
-### 3.2 Design Gate Hook
+### 3.2 Design Gate Hook (프로젝트별 커스텀)
 
-`PostToolUse:Edit|Write`에서 디자인 컨벤션 위반을 자동 감지합니다:
-- 하드코딩된 hex 색상 (CSS 변수 미사용)
-- 디자인 시스템 외 폰트 사용
-- 4px 단위가 아닌 간격값
+디자인 컨벤션은 프로젝트마다 다르므로(그리드 단위, 허용 폰트, 토큰 네이밍 등), 이 가이드에서 구체적 구현을 제공하지 않습니다. 대신 프로젝트별로 커스텀 게이트를 작성하는 보일러플레이트를 제공합니다.
 
-Hook은 `warn`만 발생시키고 `block`하지 않습니다 — CREATIVE 모드에서의 의도적 일탈을 허용하기 위함입니다.
+#### 작성 가이드
+
+```bash
+#!/bin/bash
+# your-project-design-gate.sh — 프로젝트 디자인 컨벤션 검사
+# 아래 변수를 프로젝트에 맞게 수정하세요.
+
+INPUT=$(cat)
+FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+
+# 1. 대상 확장자 (프로젝트에 맞게 수정)
+case "$FILE" in
+  *.tsx|*.jsx|*.css|*.scss) ;;
+  *) exit 0 ;;
+esac
+[ -f "$FILE" ] || exit 0
+
+# 2. 프로젝트별 설정 — 여기를 수정
+GRID_UNIT=4                    # 그리드 단위 (4px, 8px 등)
+BANNED_FONTS="Arial|Helvetica" # 금지 폰트 (프로젝트 폰트 외)
+TOKEN_PREFIX="--"              # CSS 변수 접두사
+
+# 3. 검사 로직 (예시 — 프로젝트에 맞게 추가/제거)
+VIOLATIONS=""
+
+# hex 색상 검사 (토큰 정의, 주석 제외)
+HEX_COUNT=$(grep -E '#[0-9a-fA-F]{3,8}' "$FILE" 2>/dev/null \
+  | grep -v 'var(--' | grep -v '//' | grep -v "^\s*${TOKEN_PREFIX}" \
+  | wc -l | tr -d ' ')
+[ "$HEX_COUNT" -gt 0 ] && VIOLATIONS="${VIOLATIONS}하드코딩 색상 ${HEX_COUNT}건. "
+
+# 금지 폰트 검사
+grep -iqE "font-family:.*\b(${BANNED_FONTS})\b" "$FILE" 2>/dev/null \
+  && VIOLATIONS="${VIOLATIONS}금지 폰트 사용. "
+
+# 4. 결과 출력
+if [ -n "$VIOLATIONS" ]; then
+  echo "{\"decision\": \"warn\", \"reason\": \"디자인 컨벤션: ${VIOLATIONS}\"}"
+fi
+```
+
+#### settings.json 등록 예시
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [{ "type": "command", "command": "bash hooks/scripts/your-project-design-gate.sh" }]
+      }
+    ]
+  }
+}
+```
+
+#### 핵심 원칙
+- `decision: "warn"` 사용 — CREATIVE 모드의 의도적 일탈을 허용
+- 검사 항목은 프로젝트 디자인 시스템에서 도출
+- `.claude/rules/design-mode.md`가 AI 생성 시점에 이미 컨벤션을 유도하므로, 게이트는 **보조적 사후 검증**
 
 ### 3.3 스킬 분리
 
