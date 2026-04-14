@@ -39,6 +39,7 @@
 - **v3.3 신규**: Advisor Strategy 가이드 — executor+advisor 모델 패턴, API 구현, PDARR 연계
 - **v3.3 신규**: 듀얼 모드 디자인 전략 — SYSTEMATIC/CREATIVE 모드 자동 판별, design-gate.sh 자동 검사, `/design-creative` 스킬
 - **v3.3 신규**: 디자인 시스템 확장 규칙 — 토큰 추가/변경 절차, 폰트 수정 규칙, 체크리스트
+- **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a), settings.local.json 개인 설정 분리 권장
 > v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
 
@@ -65,8 +66,9 @@ claude-code-guide/
 ├── context/              # 핸드오프 v2.0, 세션 스키마, digest 포맷
 ├── .claude/rules/        # 🆕 경로 기반 규칙 (design-mode.md 등)
 ├── hooks/                # Safety hooks + event-driven-review
+│   ├── boilerplates/     # 🆕 커스터마이징 가능 Hook 템플릿 4종
 │   ├── event-driven-review.yaml
-│   └── scripts/          # careful.sh, freeze.sh, event-trigger.sh
+│   └── scripts/          # v3.2 레퍼런스 구현
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh
 ├── docs/                 # 32편 가이드 문서 (v3.3: 디자인 전략, 스킬 경량화, 토큰 자가진단 등)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
@@ -92,9 +94,22 @@ bash scripts/install-skills.sh /path/to/your-project
 ```
 
 스킬만 설치하면 PDARR 워크플로우를 바로 쓸 수 있습니다.
-팀 에이전트(`--team` 모드)까지 사용하려면 아래 2~3단계도 진행하세요.
+Hook(안전장치)과 팀 에이전트까지 사용하려면 아래 단계도 진행하세요.
 
-### 2. 팀 시스템 설치 (선택)
+### 2. Hook 설치 (권장)
+
+```bash
+# 전체 Hook 설치 — 서브에이전트 제어, 파괴적 명령 차단, 보호 파일 보호, 감사 로그
+bash scripts/install-hooks.sh /path/to/your-project
+
+# 필수 안전장치만 빠르게
+bash scripts/install-hooks.sh --preset minimal /path/to/your-project
+```
+
+설치 후 각 Hook 파일의 `🔧 커스터마이징 영역`을 프로젝트에 맞게 수정하세요.
+상세 가이드: [hooks/README.md](hooks/README.md)
+
+### 3. 팀 시스템 설치 (선택)
 
 ```bash
 # 스킬 + 팀 시스템 한 번에 설치
@@ -113,7 +128,7 @@ chmod +x ~/.claude/team/hooks/scripts/*.sh
 chmod +x ~/.claude/team/scripts/*.sh
 ```
 
-### 3. settings.json 설정 (팀 시스템 사용 시)
+### 4. settings.json 설정 (팀 시스템 사용 시)
 
 ```json
 {
@@ -133,7 +148,7 @@ chmod +x ~/.claude/team/scripts/*.sh
 }
 ```
 
-### 4. 검증 (팀 시스템 사용 시)
+### 5. 검증 (팀 시스템 사용 시)
 
 ```bash
 bash ~/.claude/team/scripts/validate-system.sh

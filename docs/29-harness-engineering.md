@@ -211,6 +211,10 @@ echo "[$(date -Iseconds)] Bash: $CMD" >> /var/log/claude-audit.log
 | `"mcp__serena__*"` | Serena MCP 모든 도구 |
 | `"*"` | 모든 도구 |
 
+### 3.5 Hook 보일러플레이트 활용
+
+실전 Hook 템플릿은 `hooks/boilerplates/`를 참조하세요. guard-agent, safety-careful, safety-freeze, audit-agent 4종의 커스터마이징 가능 템플릿이 제공되며, `scripts/install-hooks.sh`로 대상 프로젝트에 즉시 설치할 수 있습니다. 상세 사용법은 [Hook 보일러플레이트 README](../hooks/README.md)를 참조하세요.
+
 ---
 
 ## 4. CLAUDE.md — 프로젝트 DNA

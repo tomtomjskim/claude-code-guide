@@ -19,6 +19,18 @@ bash scripts/install-skills.sh --team /path/to/your-project
 
 설치 후 아래 커맨드를 바로 사용할 수 있습니다. 기술 스택에 맞게 커스터마이징하려면 [skills/README.md](skills/README.md)를 참조하세요.
 
+### 0-b. Hook 설치 (안전장치)
+
+```bash
+# 전체 Hook 설치 (standard 프리셋 — 권장)
+bash scripts/install-hooks.sh /path/to/your-project
+
+# 또는 필수 안전장치만 (minimal 프리셋)
+bash scripts/install-hooks.sh --preset minimal /path/to/your-project
+```
+
+설치 후 각 파일의 `🔧 커스터마이징 영역`을 프로젝트에 맞게 수정하세요. 상세: [hooks/README.md](hooks/README.md)
+
 ---
 
 ## 1. 일상 코딩 (변경 없음)
@@ -181,7 +193,9 @@ bash scripts/install-skills.sh --team /path/to/your-project
 ## 관련 문서
 
 - [Skills 설치/커스터마이징](skills/README.md)
+- [Hook 보일러플레이트](hooks/README.md)
 - [프리셋 시스템 상세](docs/14-preset-system.md)
 - [에이전트 페르소나](docs/05-agent-personas.md)
 - [코드 리뷰 시스템](docs/10-code-review-system.md)
+- [하네스 엔지니어링](docs/29-harness-engineering.md)
 - [v3.0 아키텍처](docs/12-v3-architecture.md)
