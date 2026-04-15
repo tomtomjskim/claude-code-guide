@@ -40,6 +40,8 @@
 - **v3.3 신규**: 듀얼 모드 디자인 전략 — SYSTEMATIC/CREATIVE 모드 자동 판별, design-gate.sh 자동 검사, `/design-creative` 스킬
 - **v3.3 신규**: 디자인 시스템 확장 규칙 — 토큰 추가/변경 절차, 폰트 수정 규칙, 체크리스트
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
+- **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
+- **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
 - **v3.3 수정**: docs 넘버링 충돌 해소 (15 → 15/15a), settings.local.json 개인 설정 분리 권장
 > v3.2부터 이 레포가 [claude-code-team-system](https://github.com/tomtomjskim/claude-code-team-system)을 통합한 **단일 소스**입니다.
 
@@ -69,8 +71,8 @@ claude-code-guide/
 │   ├── boilerplates/     # 🆕 커스터마이징 가능 Hook 템플릿 4종
 │   ├── event-driven-review.yaml
 │   └── scripts/          # v3.2 레퍼런스 구현
-├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh
-├── docs/                 # 32편 가이드 문서 (v3.3: 디자인 전략, 스킬 경량화, 토큰 자가진단 등)
+├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh + preflight-collect.sh
+├── docs/                 # 33편 가이드 문서 (v3.3: 서브에이전트 효율성, 디자인 전략, 스킬 경량화 등)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
 ├── QUICKSTART.md
 └── README.md
@@ -218,6 +220,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 30 | [Advisor Strategy](docs/30-advisor-strategy.md) | executor+advisor 모델 패턴, API 구현 |
 | 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, 프로젝트별 커스텀 게이트 가이드 |
 | 32 | [디자인 시스템 확장 규칙](docs/32-design-system-extension.md) | 토큰 추가/변경 절차, 폰트 수정 규칙 |
+| 33 | [서브에이전트 효율성](docs/33-subagent-efficiency.md) | 12가지 전략, A/B 벤치마크, Tiered Dispatch, Result Pipe |
 
 ---
 

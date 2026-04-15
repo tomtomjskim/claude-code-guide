@@ -47,6 +47,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 28 | [토큰 낭비 자가진단](28-token-waste-selfcheck.md) | Cloud AI MCP, 7대 낭비 요소, 자동 진단, 시나리오별 프로필 |
 | 29 | [하네스 엔지니어링](29-harness-engineering.md) | 5컴포넌트 통합 아키텍처, hooks 패턴, 시나리오별 설계 |
 | 30 | [Advisor Strategy](30-advisor-strategy.md) | executor+advisor 패턴, API 구현, PDARR 연계, 비용 벤치마크 |
+| 33 | [서브에이전트 효율성](33-subagent-efficiency.md) | 12가지 효율화 전략, 성능 리스크 분석, Tiered Dispatch, Result Pipe |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |
