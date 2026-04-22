@@ -48,7 +48,8 @@ When designing a new feature, ask "which of the five does this live in?" before 
 
 - `hooks/boilerplates/*.sh` — **user-facing templates** shipped by `install-hooks.sh`. Each contains a `🔧 커스터마이징 영역` block. Edit here to change what ships to new projects.
 - `hooks/scripts/*.sh` — **reference implementation** for the team system (v3.2). Installed under `~/.claude/team/hooks/scripts/` by `--team`. Do not edit these for project-level customization.
-- `.claude/hooks/*.sh` — **this repo's own active hooks** (`guard-agent.sh`, `audit-agent.sh`). These are what guards Claude while working *in this repo*.
+
+**This repo's own active hooks** are registered in `.claude/settings.local.json` (gitignored) pointing *directly* to `hooks/boilerplates/{guard-agent,audit-agent}.sh`. Downstream projects that run `install-hooks.sh` get a per-project copy at `.claude/hooks/<hook>.sh` (intended fork point for CUSTOMIZE blocks) — this repo bypasses that copy layer because it doesn't customize the hooks, keeping `hooks/boilerplates/` as the SSOT.
 
 Changing one does not change the others.
 
