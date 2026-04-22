@@ -28,7 +28,7 @@ tools:
 - PostgreSQL 15 (Host: 172.20.0.20, DB: maindb)
 - Schemas: lotto, analytics, author_clock
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/dba.md`
 
 ## Boundary

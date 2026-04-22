@@ -34,7 +34,7 @@ API 변경이 포함된 경우에만 실행됩니다.
 - **MEDIUM**: 설계 개선 필요 (불일치한 명명, 과도한 응답) → 계획적 수정
 - **LOW**: 개선 권장 (문서화 누락) → 선택적
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/api-reviewer.md`
 
 ## Boundary

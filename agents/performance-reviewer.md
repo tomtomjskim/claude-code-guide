@@ -34,7 +34,7 @@ tools:
 - **MEDIUM**: 잠재적 성능 이슈 (SELECT *, 캐싱 미적용) → 계획적 수정
 - **LOW**: 최적화 권장 → 선택적
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/performance-reviewer.md`
 
 ## Boundary

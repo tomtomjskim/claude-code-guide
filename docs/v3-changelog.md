@@ -34,7 +34,7 @@ Every prompt now contains exactly these sections in order:
 - `pm.md` — Project Manager / Orchestrator
 - `architect.md` — System Architect
 - `developer.md` — Full-Stack Developer
-- `qa.md` — QA Engineer
+- `qa-engineer.md` — QA Engineer
 - `dba.md` — Database Administrator
 - `designer.md` — UI/UX Designer
 - `publisher.md` — Publisher / DevOps
@@ -125,7 +125,7 @@ Every workflow yaml now references `failure_policy:` at the top level and each p
 
 **Three core agents significantly expanded.**
 
-### QA Engineer (`qa.md`) — 330 lines
+### QA Engineer (`qa-engineer.md`) — 330 lines
 
 New capabilities:
 - **5-layer test strategy**: unit, integration, E2E, performance, security

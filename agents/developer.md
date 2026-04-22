@@ -38,7 +38,7 @@ tools:
 - 기존 유틸리티/컴포넌트 재사용 검토
 - 과도한 추상화 지양
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/developer.md`
 
 ## Boundary

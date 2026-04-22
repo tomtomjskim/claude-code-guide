@@ -32,7 +32,7 @@ UI 변경이 포함된 경우에만 실행됩니다.
 - **MEDIUM**: 사용 가능하나 불편 (디자인 불일치, 반응형 미흡) → 계획적 수정
 - **LOW**: UX 개선 권장 → 선택적
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/ux-reviewer.md`
 
 ## Boundary

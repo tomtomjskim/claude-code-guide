@@ -29,7 +29,7 @@ tools:
 ## 도구
 - docker, docker-compose, npm, git
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/publisher.md`
 
 ## Boundary

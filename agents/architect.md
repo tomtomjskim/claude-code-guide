@@ -37,7 +37,7 @@ tools:
 - Backend: Node.js, Python (FastAPI), PostgreSQL 15, Redis 7
 - Infra: Docker, Nginx, Oracle Cloud
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/architect.md`
 
 v3.0 표준 템플릿 적용: Opening → Working Mode → Focus On → Quality Checks → Return → Boundary

@@ -30,7 +30,7 @@ UI 컴포넌트 설계, UX 플로우 정의, 디자인 시스템 관리를 담�
 - 디자인-코드 브릿지 (핸드오프 명세 작성)
 - Anti-pattern 관리
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/designer.md`
 
 ## Boundary

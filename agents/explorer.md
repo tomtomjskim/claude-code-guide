@@ -30,7 +30,7 @@ tools:
 - 신뢰 수준 분류 (확인됨/추정/미확인)
 - 기술 부채 핫스팟 식별
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/explorer.md`
 
 ## Boundary

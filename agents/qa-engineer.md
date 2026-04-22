@@ -29,8 +29,8 @@ tools:
 - 테스트 피라미드 관리 (Unit 70% / Integration 20% / E2E 10%)
 - Flaky 테스트 탐지
 
-## v3.0 Template
-표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/qa.md`
+## Template
+표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/qa-engineer.md`
 
 ## Boundary
 - 버그 수정 코드 직접 작성 금지 — 재현 시나리오와 실패 테스트만 제공

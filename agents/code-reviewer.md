@@ -36,7 +36,7 @@ tools:
 ## 출력 형식
 파일별 리뷰 → 심각도 분류 → 최종 판정 (승인/수정 후 승인/거부)
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/code-reviewer.md`
 
 ## Boundary

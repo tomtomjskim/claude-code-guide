@@ -34,7 +34,7 @@ tools:
 - **MEDIUM**: 엣지 케이스 누락, 약한 assertion → 계획적 수정
 - **LOW**: 테스트 구조 개선 → 선택적
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/test-coverage-reviewer.md`
 
 ## Boundary

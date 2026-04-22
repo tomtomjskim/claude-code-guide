@@ -34,7 +34,7 @@ tools:
 - **MEDIUM**: 잠재적 위험 (과도한 CORS, 약한 해싱) → 계획적 수정
 - **LOW**: 보안 강화 권장 (헤더 누락) → 선택적
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/security-reviewer.md`
 
 ## Boundary

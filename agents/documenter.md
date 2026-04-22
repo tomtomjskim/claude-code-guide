@@ -25,7 +25,7 @@ API 문서화, README 작성/업데이트, 변경 로그 관리를 담당합니�
 - 변경 로그 관리
 - 사용자 가이드 작성
 
-## v3.0 Template
+## Template
 표준 5섹션 템플릿 적용. 상세 프롬프트: `~/.claude/team/prompts/documenter.md`
 
 ## Boundary

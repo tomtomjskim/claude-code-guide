@@ -17,6 +17,19 @@ HOOKS_SCRIPTS_DIR="$HOME/.claude/team/hooks/scripts"
 SETTINGS_JSON="$HOME/.claude/settings.json"
 SESSION_SCHEMA="$HOME/.claude/team/context/session-state-schema.yaml"
 
+# v4.0 P0-4: agents.yaml을 SSOT로 삼는 동적 에이전트 이름 파싱
+# bash grep 기반 — yq 외부 의존 회피 (strategy.md Decision 3)
+if [ -f "$AGENTS_YAML" ]; then
+    ALL_AGENTS=$(awk '/^agents:$/{in_block=1; next} in_block && /^[a-z_]+:/{in_block=0} in_block && /^  [a-z-]+:$/{gsub(/^  |:$/,""); print}' "$AGENTS_YAML")
+    REVIEWERS=$(echo "$ALL_AGENTS" | grep -E -- '-reviewer$' || true)
+    # domain_specific = 리뷰어·엔지니어·PM을 제외한 에이전트 (terminology 체크 skip 대상)
+    DOMAIN_SPECIFIC=$(echo "$ALL_AGENTS" | grep -vE -- '-reviewer$|^(developer|qa-engineer|architect|pm)$' || true)
+else
+    ALL_AGENTS=""
+    REVIEWERS=""
+    DOMAIN_SPECIFIC=""
+fi
+
 echo "=== Multi-Agent Team System v3.2 Validation ==="
 echo ""
 
@@ -40,8 +53,8 @@ echo ""
 echo "--- 2. Subagent Definition Files ---"
 for agent in "$AGENTS_DIR"/*.md; do
     filename=$(basename "$agent")
-    if ! grep -q "## v3.0 Template" "$agent" 2>/dev/null; then
-        echo "ERROR: $filename missing '## v3.0 Template'"
+    if ! grep -q "^## Template$" "$agent" 2>/dev/null; then
+        echo "ERROR: $filename missing '## Template'"
         ERRORS=$((ERRORS + 1))
     fi
     if ! grep -q "## Boundary" "$agent" 2>/dev/null; then
@@ -49,6 +62,15 @@ for agent in "$AGENTS_DIR"/*.md; do
         ERRORS=$((ERRORS + 1))
     fi
 done
+# v4.0 P0-1: agents.yaml 선언 ↔ agents/*.md 파일 매칭
+if [ -n "$ALL_AGENTS" ]; then
+    for agent_name in $ALL_AGENTS; do
+        if [ ! -f "$AGENTS_DIR/$agent_name.md" ]; then
+            echo "ERROR: agents.yaml declares '$agent_name' but $agent_name.md not found"
+            ERRORS=$((ERRORS + 1))
+        fi
+    done
+fi
 AGENT_COUNT=$(ls -1 "$AGENTS_DIR"/*.md 2>/dev/null | wc -l)
 echo "  Checked $AGENT_COUNT agent definitions"
 
@@ -70,6 +92,7 @@ echo "  Checked $AGENT_COUNT agents for v3.1 frontmatter"
 # 2c. Check selective fields
 echo ""
 echo "--- 2c. Selective Agent Fields ---"
+# 선택 검증: isolation은 파일 수정권을 가진 developer·qa-engineer 에이전트에만 요구되는 설계 정책 (drift 재생산 엔진 아님, 하드코딩 유지)
 # isolation: worktree on developer and qa-engineer
 for agent_name in developer qa-engineer; do
     if ! grep -q "^isolation:" "$AGENTS_DIR/$agent_name.md" 2>/dev/null; then
@@ -78,6 +101,7 @@ for agent_name in developer qa-engineer; do
     fi
 done
 
+# 선택 검증: memory: project는 장기 컨텍스트 축적이 필요한 핵심 리뷰어 4종에만 요구되는 설계 정책 (하드코딩 유지)
 # memory: project on key reviewers
 for agent_name in security-reviewer performance-reviewer test-coverage-reviewer code-reviewer; do
     if ! grep -q "^memory:" "$AGENTS_DIR/$agent_name.md" 2>/dev/null; then
@@ -86,6 +110,7 @@ for agent_name in security-reviewer performance-reviewer test-coverage-reviewer 
     fi
 done
 
+# 선택 검증: disallowedTools는 탐색 전용 explorer에만 요구되는 설계 정책 (하드코딩 유지)
 # disallowedTools on explorer
 if ! grep -q "^disallowedTools:" "$AGENTS_DIR/explorer.md" 2>/dev/null; then
     echo "WARNING: explorer.md missing 'disallowedTools'"
@@ -214,7 +239,12 @@ done
 # 8. Check Confidence Scoring in reviewers
 echo ""
 echo "--- 8. Confidence Scoring (v3.1) ---"
-REVIEWER_PROMPTS=("security-reviewer" "performance-reviewer" "test-coverage-reviewer" "accessibility-reviewer" "ux-reviewer" "api-reviewer" "code-reviewer" "qa")
+# v4.0 P0-4: REVIEWERS($AGENTS_YAML에서 동적 추출) + qa-engineer(P0-5 rename 후 정식명)
+REVIEWER_PROMPTS=()
+while IFS= read -r r; do
+    [ -n "$r" ] && REVIEWER_PROMPTS+=("$r")
+done <<< "$REVIEWERS"
+REVIEWER_PROMPTS+=("qa-engineer")
 CONF_COUNT=0
 for reviewer in "${REVIEWER_PROMPTS[@]}"; do
     if grep -q "신뢰도 점수" "$PROMPTS_DIR/$reviewer.md" 2>/dev/null; then
@@ -224,7 +254,7 @@ for reviewer in "${REVIEWER_PROMPTS[@]}"; do
         WARNINGS=$((WARNINGS + 1))
     fi
 done
-echo "  Confidence scoring: $CONF_COUNT/8 reviewers"
+echo "  Confidence scoring: $CONF_COUNT/${#REVIEWER_PROMPTS[@]} reviewers"
 
 # 9. Check validation terminology consistency
 echo ""
@@ -234,7 +264,20 @@ TERM_TOTAL=0
 for prompt in "$PROMPTS_DIR"/*.md; do
     filename=$(basename "$prompt")
     # Skip pm.md (uses quality gates) and domain-specific prompts
-    if [ "$filename" = "pm.md" ] || [ "$filename" = "dba.md" ] || [ "$filename" = "publisher.md" ] || [ "$filename" = "documenter.md" ] || [ "$filename" = "explorer.md" ] || [ "$filename" = "designer.md" ]; then
+    # v4.0 P0-4: DOMAIN_SPECIFIC(agents.yaml 동적 추출) + pm(orchestrator, 별도 skip)
+    skip=0
+    case "$filename" in
+        pm.md) skip=1 ;;
+    esac
+    if [ "$skip" = "0" ]; then
+        for ds in $DOMAIN_SPECIFIC; do
+            if [ "$filename" = "${ds}.md" ]; then
+                skip=1
+                break
+            fi
+        done
+    fi
+    if [ "$skip" = "1" ]; then
         continue
     fi
     TERM_TOTAL=$((TERM_TOTAL + 1))
