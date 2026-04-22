@@ -41,6 +41,8 @@
 
 **총 서브에이전트 비용**: ~56k fixed overhead. Workers는 탐색 턴 없이 digest 기반 작업 → Classic 4-5 에이전트 병렬 대비 ~50% 절감 (docs/33 벤치마크 기준).
 
+> **Note**: Scout이 Sonnet인 이유 — `subagent-strategy.md`의 기본 Tiered Dispatch 표는 Scout=Haiku를 제안하지만, 이 감사는 coherence 렌즈 특성상 cross-reference 추론 정확도가 inventory 품질의 상한을 결정함. 의도적 상향 결정은 **Appendix A** 참조.
+
 ### 2.2 데이터 흐름
 
 ```
@@ -263,7 +265,8 @@ Date    : {timestamp}
 - hooks 3중 네이밍 ↔ README/hooks-README/CLAUDE.md 설명 차이
 
 **W3용**
-- 5개 고정 체크리스트: 버전 숫자 · 에이전트 목록 · 스킬 목록 · PDARR 흐름 · 프리셋 정의
+- **7개 고정 체크리스트**: 버전 숫자 · 에이전트 목록 · 스킬 목록 · PDARR 흐름 · 모델 라우팅 · 프리셋 정의 · Hooks 3중 네이밍 구별
+  (§3.5 TASK의 7개 고정 체크리스트와 정확히 일치 — 이 문서 자체의 SSOT 시범)
 
 ---
 
@@ -341,8 +344,27 @@ Phase 4가 단일 파일에 6개 섹션으로 구성 (의도적 SSOT 시범).
 
 ## 7. 오류 처리 매트릭스
 
+### 7.0 Phase 0 Preflight (Scout spawn 전 필수 검증)
+
+Scout 디스패치 **직전** Main이 다음을 확인. 하나라도 실패 시 감사 중단하고 사용자에게 보고.
+
+```bash
+# 필수 경로 존재 확인 (Scout의 Section 4, 6이 여기에 의존)
+test -f agents.yaml            || FAIL "agents.yaml 누락 — Section 4 의미 상실"
+test -d agents/                || FAIL "agents/ 누락 — Section 4 의미 상실"
+test -d prompts/               || FAIL "prompts/ 누락 — Section 4 의미 상실"
+test -f scripts/validate-system.sh || FAIL "validate-system.sh 누락 — Section 6 불가"
+test -d skills/                || FAIL "skills/ 누락 — Section 7 의미 상실"
+test -w .                      || FAIL ".audit/ 생성 불가 — 작업 디렉토리 쓰기 권한 없음"
+```
+
+이 단계는 "glob이 비어서 Scout이 silently 부분 inventory 생성"을 방지. 누락 경로가 있으면 **설계 전제가 깨진 것**이므로 진행 불가.
+
+### 7.1 실패 모드 매트릭스
+
 | 실패 모드 | 즉각 대응 | Fallback |
 |---------|---------|---------|
+| Phase 0 preflight 실패 | 감사 중단, 누락 항목 사용자에게 보고 | 레포 구조 재확인 요청 (대체 경로 추측 금지) |
 | Scout 완전 실패 | Main이 `scripts/preflight-collect.sh` 직접 실행 + 수동 grep으로 inventory 재구축 | 속도 -30%, 품질 동등 유지 |
 | Scout PARTIAL | 누락 섹션을 digest에서 비우고 "blind spot" 태그 | strategy.md §5에 "미확인 영역" 명시 |
 | Worker BLOCKED | digest에 2~3 파일 추가 + 1회 재디스패치 | 2차 BLOCKED 시 나머지 2 워커로 진행 + strategy에 "W_i 커버리지 누락" |
@@ -361,7 +383,7 @@ Phase 4가 단일 파일에 6개 섹션으로 구성 (의도적 SSOT 시범).
 
 v4.0 전략의 판정 기준(§5)과 별도로, **이 감사 실행**이 성공적으로 끝났는지 판단하는 기준:
 
-- [ ] `.audit/inventory.md` 존재 + 7 섹션 모두 채워짐 (또는 blind spot 명시)
+- [ ] `.audit/inventory.md` 존재 + 7 섹션 모두 채워짐, **또는** 누락 섹션이 명시적 "blind spot" 태그를 갖고 §7 오류 경로(Scout PARTIAL)를 거쳤음 — 이 경우 PARTIAL도 pass로 카운트
 - [ ] `.audit/result-W{1,2,3}.md` 3개 모두 존재 (BLOCKED 워커가 있다면 strategy에 명시)
 - [ ] `docs/v4/strategy.md` 6 섹션 모두 존재
 - [ ] strategy §3 백로그 총 항목 ≥ 5 (이하면 감사 품질 부족 의심)
