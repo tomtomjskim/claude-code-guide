@@ -16,3 +16,6 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# v4.0 audit ephemeral artifacts
+.audit/
