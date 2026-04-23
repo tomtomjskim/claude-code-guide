@@ -6,6 +6,40 @@
 
 ---
 
+## 🚀 Quick Install (한 줄)
+
+Claude Code 세션에서 "**claude-code-guide 설치해줘**"라고 말하거나, 아래 원라이너 실행:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+```
+
+**프로파일 옵션** (기본: `auto` — 프로젝트 분석 후 자동 추천):
+
+```bash
+# 1인 개발 (5 스킬 + minimal hooks)
+curl ... | bash -s -- --profile solo
+
+# 2-5인 팀 (18 스킬 + standard hooks)
+curl ... | bash -s -- --profile team
+
+# 대형/프로덕션 (team + 팀 시스템 + validate)
+curl ... | bash -s -- --profile enterprise
+
+# 리뷰 도입만 (check-code / check-spec / qa-test 3 스킬)
+curl ... | bash -s -- --profile review-only
+
+# 특정 경로에 설치
+curl ... | bash -s -- --profile team --target /path/to/project
+
+# 실제 변경 없이 실행 명령만 확인 (dry-run)
+curl ... | bash -s -- --dry-run
+```
+
+대화형 상세 가이드: [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 진입점.
+
+---
+
 ## 개요
 
 이 레포지토리는 Claude Code 초기 설정부터 팀 워크플로우까지 모든 것을 다룹니다.
