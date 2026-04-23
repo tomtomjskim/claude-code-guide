@@ -306,6 +306,8 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 
 **Plan → Document → Act → Review → Reflect**
 
+> Canonical 순차: [`CLAUDE.md` §PDARR + preset system](CLAUDE.md#pdarr--preset-system) `Flow` bullet. 아래 다이어그램은 분기 시각화 보조.
+
 모든 작업은 복잡도에 따라 이 사이클의 전체 또는 일부를 거친다.
 `/dispatch`가 작업 크기에 맞는 사이클 범위를 자동 결정한다.
 

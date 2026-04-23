@@ -6,7 +6,7 @@ description: "서브에이전트 사용 전략 — 스폰 판단, prompt 구조,
 > 상세 가이드: [docs/33-subagent-efficiency.md](../../docs/33-subagent-efficiency.md)
 
 ## 핵심 원칙
-- 서브에이전트 1회 = **~14,000 tokens 고정 비용** (시스템 프롬프트 + 도구 스키마 + CLAUDE.md)
+- 서브에이전트 1회 = **~14,000 tokens 고정 비용** (시스템 프롬프트 + 도구 스키마 + CLAUDE.md). 분해 상세는 [`docs/33-subagent-efficiency.md#1-고정-오버헤드-구조`](../../docs/33-subagent-efficiency.md#1-고정-오버헤드-구조) 참조
 - 서브에이전트 내부에서는 PreToolUse Hook이 적용되지 않는다
 - 서브에이전트는 `.claude/rules/*.md`를 상속받지 않을 수 있다
 - prompt에 필요한 규칙을 명시적으로 포함해야 한다
@@ -60,6 +60,8 @@ description: "서브에이전트 사용 전략 — 스폰 판단, prompt 구조,
 - 참조 파일(구조, 의존성)은 프리플라이트 데이터 사용
 
 ## 모델 라우팅
+
+**Canonical**: [`agents.yaml` `model_routing`](../../agents.yaml) — 에이전트별 조건·threshold·모델 매핑의 권위 정의. 아래 표는 비용 중심 요약.
 
 | 작업 유형 | 모델 | 비용 비율 |
 |----------|------|----------|

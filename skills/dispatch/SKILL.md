@@ -147,6 +147,8 @@ ls docs/todo/*.md 2>/dev/null
 
 ## 전체 흐름도 참조
 
+> Canonical 순차: [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system) `Flow` bullet. 아래 다이어그램은 dispatch 라우팅 분기 시각화.
+
 ```
 사용자 요청
     │

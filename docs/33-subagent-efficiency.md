@@ -330,6 +330,8 @@ fi
 
 ### 전략 12: 모델 라우팅 세분화
 
+**Canonical**: [`agents.yaml` `model_routing`](../agents.yaml) — 에이전트별 조건·threshold·모델 매핑. 본 섹션은 작업 유형 중심 요약.
+
 현행 3단계(Opus/Sonnet/Haiku)를 작업 유형에 따라 더 구체적으로 매핑한다.
 
 | 작업 유형 | 모델 | 이유 |

@@ -89,6 +89,8 @@ Task(
 
 ## PDARR Phase 요약
 
+> Canonical 순차: [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system) `Flow` bullet. 아래는 워크플로우 Phase별 실행 세부 요약.
+
 ### Phase 1: PLAN (분석)
 `/analyze` 실행. CLAUDE.md 읽기, 코드베이스 탐색, 도메인 매핑.
 Semi-Auto 이상: 분석 결과 보고 후 승인 대기.
@@ -152,6 +154,8 @@ payload:
 ---
 
 ## Model Routing
+
+**Canonical**: [`agents.yaml` `model_routing`](../../agents.yaml) — 전체 조건·threshold 정의. 아래 표는 핵심 케이스 요약.
 
 에이전트별 모델 자동 선택:
 

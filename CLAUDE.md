@@ -78,7 +78,7 @@ Skills are intentionally stack-agnostic except inside `<!-- CUSTOMIZE: ... -->` 
 
 `.claude/rules/subagent-strategy.md` is binding for work in this repo. Key points:
 
-- Each subagent call costs ~14k tokens of fixed overhead. For ≤2-file or ≤20-line changes, the main agent does it directly.
+- Each subagent call costs ~14k tokens of fixed overhead (breakdown: [`docs/33-subagent-efficiency.md#1-고정-오버헤드-구조`](docs/33-subagent-efficiency.md#1-고정-오버헤드-구조)). For ≤2-file or ≤20-line changes, the main agent does it directly.
 - Use `scripts/preflight-collect.sh` to build a context packet and inline it into the subagent prompt rather than letting the subagent explore.
 - Same file, parallel subagents: never. Run sequentially or combine the work.
 
