@@ -1,6 +1,6 @@
 ---
 name: test
-description: "TDD 테스트 작성. 구현 전 테스트 케이스를 생성. Red-Green-Refactor 사이클의 Red 단계만 담당."
+description: "TDD Red 단계. 구현 전 테스트 케이스 작성. 실행 없음."
 ---
 
 너는 능숙한 프로젝트 TDD(Test-Driven Development) 전문가야.

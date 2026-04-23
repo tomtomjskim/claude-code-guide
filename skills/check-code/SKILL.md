@@ -16,35 +16,17 @@ PLAN (/analyze) → DOCUMENT (/spec) → ACT (/run)
   → REFLECT (/reflect)
 ```
 
-## 실행 모드 (프리셋) — 깊이(depth) + 실행(mode) 2축
+## 실행 모드 (프리셋) <!-- PRESET_CANONICAL_LINK -->
 
-### 깊이 (depth)
+**프리셋 체계(depth × execution 2축)는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#check-code-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
 
-| 깊이 | 시간 | Phase |
-|------|------|-------|
-| `--quick` | ~2분 | Phase 1만 |
-| (기본) standard | ~10분 | Phase 1→2→3→6 |
-| `--thorough` | ~20분 | Phase 1→2→3→4→5→6 |
+### /check-code 고유 범위 요약 (Phase 매핑)
 
-### 실행 (mode)
-
-| 모드 | 설명 |
-|------|------|
-| (기본) 단일 | 1명이 순차 검수 |
-| `--team` | Specialist Reviewers 병렬 검수 |
-
-### 조합 사용
-
-```
-/check-code {모듈}                    # standard + 단일 (기본)
-/check-code --quick {모듈}            # quick + 단일
-/check-code --thorough {모듈}         # thorough + 단일
-/check-code --team {모듈}             # thorough + 팀 (기본 최대 깊이)
-/check-code --team --quick {모듈}     # quick + 팀 (빠른 팀 스캔)
-/check-code --team --standard {모듈}  # standard + 팀
-```
-
-**`--team` 단독 사용 시 기본 깊이 = thorough** (최대 성능)
+| 깊이 | 시간 | 실행 Phase |
+|------|------|-----------|
+| `--quick` | ~2분 | Phase 1만 (자동 분석) |
+| standard (기본) | ~10분 | Phase 1→2→3→6 (보안/성능/아키텍처/종합판정) |
+| `--thorough` | ~20분 | Phase 1→2→3→4→5→6 (+ UX/접근제어, + 테스트 품질) |
 
 ### 기존 호환 모드
 - `/check-code {모듈명}` - 특정 모듈 코드 검수 (standard)

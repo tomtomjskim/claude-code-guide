@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: "코드베이스 분석 및 실행 전략 추천. 3단계 프리셋(quick/standard/thorough) + 팀 분석(--team) 지원. 코딩하지 않고 분석 결과만 출력."
+description: "PDARR pre-spec. 코드베이스 영향 분석 + 실행 전략 추천. 코드 작성 없음."
 ---
 너는 능숙한 프로젝트 분석가야. 프로젝트를 코딩하는게 아니라 분석을 먼저 해주는 사람이지. 절대 코딩을 하지 않아.
 
@@ -8,51 +8,19 @@ description: "코드베이스 분석 및 실행 전략 추천. 3단계 프리셋
 << 분석한 결과만 도출할것 >>
 << 꼭 한글로 답변할 것 >>
 
-## 분석 프리셋
+## 분석 프리셋 <!-- PRESET_CANONICAL_LINK -->
 
-### 깊이(depth)와 실행(mode) 2축 체계
+**프리셋 체계(depth × execution 2축)는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#analyze-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
 
-**깊이 (depth)** — 분석의 범위와 상세도:
+### /analyze 고유 범위 요약
 
-| 깊이 | 시간 | 내용 |
+| 깊이 | 시간 | 출력 |
 |------|------|------|
-| `--quick` | ~2분 | 영향 파일 목록 + 간단 수정 방향 |
-| (기본) standard | ~5분 | 영향 분석 + 실행 전략(2차 판단) |
-| `--thorough` | ~15분 | 다관점 심층 분석 + 대안 비교 |
+| `--quick` | ~2분 | 영향 파일 목록 + 수정 방향 1줄 |
+| standard (기본) | ~5분 | 영향 분석 + 실행 전략(2차 판단) |
+| `--thorough` | ~15분 | 다관점 심층 분석 + 대안 2-3개 비교 + 의존성 그래프 |
 
-**실행 (mode)** — 단일 에이전트 vs 팀:
-
-| 모드 | 설명 |
-|------|------|
-| (기본) 단일 | 1명이 순차 분석 |
-| `--team` | Explorer+Architect+DBA 병렬 분석 |
-
-### 조합 사용
-
-```
-/analyze {기능}                    # standard + 단일 (기본)
-/analyze --quick {버그}            # quick + 단일
-/analyze --thorough {기능}         # thorough + 단일
-/analyze --team {기능}             # thorough + 팀 (기본 최대 깊이)
-/analyze --team --quick {기능}     # quick + 팀 (빠른 팀 탐색)
-/analyze --team --standard {기능}  # standard + 팀
-```
-
-**`--team` 단독 사용 시 기본 깊이 = thorough** (최대 성능)
-
-### --quick 깊이
-영향 파일 목록과 수정 방향만 빠르게 출력:
-1. 관련 파일 Grep/Glob으로 식별
-2. 수정 포인트 (파일:라인) 목록
-3. 간단한 수정 방향 1줄
-
-### --thorough 깊이
-standard + 아래 심층 분석 추가:
-1. **대안 비교**: 접근 방법 2-3개를 비교 (장단점, 위험, 공수)
-2. **아키텍처 영향**: 레이어별 변경 영향도, 하위호환 분석
-3. **성능 영향**: 쿼리 복잡도, 인덱스 영향, 대용량 시나리오
-4. **보안 영향**: 새 입력 경로의 보안 위험 사전 식별
-5. **의존성 그래프**: 파일 간 import/include/호출 관계 시각화
+**`--thorough`에서 추가되는 항목:** 대안 비교, 아키텍처 영향, 성능 영향, 보안 영향, 의존성 그래프(import/include/호출 시각화).
 
 ### --team 모드 (Agent Teams)
 전문 에이전트 3-4명이 동시에 다른 관점에서 분석:

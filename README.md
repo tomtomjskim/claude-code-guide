@@ -401,27 +401,27 @@ docs/
 
 > v3.0부터 각 페르소나는 5-section 표준 템플릿(Opening/Working Mode/Focus On/Quality Checks/Return/Boundary)을 따릅니다.
 
-### 프리셋 시스템 (v3.0 확장)
+### 프리셋 시스템
 
-**깊이(depth) x 실행(mode) 2축 독립 제어:**
+**깊이(depth) × 실행(mode) 2축 독립 제어.** canonical 규칙은 [`CLAUDE.md` §PDARR + preset system](CLAUDE.md#pdarr--preset-system), 상세 체계는 [`docs/14-preset-system.md`](docs/14-preset-system.md).
+
+**6개 스킬에 공통 적용** (`analyze`, `spec`, `check-spec`, `check-code`, `qa-test`, `qa-e2e`):
 
 ```
 깊이:  --quick ← standard → --thorough
 실행:  단일    ← 기본    → --team
 
---team 단독 = thorough + 팀 (기본 최대 성능)
---team --quick = quick + 팀 (조합 가능)
+--team 단독 = thorough + 팀 (기본 최대 성능, qa-test는 --full)
+qa-e2e는 depth 축 미적용 — --tc TC-N으로 범위 제어
 ```
 
-**3개 스킬에 공통 적용:**
 ```
-/analyze --team {기능}              # 팀 분석 (최대 깊이)
-/spec --team                        # 팀 설계 (최대 깊이)
-/check-code --team {모듈}           # 팀 리뷰 (최대 깊이)
-/check-code --team --quick {모듈}   # 팀 리뷰 (빠른 스캔)
+/analyze --team {기능}              # 팀 분석
+/check-code --team --quick {모듈}   # 팀 + 빠른 스캔 조합
+/qa-e2e --team {모듈}               # 팀 E2E (전 TC 또는 --tc 필터)
 ```
 
-자세한 내용은 [프리셋 시스템](docs/14-preset-system.md), [코드 리뷰 시스템](docs/10-code-review-system.md)을 참조하세요.
+6단계 코드 리뷰 Phase 매핑 상세: [코드 리뷰 시스템](docs/10-code-review-system.md).
 
 ---
 

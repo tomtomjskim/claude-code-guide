@@ -23,12 +23,14 @@ quick → standard → thorough → 팀 리뷰
 
 ## 적용 대상 스킬
 
-| 스킬 | 역할 | 프리셋 지원 |
-|------|------|------------|
-| `/analyze` | 코드베이스 분석, 영향도, 실행 전략 | depth + mode |
-| `/spec` (또는 `/design`) | 기술 명세서 작성 | depth + mode |
-| `/check-spec` | 설계문서 검수 | depth + mode |
-| `/check-code` (또는 `/review`) | 코드 품질 검수 | depth + mode |
+| 스킬 | 역할 | 프리셋 지원 | 비고 |
+|------|------|------------|------|
+| `/analyze` | 코드베이스 분석, 영향도, 실행 전략 | depth + mode | 표준 2축 |
+| `/spec` (또는 `/design`) | 기술 명세서 작성 | depth + mode | 표준 2축 |
+| `/check-spec` | 설계문서 검수 | depth + mode | 표준 2축 |
+| `/check-code` (또는 `/review`) | 코드 품질 검수 | depth + mode | 표준 2축 + Phase 매핑 |
+| `/qa-test` | 종합 QA 자동화 | depth(4라벨) + mode | 기존 `--minimal/--basic/--standard/--full` 유지 + 2축 alias 지원 (아래 `/qa-test 프리셋` 참조) |
+| `/qa-e2e` | 비즈니스 E2E 검증 | **mode only** | depth 축 없음 — 시나리오 기반 (아래 `/qa-e2e 프리셋` 참조) |
 
 ---
 
@@ -117,6 +119,10 @@ quick → standard → thorough → 팀 리뷰
 
 팀 에이전트를 투입한다는 것은 중요한 작업이라는 의미이므로,
 명시적으로 `--quick`이나 `--standard`를 지정하지 않는 한 최대 깊이를 적용합니다.
+
+**예외:**
+- `/qa-test --team`은 기본값 `--full`(= `--thorough` alias) 적용 — 동일 규칙
+- `/qa-e2e --team`은 depth 축 미적용이므로 깊이 기본값 개념이 없음 — 전 TC(또는 `--tc` 필터 집합) 대상 팀 실행
 
 ---
 
@@ -209,6 +215,59 @@ standard에 추가:
 ├─ Code Reviewer: 코드 품질 종합
 └─ API Arbiter: API 설계 검수 (해당 시)
 ```
+
+---
+
+### /qa-test 프리셋
+
+qa-test는 역사적으로 **4단계 난이도 라벨**(`--minimal/--basic/--standard/--full`)을 사용해왔다. 2축 체계와의 호환을 위해 **기존 라벨을 보존하면서 2축 depth alias를 병행 지원**한다.
+
+#### 난이도 ↔ 2축 depth 매핑
+
+| qa-test 라벨 | 2축 alias | 범위 | Phase |
+|-------------|-----------|------|-------|
+| `--minimal` | `--quick` | 문법 검증만 | Phase 2 |
+| `--basic` | (alias 없음, quick 상위) | 문법 + 코드 품질 | Phase 2-3 |
+| `--standard` (기본) | (동일, 기본값) | 문법 + 품질 + UI/이벤트 + 의존성 | Phase 2-5 |
+| `--full` | `--thorough` | + 이전 리포트 비교 | Phase 2-7 |
+
+**규칙:** 두 라벨은 동시에 유효한 별칭. `--quick`과 `--minimal`은 결과가 동일하며, 사용자가 편한 쪽을 쓸 수 있다. `--basic`은 4단계 체계 고유이며 2축 alias가 없음(의도적 — "quick 상위"는 2축에서 불필요한 세분화).
+
+#### --team 모드
+```
+┌─ PM (Lead): Phase 분배, 결과 종합, 리포트 통합
+├─ QA Engineer: Phase 2-5 실행, 시나리오 검증, DB 상태 확인
+├─ Security Sentinel: SQL Injection, XSS, 권한 우회 테스트
+├─ Performance Prophet: N+1 쿼리, 대량 데이터, 인덱스 누락
+└─ Access Advocate: 권한별 접근, 세션 변조, 비인가 API 호출
+```
+
+`--team` 단독 사용 시 기본 난이도 = `--full`(= `--thorough` alias).
+
+---
+
+### /qa-e2e 프리셋
+
+**qa-e2e는 depth 축을 적용하지 않는다.** 이유는 E2E 테스트의 본질이 **시나리오 파일(`test_scenarios.md`)에 선언된 TC 집합 전체 실행**이며, "깊이를 줄여 일부만 실행"은 시나리오 자체를 쪼개는 작업이지 depth 옵션이 아니기 때문이다. 대신 **특정 TC만 실행**하는 `--tc TC-N` 옵션으로 범위를 제어한다.
+
+#### 지원 축 요약
+
+| 축 | qa-e2e 지원 여부 | 옵션 |
+|----|------------------|------|
+| depth | ✗ | 없음 — TC 단위 `--tc TC-N`으로 범위 제어 |
+| execution | ✓ | 기본 단일 / `--team` (다관점 병렬) |
+| 추가 modifier | ✓ | `--browser`(Playwright UI), `--headed`(관찰 모드), `--prepare`(데이터 준비만) |
+
+#### --team 모드
+```
+┌─ PM (Lead): TC 분배, 결과 종합, 리포트 통합
+├─ QA Engineer: TC별 시나리오 실행, DB 상태 검증, 계산 검증
+├─ DBA: 데이터 정합성, 트랜잭션, 외래키 무결성
+├─ Security Sentinel: 결제/환불 보안, 금액 변조, 권한 우회
+└─ Explorer: 크로스 도메인 영향, 연관 프로세스 사이드이펙트
+```
+
+`--team` 사용 시 범위는 전 TC(또는 `--tc`로 필터된 집합)에 팀 구성 적용.
 
 ---
 

@@ -1,74 +1,33 @@
 ---
 name: spec
-description: "기술 명세서 작성. 3단계 프리셋(quick/standard/thorough) + 팀 설계(--team) 지원. docs/spec/[module]/에 문서 생성. 코딩하지 않음."
+description: "PDARR author. 기술 명세서 작성. docs/spec/[module]/ 생성."
 ---
 
 너는 능숙한 프로젝트 명세서 작성 전문가야.
 
 구현 전 명확한 기술 명세서(Specification)를 작성하여 AI Agent와 개발자 모두가 이해할 수 있는 단일 소스를 제공합니다.
 
-## 명세서 프리셋
+## 명세서 프리셋 <!-- PRESET_CANONICAL_LINK -->
 
-### 깊이(depth)와 실행(mode) 2축 체계
+**프리셋 체계(depth × execution 2축)는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#spec-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
 
-**깊이 (depth)** — 명세서의 범위와 상세도:
+### /spec 고유 범위 요약
 
-| 깊이 | 시간 | 내용 |
+| 깊이 | 시간 | 출력 |
 |------|------|------|
 | `--quick` | ~3분 | architecture.md만 (핵심 구조) |
-| (기본) standard | ~10분 | architecture + api_design + database_schema |
-| `--thorough` | ~20분 | 전체 9섹션 + 대안 비교 + 보안/성능 설계 |
+| standard (기본) | ~10분 | architecture + api_design + database_schema |
+| `--thorough` | ~20분 | 전체 9섹션 + 대안 비교 + 보안/성능 설계 + 마이그레이션 + i18n |
 
-**실행 (mode)** — 단일 에이전트 vs 팀:
+**`--thorough`에서 추가되는 항목:** 설계 접근법 2-3개 대안 비교, 보안 설계(XSS/SQL Injection/권한), 성능 설계(쿼리/인덱스/캐싱), 마이그레이션(롤백 전략), i18n 키 설계(중복 검사).
 
-| 모드 | 설명 |
-|------|------|
-| (기본) 단일 | 1명이 순차 작성 |
-| `--team` | Architect+DBA+Explorer+Designer 협업 |
+### --team 모드: 워크플로우
 
-### 조합 사용
+팀 구성(PM/Explorer/Architect/DBA/Designer)과 공통 규칙은 canonical 참조. /spec 고유 실행 순서:
 
-```
-/spec                              # standard + 단일 (기본)
-/spec --quick                      # quick + 단일
-/spec --thorough                   # thorough + 단일
-/spec --team                       # thorough + 팀 (기본 최대 깊이)
-/spec --team --quick               # quick + 팀 (빠른 팀 설계)
-/spec --team --standard            # standard + 팀
-```
-
-**`--team` 단독 사용 시 기본 깊이 = thorough** (최대 성능)
-
-### --quick 깊이
-기존 유사 패턴이 명확할 때 최소 명세:
-1. architecture.md: 개요 + 레이어 구조 + 구현 순서만
-2. 유사 패턴 참조 파일 경로 목록
-3. 추정 소요 시간
-
-### --thorough 깊이
-standard + 아래 심층 내용 추가:
-1. **대안 비교**: 설계 접근법 2-3개 비교 (장단점, 확장성, 유지보수성)
-2. **보안 설계**: 입력 검증, 권한 체크, XSS/SQL Injection 방어 명세
-3. **성능 설계**: 쿼리 최적화 전략, 인덱스 계획, 캐싱 전략
-4. **마이그레이션 계획**: 기존 데이터 영향, 롤백 전략
-5. **i18n 키 설계**: 전체 키 목록 + 중복 검사 결과
-
-### --team 모드 (Agent Teams)
-전문 에이전트 4-5명이 동시에 다른 관점에서 설계:
-
-```
-팀 구성:
-┌─ PM (Lead): 설계 조율, 결과 종합, 품질 게이트
-├─ Explorer (haiku→sonnet): 유사 패턴 탐색, 재사용 컴포넌트 식별
-├─ Architect (sonnet/opus): 구조 설계, API 설계
-├─ DBA: DB 스키마 설계, 인덱스 계획, 쿼리 최적화 전략
-└─ Designer: UI 구조 설계, 스타일 계획, UX 패턴 선정 (해당 시)
-```
-
-**워크플로우**:
 1. Explorer + DBA 병렬 분석 (코드/DB 현황 파악)
 2. Architect가 분석 결과 기반 구조 설계 (Handoff 수신)
-3. DBA가 database_schema.md + create_table.sql 작성
+3. DBA가 `database_schema.md` + `create_table.sql` 작성
 4. Designer가 UI 구조 설계 (해당 시)
 5. PM이 종합 → 사용자 승인 요청
 

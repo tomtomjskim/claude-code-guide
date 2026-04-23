@@ -1,63 +1,29 @@
 ---
 name: check-spec
-description: "설계문서(spec) 검수. 3단계 프리셋(quick/standard/thorough) + 팀 검수(--team) 지원. docs/spec/ 문서의 규칙/코드베이스 일관성 검토."
+description: "PDARR post-spec. docs/spec/ 문서의 규칙·코드베이스 일관성 검증."
 ---
 
 너는 능숙한 프로젝트 설계문서 검수 전문가야.
 
 설계문서(spec)가 프로젝트 규칙과 코드베이스에 일관성 있게 작성되었는지 최종 검토합니다.
 
-## 설계 검수 프리셋
+## 설계 검수 프리셋 <!-- PRESET_CANONICAL_LINK -->
 
-### 깊이(depth)와 실행(mode) 2축 체계
+**프리셋 체계(depth × execution 2축)는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#check-spec-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
 
-**깊이 (depth)** — 검수의 범위와 상세도:
+### /check-spec 고유 범위 요약
 
-| 깊이 | 시간 | 내용 |
+| 깊이 | 시간 | 출력 |
 |------|------|------|
-| `--quick` | ~2분 | 문서 구조 + 필수 섹션 존재 여부만 |
-| (기본) standard | ~5분 | 구조 + 코드베이스 대조 + 규칙 검증 (Phase 1~3) |
-| `--thorough` | ~10분 | 전체 Phase + 요구사항 완전성 심층 + 대안 검토 |
+| `--quick` | ~2분 | 문서 파일 + 필수 섹션 존재 여부만 |
+| standard (기본) | ~5분 | 구조 + 코드베이스 대조 + 규칙 검증 (Phase 1-3) |
+| `--thorough` | ~10분 | 전체 Phase + 요구사항 완전성 심층(0절) + 대안 검토 + 마이그레이션 리스크 |
 
-**실행 (mode)** — 단일 에이전트 vs 팀:
+**`--thorough`에서 추가되는 항목:** 요구사항 완전성 심층(비즈니스 로직/엣지 케이스/상태 전이), 설계 대안 비교, 보안/성능 설계 유무(공격 벡터/N+1/인덱스), 마이그레이션 리스크(데이터 영향/롤백).
 
-| 모드 | 설명 |
-|------|------|
-| (기본) 단일 | 1명이 순차 검수 |
-| `--team` | Architect+DBA+Explorer 다관점 검수 |
+### --team 모드
 
-### 조합 사용
-
-```
-/check-spec {모듈}                    # standard + 단일 (기본)
-/check-spec --quick {모듈}            # quick + 단일
-/check-spec --thorough {모듈}         # thorough + 단일
-/check-spec --team {모듈}             # thorough + 팀 (기본 최대 깊이)
-/check-spec --team --quick {모듈}     # quick + 팀 (빠른 구조 확인)
-```
-
-**`--team` 단독 사용 시 기본 깊이 = thorough** (최대 성능)
-
-### --quick 깊이
-1. 문서 파일 존재 여부 (architecture.md, api_design.md, database_schema.md)
-2. 필수 섹션 헤더 존재 여부
-3. 명백한 누락 항목 식별
-
-### --thorough 깊이
-standard + 추가:
-1. **요구사항 완전성 심층** (0절 전체): 비즈니스 로직, 엣지 케이스, 상태 전이
-2. **대안 검토**: 설계 대안의 장단점이 충분히 비교되었는지
-3. **보안/성능 설계**: 공격 벡터, N+1, 인덱스 계획이 명세에 포함되었는지
-4. **마이그레이션 리스크**: 기존 데이터 영향, 롤백 전략 유무
-
-### --team 모드 (Agent Teams)
-```
-팀 구성:
-┌─ PM (Lead): 검수 조율, 결과 종합
-├─ Architect: 설계 일관성, 레이어 분리, 패턴 준수
-├─ DBA: DB 스키마 정합성, 인덱스 계획, 쿼리 최적화 전략
-└─ Explorer: 코드베이스 대조, 유사 패턴 비교, 영향 범위 확인
-```
+팀 구성(PM/Architect/DBA/Explorer)과 공통 규칙은 canonical 참조.
 
 ---
 

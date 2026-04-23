@@ -76,19 +76,23 @@ bash scripts/install-skills.sh --list
 
 ## 프리셋 시스템
 
-`analyze`, `spec`, `check-spec`, `check-code`, `qa-test`, `qa-e2e`는 **2축 프리셋**을 지원합니다.
+6개 스킬이 2축 프리셋(depth × execution)을 지원합니다. 상세 체계는 canonical 문서 참조:
 
-```
-깊이(depth):  --quick ← standard(기본) → --thorough
-실행(mode):   단일    ← 기본           → --team
-```
+- [`CLAUDE.md` §PDARR + preset system](../CLAUDE.md#pdarr--preset-system) — 규칙 요약
+- [`docs/14-preset-system.md`](../docs/14-preset-system.md) — 스킬별 depth 범위/팀 구성/조합 예시
+
+**적용 스킬:**
+
+| 스킬 | depth | execution | 비고 |
+|------|-------|-----------|------|
+| `analyze`, `spec`, `check-spec`, `check-code` | ✓ | ✓ | 표준 2축 |
+| `qa-test` | ✓ (4라벨 + alias) | ✓ | `--minimal/--basic/--standard/--full` ↔ `--quick/standard/--thorough` |
+| `qa-e2e` | ✗ | ✓ | 시나리오 기반 (`--tc TC-N`으로 범위 제어) |
 
 ```bash
-/analyze --quick {버그}          # 빠른 분석
-/analyze {기능}                  # 표준 분석
-/analyze --thorough {기능}       # 심층 분석
-/analyze --team {기능}           # 팀 에이전트 분석 (최대 깊이)
-/check-code --team --quick {모듈} # 팀 + 빠른 스캔 (조합 가능)
+/analyze --quick {버그}              # 빠른 분석
+/analyze --team {기능}               # 팀 분석 (기본 thorough)
+/check-code --team --quick {모듈}    # 팀 + 빠른 스캔 조합
 ```
 
 ---

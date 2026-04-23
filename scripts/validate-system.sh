@@ -6,6 +6,7 @@ set -e
 
 PROMPTS_DIR="$HOME/.claude/team/prompts"
 AGENTS_DIR="$HOME/.claude/agents"
+SKILLS_DIR="$HOME/.claude/skills"
 WORKFLOWS_DIR="$HOME/.claude/team/workflows"
 HOOKS_DIR="$HOME/.claude/team/hooks"
 AGENTS_YAML="$HOME/.claude/team/agents.yaml"
@@ -452,12 +453,49 @@ else
     WARNINGS=$((WARNINGS + 1))
 fi
 
+# 19. Preset canonical marker check (v4.0 P1-2)
+# 6 스킬의 SKILL.md에 canonical 링크 마커 존재 + 2축 테이블 중복 선언 부재 확인
+echo ""
+echo "--- 19. Preset canonical markers (6 skills) ---"
+PRESET_SKILLS=("analyze" "spec" "check-spec" "check-code" "qa-test" "qa-e2e")
+PRESET_MARKER="<!-- PRESET_CANONICAL_LINK -->"
+MISSING_MARKERS=0
+DUPLICATE_TABLES=0
+
+for skill in "${PRESET_SKILLS[@]}"; do
+    skill_file="$SKILLS_DIR/$skill/SKILL.md"
+    if [ ! -f "$skill_file" ]; then
+        echo "  WARNING: $skill/SKILL.md not found (skipping)"
+        continue
+    fi
+
+    # (a) canonical 마커 존재
+    if ! grep -q "$PRESET_MARKER" "$skill_file"; then
+        echo "ERROR: $skill/SKILL.md missing preset canonical marker '$PRESET_MARKER'"
+        ERRORS=$((ERRORS + 1))
+        MISSING_MARKERS=$((MISSING_MARKERS + 1))
+    fi
+
+    # (b) 중복 2축 테이블 선언 탐지 — `| ... --quick ... standard ... --thorough ... |` 헤더 패턴
+    # qa-test의 alias 매핑 테이블은 헤더가 `| 4단계 라벨 | 2축 alias | 범위 |`로 다르므로 매칭 안됨
+    if grep -qE '^\|[^|]*--quick[^|]*\|[^|]*standard[^|]*\|[^|]*--thorough[^|]*\|[[:space:]]*$' "$skill_file"; then
+        echo "WARNING: $skill/SKILL.md contains 2-axis depth table — canonical duplication (should link only)"
+        WARNINGS=$((WARNINGS + 1))
+        DUPLICATE_TABLES=$((DUPLICATE_TABLES + 1))
+    fi
+done
+
+echo "  Preset canonical markers: $((${#PRESET_SKILLS[@]} - MISSING_MARKERS))/${#PRESET_SKILLS[@]} skills"
+if [ "$DUPLICATE_TABLES" -gt 0 ]; then
+    echo "  Duplicate 2-axis tables detected: $DUPLICATE_TABLES"
+fi
+
 # Summary
 echo ""
 echo "=== Validation Summary ==="
 echo "  Errors: $ERRORS"
 echo "  Warnings: $WARNINGS"
-echo "  Checks: 18 categories (v3.0: 7 + v3.1: 5 + v3.2: 6)"
+echo "  Checks: 19 categories (v3.0: 7 + v3.1: 5 + v3.2: 6 + v4.0: 1)"
 echo ""
 
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then

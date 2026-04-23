@@ -1,23 +1,37 @@
 ---
 name: qa-test
-description: "QA 자동화. 변경 파일에 대해 난이도별(minimal/basic/standard/full) 종합 QA 테스트 수행 및 리포트 생성."
+description: "단위·통합 레벨 QA 자동 실행. 변경 파일 대상."
 ---
 # QA Test - 종합 QA 자동화
 
 변경된 파일에 대해 난이도별 종합 QA 테스트를 수행하고 리포트를 생성합니다.
 
-## 사용법
+## 사용법 <!-- PRESET_CANONICAL_LINK -->
+
+**프리셋 체계는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#qa-test-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
+
+### 난이도 라벨 ↔ 2축 depth alias
+
+qa-test는 기존 4단계 라벨을 보존하면서 2축 alias도 지원합니다(둘 다 동시에 유효).
+
+| 4단계 라벨 | 2축 alias | 범위 |
+|-----------|-----------|------|
+| `--minimal` | `--quick` | 문법만 (Phase 2) |
+| `--basic` | (alias 없음) | 문법 + 품질 (Phase 2-3) |
+| `--standard` (기본) | standard | + UI/이벤트 + 의존성 (Phase 2-5) |
+| `--full` | `--thorough` | + 이전 리포트 비교 (Phase 2-7) |
+
+### 명령 예시
 
 ```
-/qa-test                              # 변경 파일 자동 테스트 (난이도 자동)
-/qa-test [기능명]                      # 특정 기능 테스트
-/qa-test --minimal                    # 최소 테스트 (문법만)
-/qa-test --basic                      # 기본 테스트
-/qa-test --standard                   # 표준 테스트
-/qa-test --full                       # 전체 테스트
-/qa-test customerDetailPopup --full   # 특정 기능 전체 테스트
-/qa-test --team                       # 팀 에이전트 종합 QA (full + 다관점)
-/qa-test --team --basic [기능명]      # 팀 에이전트 + 난이도 조합
+/qa-test                              # 변경 파일 자동 (난이도 자동 판별)
+/qa-test [기능명]                      # 특정 기능
+/qa-test --minimal        (= --quick)   # 문법만
+/qa-test --basic                        # 문법 + 품질
+/qa-test --standard       (= standard)  # 기본
+/qa-test --full           (= --thorough)# 전체
+/qa-test --team                          # 팀 (기본 = --full)
+/qa-test --team --basic [기능명]          # 팀 + 기본
 ```
 
 ---
@@ -50,13 +64,7 @@ PM: Phase 6~7 (종합 리포트 생성 + 이전 비교)
 
 ### --team 난이도 조합
 
-```
---team 단독     = full + 팀 (기본 최대 깊이)
---team --minimal = minimal + 팀 (문법만 다관점)
---team --basic   = basic + 팀
---team --standard = standard + 팀
---team --full    = full + 팀 (명시적)
-```
+`--team` 단독 사용 시 기본 난이도 = `--full`(= `--thorough` alias). 상세 조합은 위 난이도 매핑 테이블 참조.
 
 ### --team 리포트 추가 섹션
 

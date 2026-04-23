@@ -8,7 +8,11 @@ description: "E2E 비즈니스 로직 테스트. test_scenarios.md 기반으로 
 테스트 시나리오 문서(test_scenarios.md)를 기반으로 비즈니스 프로세스를 단계별로 검증합니다.
 코드 품질 검수(/qa-test, /check-code)와 다르게 **실제 비즈니스 흐름과 데이터 정합성**을 검증합니다.
 
-## 사용법
+## 사용법 <!-- PRESET_CANONICAL_LINK -->
+
+**프리셋 체계는 [`CLAUDE.md` §PDARR + preset system](../../CLAUDE.md#pdarr--preset-system)과 [`docs/14-preset-system.md#qa-e2e-프리셋`](../../docs/14-preset-system.md)에서 canonical로 관리합니다.**
+
+> **qa-e2e는 depth 축을 적용하지 않습니다** — E2E는 시나리오 기반이므로 "깊이를 줄여 부분만 실행"이 아닌 **`--tc TC-N`으로 TC 단위 필터**로 범위를 제어합니다. execution 축(`--team`)과 modifier(`--browser`/`--headed`/`--prepare`)는 지원합니다.
 
 ```
 /qa-e2e                                    # 현재 세션 작업의 테스트 시나리오 자동 탐색

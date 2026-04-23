@@ -15,7 +15,7 @@ There is no `package.json`, no test runner, no lint config at the repo root. The
 ## Commands that matter
 
 ```bash
-# Validate the team system after a --team install (checks 18 categories)
+# Validate the team system after a --team install (checks 19 categories)
 bash scripts/validate-system.sh
 
 # Sanity-check the current repo/project for token-wasting config
@@ -53,13 +53,15 @@ When designing a new feature, ask "which of the five does this live in?" before 
 
 Changing one does not change the others.
 
-## PDARR + preset system (what the skills encode)
+## PDARR + preset system
 
 - **Flow**: `/dispatch` → `/prd` → `/analyze` → `/spec` → `/run` → `/check-code` → `/reflect` → `/complete` → `/stage`
-- **2-axis presets** on `analyze`, `spec`, `check-spec`, `check-code`, `qa-test`, `qa-e2e`:
-  - depth: `--quick` / standard / `--thorough`
-  - execution: single (default) / `--team`
-  - `--team` used alone implies `--thorough`
+- **2-axis presets** — canonical details in [`docs/14-preset-system.md`](docs/14-preset-system.md):
+  - depth axis (`--quick` / standard / `--thorough`): applies to `analyze`, `spec`, `check-spec`, `check-code`
+  - depth axis with 4-label alias (`--minimal`/`--basic`/`--standard`/`--full` ↔ quick/standard/thorough): applies to `qa-test`
+  - execution axis (single (default) / `--team`): applies to all 6 skills (`analyze`, `spec`, `check-spec`, `check-code`, `qa-test`, `qa-e2e`)
+  - `qa-e2e` has **no depth axis** (scenario-driven — use `--tc TC-N` for range control)
+  - `--team` used alone implies `--thorough` (or `--full` for qa-test). Not applicable to qa-e2e.
 - Complexity tiers (Trivial / Simple / Medium / Complex) in `/dispatch` drive which subset of the flow runs. Keep these tier names consistent across skills and docs — `/dispatch` and `.claude/rules/subagent-strategy.md` both reference them.
 
 ## CUSTOMIZE blocks in skills
