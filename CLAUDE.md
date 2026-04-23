@@ -28,6 +28,10 @@ bash scripts/preflight-collect.sh [target-path]
 # List installable skills / hooks without installing
 bash scripts/install-skills.sh --list
 bash scripts/install-hooks.sh --list
+
+# Full option canonical: each installer's --help is authoritative
+bash scripts/install-skills.sh --help
+bash scripts/install-hooks.sh --help
 ```
 
 The validators and installers are idempotent: `install-skills.sh` and `install-hooks.sh` **SKIP** existing files unless `--force` is passed. Prefer re-running with `--force` over hand-editing target files when iterating on a skill or hook.

@@ -95,6 +95,8 @@ bash scripts/install-skills.sh /path/to/your-project
 # 확인: 프로젝트에서 /dispatch, /run, /check-code 등 즉시 사용 가능
 ```
 
+> **전체 옵션 canonical**: `bash scripts/install-skills.sh --help` · `bash scripts/install-hooks.sh --help`. README의 예시는 주요 사용 패턴 요약.
+
 스킬만 설치하면 PDARR 워크플로우를 바로 쓸 수 있습니다.
 Hook(안전장치)과 팀 에이전트까지 사용하려면 아래 단계도 진행하세요.
 

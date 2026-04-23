@@ -24,6 +24,8 @@ bash scripts/install-skills.sh --team /path/to/your-project
 bash scripts/install-skills.sh --list
 ```
 
+> **전체 옵션 canonical**: `bash scripts/install-skills.sh --help` 실행. 문서의 사용 예는 요약.
+
 설치 후 프로젝트의 `.claude/skills/`에 스킬이 추가되며, Claude Code에서 슬래시 커맨드로 즉시 사용 가능합니다.
 
 ---

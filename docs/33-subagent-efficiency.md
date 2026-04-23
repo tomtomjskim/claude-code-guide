@@ -11,6 +11,7 @@
 **관련 문서**:
 - [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
 - [토큰 낭비 자가진단](28-token-waste-selfcheck.md)
+- [하네스 엔지니어링 가이드](29-harness-engineering.md) — 상위 축(5 컴포넌트) 맥락
 - [Coordinator Mode](26-coordinator-mode.md)
 - [Advisor Strategy](30-advisor-strategy.md)
 - [컨텍스트 윈도우 내부](19-context-window-internals.md)

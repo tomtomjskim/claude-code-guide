@@ -12,6 +12,7 @@
 - [Settings 스키마 레퍼런스](20-settings-schema-reference.md)
 - [토큰 낭비 자가진단](28-token-waste-selfcheck.md)
 - [스킬 경량화 가이드](27-skill-lightweight-guide.md)
+- [서브에이전트 효율성 가이드](33-subagent-efficiency.md) — 하네스 하위 축(에이전트 실행 비용) 상세
 - [Advisor Strategy 가이드](30-advisor-strategy.md)
 - [환경 변수 레퍼런스](17-environment-variables.md)
 

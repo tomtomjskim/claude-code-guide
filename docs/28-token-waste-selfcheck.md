@@ -9,6 +9,7 @@ Claude Code 세션에서 토큰이 어디서 낭비되는지 진단하고 개선
 **관련 문서**:
 - [스킬 경량화 가이드](27-skill-lightweight-guide.md)
 - [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+- [서브에이전트 효율성 가이드](33-subagent-efficiency.md) — 에이전트 오버헤드 상세
 - [Fast Mode 가이드](18-fast-mode.md)
 - [환경 변수 레퍼런스](17-environment-variables.md)
 - [Settings 스키마 레퍼런스](20-settings-schema-reference.md)

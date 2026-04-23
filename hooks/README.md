@@ -36,6 +36,8 @@ bash scripts/install-hooks.sh --force /path/to/my-project
 bash scripts/install-hooks.sh --list
 ```
 
+> **전체 옵션 canonical**: `bash scripts/install-hooks.sh --help` 실행. 위 예시는 주요 옵션 요약.
+
 인스톨러는 다음을 자동 수행합니다:
 1. `<project>/.claude/hooks/` 디렉토리에 Hook 스크립트 복사
 2. `<project>/.claude/settings.local.json`에 Hook 등록 (matcher/event 매핑)

@@ -10,6 +10,8 @@ Claude Code 사용 비용을 이해하고 최적화하는 방법을 설명합니
 - [환경 변수 레퍼런스](17-environment-variables.md)
 - [Fast Mode 가이드](18-fast-mode.md)
 - [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
+- [토큰 낭비 자가진단](28-token-waste-selfcheck.md) — 7대 낭비 요소 실전 진단
+- [서브에이전트 효율성 가이드](33-subagent-efficiency.md) — 14k 고정 비용 분해 및 12가지 절감 전략
 - [초기 셋업 체크리스트](00-setup-checklist.md)
 
 ---
