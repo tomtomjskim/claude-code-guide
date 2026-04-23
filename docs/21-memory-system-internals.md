@@ -252,6 +252,6 @@ auto-compact 발생 시 메모리 파일은 압축되지 않습니다. 압축 �
 
 ## 다음 단계
 
-- [컨텍스트 윈도우 내부 동작](18-context-window-internals.md)
-- [Settings 전체 스키마 레퍼런스](19-settings-schema-reference.md)
-- [Agent Frontmatter 완전 스키마](21-agent-frontmatter-schema.md)
+- [컨텍스트 윈도우 내부 동작](19-context-window-internals.md)
+- [Settings 전체 스키마 레퍼런스](20-settings-schema-reference.md)
+- [Agent Frontmatter 완전 스키마](22-agent-frontmatter-schema.md)

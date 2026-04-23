@@ -7,9 +7,9 @@ Claude Code가 인식하는 모든 환경 변수를 카테고리별로 정리합
 ---
 
 **관련 문서**:
-- [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
-- [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
-- [Fast Mode 가이드](17-fast-mode.md)
+- [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+- [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
+- [Fast Mode 가이드](18-fast-mode.md)
 - [초기 셋업 체크리스트](00-setup-checklist.md)
 
 ---
@@ -140,7 +140,7 @@ export CLAUDE_CODE_DISABLE_FAST_MODE=1
 | 기본값 | Fast Mode 활성화 가능 (조건 충족 시 자동 전환) |
 | 효과 | Opus 4.6 Fast Mode 차단 (6x 비용 방지) |
 | 강력도 | settings.json의 fastMode:false보다 강력 |
-| 자세한 내용 | [17-fast-mode.md](17-fast-mode.md) 참조 |
+| 자세한 내용 | [18-fast-mode.md](18-fast-mode.md) 참조 |
 
 ### ANTHROPIC_SMALL_FAST_MODEL
 
@@ -411,7 +411,7 @@ claude --print "코드 분석 실행"
 
 ## 다음 단계
 
-1. [Fast Mode 가이드](17-fast-mode.md)
-2. [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
-3. [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
+1. [Fast Mode 가이드](18-fast-mode.md)
+2. [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+3. [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
 4. [초기 셋업 체크리스트](00-setup-checklist.md)

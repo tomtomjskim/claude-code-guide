@@ -7,9 +7,9 @@ Fast Mode는 Opus 4.6 전용 고속 출력 모드입니다. 비용이 일반 모
 ---
 
 **관련 문서**:
-- [환경 변수 레퍼런스](16-environment-variables.md)
-- [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
-- [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
+- [환경 변수 레퍼런스](17-environment-variables.md)
+- [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+- [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
 
 ---
 
@@ -391,7 +391,7 @@ Fast Mode가 의도치 않게 활성화되었다면 `/cost` 명령의 비용이 
 
 ## 다음 단계
 
-1. [환경 변수 레퍼런스](16-environment-variables.md)
-2. [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
-3. [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
+1. [환경 변수 레퍼런스](17-environment-variables.md)
+2. [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+3. [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
 4. [초기 셋업 체크리스트](00-setup-checklist.md)

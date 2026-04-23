@@ -1011,5 +1011,5 @@ Do not make [다른 에이전트 영역] decisions. Escalate to [담당 에이�
 - [프로젝트 구조 템플릿](06-project-structure.md)
 - [CLAUDE.md 템플릿](07-claude-md-template.md)
 - [코드 리뷰 시스템 v3.0](10-code-review-system.md)
-- [워크플로우 가이드](08-workflows.md)
+- [워크플로우 가이드](11-workflow-commands.md)
 - [추천 플러그인](09-recommended-plugins.md)

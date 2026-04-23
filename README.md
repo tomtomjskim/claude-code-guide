@@ -285,18 +285,18 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 
 | # | 문서 | 설명 |
 |---|------|------|
-| 14 | [토큰 가격표 & 비용 최적화](docs/14-token-pricing-optimization.md) | 모델별 단가, 서브에이전트 전략, 플랜 예산 |
-| 15 | [사용량 한도 & Rate Limit](docs/15-usage-limits-ratelimit.md) | 5h/7d 윈도우, Early Warning, Overage |
-| 16 | [환경변수 레퍼런스](docs/16-environment-variables.md) | 비공개 포함 15+ 환경변수 |
-| 17 | [Fast Mode 상세 & 비활성화](docs/17-fast-mode.md) | 6x 비용, 비활성화 방법, 권장 설정 |
-| 18 | [컨텍스트 윈도우 내부](docs/18-context-window-internals.md) | auto-compact, 압축 구조, 재주입 |
-| 19 | [Settings 전체 스키마](docs/19-settings-schema-reference.md) | 60+ 키, 4단계 병합, 권장 조합 |
-| 20 | [Memory 시스템 내부](docs/20-memory-system-internals.md) | 한도, 랭킹, frontmatter 최적화 |
-| 21 | [Agent Frontmatter 스키마](docs/21-agent-frontmatter-schema.md) | 15개 필드 완전 레퍼런스 |
-| 22 | [도구 동시성 모델](docs/22-tool-concurrency-model.md) | 병렬/직렬 분류, 성능 팁 |
-| 23 | [Retry & 에러 복구](docs/23-retry-error-recovery.md) | 재시도 상수, 에러 분류, 에스컬레이션 |
-| 24 | [Permission 결정 트리](docs/24-permission-system.md) | 5모드, AST 파싱, ML 분류기 |
-| 25 | [Coordinator Mode](docs/25-coordinator-mode.md) | 멀티에이전트 오케스트레이션 |
+| 15 | [토큰 가격표 & 비용 최적화](docs/15-token-pricing-optimization.md) | 모델별 단가, 서브에이전트 전략, 플랜 예산 |
+| 16 | [사용량 한도 & Rate Limit](docs/16-usage-limits-ratelimit.md) | 5h/7d 윈도우, Early Warning, Overage |
+| 17 | [환경변수 레퍼런스](docs/17-environment-variables.md) | 비공개 포함 15+ 환경변수 |
+| 18 | [Fast Mode 상세 & 비활성화](docs/18-fast-mode.md) | 6x 비용, 비활성화 방법, 권장 설정 |
+| 19 | [컨텍스트 윈도우 내부](docs/19-context-window-internals.md) | auto-compact, 압축 구조, 재주입 |
+| 20 | [Settings 전체 스키마](docs/20-settings-schema-reference.md) | 60+ 키, 4단계 병합, 권장 조합 |
+| 21 | [Memory 시스템 내부](docs/21-memory-system-internals.md) | 한도, 랭킹, frontmatter 최적화 |
+| 22 | [Agent Frontmatter 스키마](docs/22-agent-frontmatter-schema.md) | 15개 필드 완전 레퍼런스 |
+| 23 | [도구 동시성 모델](docs/23-tool-concurrency-model.md) | 병렬/직렬 분류, 성능 팁 |
+| 24 | [Retry & 에러 복구](docs/24-retry-error-recovery.md) | 재시도 상수, 에러 분류, 에스컬레이션 |
+| 25 | [Permission 결정 트리](docs/25-permission-system.md) | 5모드, AST 파싱, ML 분류기 |
+| 26 | [Coordinator Mode](docs/26-coordinator-mode.md) | 멀티에이전트 오케스트레이션 |
 
 ---
 

@@ -7,9 +7,9 @@ Claude Code 사용 비용을 이해하고 최적화하는 방법을 설명합니
 ---
 
 **관련 문서**:
-- [환경 변수 레퍼런스](16-environment-variables.md)
-- [Fast Mode 가이드](17-fast-mode.md)
-- [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
+- [환경 변수 레퍼런스](17-environment-variables.md)
+- [Fast Mode 가이드](18-fast-mode.md)
+- [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
 - [초기 셋업 체크리스트](00-setup-checklist.md)
 
 ---
@@ -31,7 +31,7 @@ Claude Code 사용 비용을 이해하고 최적화하는 방법을 설명합니
 | claude-opus-4-6 (일반) | $5.00 | $25.00 | $6.25 | $0.50 | $0.01 |
 | claude-opus-4-6 (Fast) | $30.00 | $150.00 | $37.50 | $3.00 | $0.01 |
 
-> **주의**: Opus 4.6 Fast Mode는 일반 Sonnet 대비 10배, 일반 Opus 4.6 대비 6배 비싸다. Fast Mode 비활성화 방법은 [17-fast-mode.md](17-fast-mode.md)를 참조하라.
+> **주의**: Opus 4.6 Fast Mode는 일반 Sonnet 대비 10배, 일반 Opus 4.6 대비 6배 비싸다. Fast Mode 비활성화 방법은 [18-fast-mode.md](18-fast-mode.md)를 참조하라.
 
 ---
 
@@ -279,7 +279,7 @@ Claude Code는 각 세션에서 소비한 토큰과 비용을 `/cost` 명령으�
 
 ## 다음 단계
 
-1. [사용량 한도 및 Rate Limit](15-usage-limits-ratelimit.md)
-2. [환경 변수 레퍼런스](16-environment-variables.md)
-3. [Fast Mode 가이드](17-fast-mode.md)
+1. [사용량 한도 및 Rate Limit](16-usage-limits-ratelimit.md)
+2. [환경 변수 레퍼런스](17-environment-variables.md)
+3. [Fast Mode 가이드](18-fast-mode.md)
 4. [초기 셋업 체크리스트](00-setup-checklist.md)

@@ -343,6 +343,6 @@ claude config get <key> --verbose
 
 ## 다음 단계
 
-- [컨텍스트 윈도우 내부 동작](18-context-window-internals.md)
-- [Memory 시스템 내부 동작](20-memory-system-internals.md)
-- [Agent Frontmatter 완전 스키마](21-agent-frontmatter-schema.md)
+- [컨텍스트 윈도우 내부 동작](19-context-window-internals.md)
+- [Memory 시스템 내부 동작](21-memory-system-internals.md)
+- [Agent Frontmatter 완전 스키마](22-agent-frontmatter-schema.md)

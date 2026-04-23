@@ -267,6 +267,6 @@ settings.json deny 패턴 확인
 
 ## 관련 문서
 
-- [Settings 전체 스키마](19-settings-schema-reference.md) - `permissions` 필드 전체 옵션
-- [Agent Frontmatter 스키마](21-agent-frontmatter-schema.md) - 에이전트별 `permissionMode` 설정
-- [환경변수 레퍼런스](16-environment-variables.md) - 권한 관련 환경변수
+- [Settings 전체 스키마](20-settings-schema-reference.md) - `permissions` 필드 전체 옵션
+- [Agent Frontmatter 스키마](22-agent-frontmatter-schema.md) - 에이전트별 `permissionMode` 설정
+- [환경변수 레퍼런스](17-environment-variables.md) - 권한 관련 환경변수

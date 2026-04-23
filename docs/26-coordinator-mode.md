@@ -245,7 +245,7 @@ Implementation 완료 → Verification 워커 → 결과 확인
 
 ## 관련 문서
 
-- [도구 동시성 모델](22-tool-concurrency-model.md) - Agent 병렬 실행 상세
-- [Agent Frontmatter 스키마](21-agent-frontmatter-schema.md) - 워커 에이전트 설정
-- [환경변수 레퍼런스](16-environment-variables.md) - `CLAUDE_CODE_COORDINATOR_MODE` 포함 전체 환경변수
+- [도구 동시성 모델](23-tool-concurrency-model.md) - Agent 병렬 실행 상세
+- [Agent Frontmatter 스키마](22-agent-frontmatter-schema.md) - 워커 에이전트 설정
+- [환경변수 레퍼런스](17-environment-variables.md) - `CLAUDE_CODE_COORDINATOR_MODE` 포함 전체 환경변수
 - [v3.0 아키텍처](12-v3-architecture.md) - 멀티에이전트 팀 시스템 전체 설계

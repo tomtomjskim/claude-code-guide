@@ -176,6 +176,6 @@ export CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY=15  # 높이면 처리량 증가 (�
 
 ## 관련 문서
 
-- [환경변수 레퍼런스](16-environment-variables.md) - `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` 포함 전체 환경변수
-- [Agent Frontmatter 스키마](21-agent-frontmatter-schema.md) - Agent 도구 설정 옵션
-- [Coordinator Mode](25-coordinator-mode.md) - 고급 멀티에이전트 오케스트레이션
+- [환경변수 레퍼런스](17-environment-variables.md) - `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` 포함 전체 환경변수
+- [Agent Frontmatter 스키마](22-agent-frontmatter-schema.md) - Agent 도구 설정 옵션
+- [Coordinator Mode](26-coordinator-mode.md) - 고급 멀티에이전트 오케스트레이션

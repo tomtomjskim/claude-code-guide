@@ -378,4 +378,4 @@ bash ~/.claude/team/scripts/validate-system.sh
 4. [문서화 규칙](04-documentation-rules.md)
 5. [에이전트 페르소나](05-agent-personas.md)
 6. [v3.0 아키텍처](12-v3-architecture.md)
-7. [핸드오프 & 실패 복구](13-handoff-failure-recovery.md)
+7. [핸드오프 & 실패 복구](13-handoff-and-failure.md)

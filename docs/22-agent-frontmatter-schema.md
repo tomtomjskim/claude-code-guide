@@ -481,8 +481,8 @@ hooks:
 
 ## 다음 단계
 
-- [컨텍스트 윈도우 내부 동작](18-context-window-internals.md)
-- [Settings 전체 스키마 레퍼런스](19-settings-schema-reference.md)
-- [Memory 시스템 내부 동작](20-memory-system-internals.md)
+- [컨텍스트 윈도우 내부 동작](19-context-window-internals.md)
+- [Settings 전체 스키마 레퍼런스](20-settings-schema-reference.md)
+- [Memory 시스템 내부 동작](21-memory-system-internals.md)
 - [에이전트 페르소나](05-agent-personas.md)
 - [v3.0 아키텍처](12-v3-architecture.md)

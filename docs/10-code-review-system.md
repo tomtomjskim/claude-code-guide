@@ -340,4 +340,4 @@ validate_build()         # 빌드 성공 확인
 
 - [에이전트 페르소나 v3.0](05-agent-personas.md)
 - [추천 플러그인](09-recommended-plugins.md)
-- [워크플로우 가이드](08-workflows.md)
+- [워크플로우 가이드](11-workflow-commands.md)

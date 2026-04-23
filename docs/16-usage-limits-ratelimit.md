@@ -7,9 +7,9 @@ Claude Code의 사용량 한도 체계와 Rate Limiting 동작 방식을 설명�
 ---
 
 **관련 문서**:
-- [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
-- [환경 변수 레퍼런스](16-environment-variables.md)
-- [Fast Mode 가이드](17-fast-mode.md)
+- [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+- [환경 변수 레퍼런스](17-environment-variables.md)
+- [Fast Mode 가이드](18-fast-mode.md)
 
 ---
 
@@ -328,7 +328,7 @@ const checkUsageLimits = async () => {
 
 ## 다음 단계
 
-1. [환경 변수 레퍼런스](16-environment-variables.md)
-2. [Fast Mode 가이드](17-fast-mode.md)
-3. [토큰 가격 및 비용 최적화](14-token-pricing-optimization.md)
+1. [환경 변수 레퍼런스](17-environment-variables.md)
+2. [Fast Mode 가이드](18-fast-mode.md)
+3. [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
 4. [초기 셋업 체크리스트](00-setup-checklist.md)

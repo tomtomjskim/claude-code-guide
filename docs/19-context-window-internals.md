@@ -216,6 +216,6 @@ export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1   # 백그라운드 태스크 비�
 
 ## 다음 단계
 
-- [Settings 전체 스키마 레퍼런스](19-settings-schema-reference.md)
-- [Memory 시스템 내부 동작](20-memory-system-internals.md)
-- [Agent Frontmatter 완전 스키마](21-agent-frontmatter-schema.md)
+- [Settings 전체 스키마 레퍼런스](20-settings-schema-reference.md)
+- [Memory 시스템 내부 동작](21-memory-system-internals.md)
+- [Agent Frontmatter 완전 스키마](22-agent-frontmatter-schema.md)

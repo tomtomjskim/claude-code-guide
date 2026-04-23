@@ -170,6 +170,6 @@ CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1   # 백그라운드 태스크 비활성�
 
 ## 관련 문서
 
-- [환경변수 레퍼런스](16-environment-variables.md) - 재시도 관련 환경변수
-- [사용량 한도 & Rate Limit](15-usage-limits-ratelimit.md) - 5h/7d 윈도우, Early Warning
-- [컨텍스트 윈도우 내부](18-context-window-internals.md) - 출력 한도와 auto-compact 연동
+- [환경변수 레퍼런스](17-environment-variables.md) - 재시도 관련 환경변수
+- [사용량 한도 & Rate Limit](16-usage-limits-ratelimit.md) - 5h/7d 윈도우, Early Warning
+- [컨텍스트 윈도우 내부](19-context-window-internals.md) - 출력 한도와 auto-compact 연동
