@@ -71,6 +71,7 @@ bash scripts/install-skills.sh --list
 | **organize-docs** | `/organize-docs` | 누락된 문서화 보완 |
 | **workflow** | `/workflow {기능}` | PDARR 전체 사이클 자동 실행 |
 | **profile** | `/profile {대상}` | 성능 프로파일링 코드 삽입 |
+| **design-creative** | `/design-creative {대상}` | CREATIVE 모드 디자인 (랜딩페이지·프로토타입). 토큰 매핑 단계 필수 |
 
 ---
 
@@ -185,7 +186,8 @@ skills/
 │   └── references/
 │       ├── team-agent-guide.md
 │       └── pdarr-agent-prompt.md
-└── profile/SKILL.md       # 성능 프로파일링
+├── profile/SKILL.md       # 성능 프로파일링
+└── design-creative/SKILL.md  # CREATIVE 모드 디자인 (랜딩/프로토타입)
 ```
 
 ---
