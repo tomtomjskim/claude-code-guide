@@ -179,19 +179,11 @@ refreshToken() 함수의 만료 시간을 30분에서 60분으로 변경.
 
 작업 복잡도에 따라 정보 수집 방식을 분기한다. 모든 작업에 Scout 에이전트를 띄우지 않는다.
 
-```
-Dispatch 판정 기준 (기계적):
-  파일 수 ≤ 2, 변경 ≤ 20줄  → Trivial
-  파일 수 ≤ 4, 변경 ≤ 100줄 → Simple
-  파일 수 ≤ 8               → Medium
-  파일 수 > 8 또는 서비스 2+ → Complex
+임계값과 실행 방식은 canonical에 정의: [`.claude/rules/subagent-strategy.md#tiered-dispatch--복잡도별-실행-방식`](../.claude/rules/subagent-strategy.md).
 
-실행 방식:
-  Trivial → 메인이 직접 수행 (에이전트 없음)
-  Simple  → 메인이 직접 수행 또는 에이전트 1개
-  Medium  → 메인이 Read/Grep으로 digest 생성 + Worker 1-2개
-  Complex → Scout(Haiku) → digest → Worker N개(Sonnet)
-```
+요약:
+- 판정 축은 **파일 수**(보조: 변경 줄 수·서비스 수)
+- 4단계(Trivial/Simple/Medium/Complex) 각각에 고유한 실행 방식(메인 직접 → 에이전트 1개 → digest + Worker 1-2 → Scout + Worker N)
 
 **절감**: Medium에서 Scout 에이전트 1회(~20,000 tokens) 회피.
 

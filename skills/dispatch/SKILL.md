@@ -46,15 +46,18 @@ ls docs/todo/*.md 2>/dev/null
 
 ### Phase 3: Quick Assessment (30초 이내)
 
-**복잡도 판단 기준**: <!-- CUSTOMIZE: point to your project's complexity matrix if available -->
+**복잡도 판단 기준**: canonical은 [`.claude/rules/subagent-strategy.md#tiered-dispatch--복잡도별-실행-방식`](../../.claude/rules/subagent-strategy.md). 아래 표는 canonical을 mirror한 것 + 보조 지표.
 
-#### 3.1 키워드 + 범위 기반 판단
+#### 3.1 Canonical 임계값 (파일 수 기준)
 
-키워드로 초기 판단 후, 관련 파일 수 / 아키텍처 레이어 / 프론트+백엔드 여부로 보정하여 최종 판정:
-- **Trivial**: 1-2줄 수정, 오타, 설정값 변경
-- **Simple**: 단일 파일, 1-2개 함수
-- **Medium**: 2-5개 파일, 1-2개 레이어
-- **Complex**: 6개+ 파일, 3개+ 레이어, 프론트+백엔드 동시
+| 복잡도 | 판정 기준 | 보조 지표 (dispatch 고유) |
+|--------|----------|--------------------------|
+| **Trivial** | 파일 ≤2, 변경 ≤20줄 | 오타·설정값·1-2줄 수정류 |
+| **Simple** | 파일 ≤4, 변경 ≤100줄 | 1-2개 함수, 1 레이어 |
+| **Medium** | 파일 ≤8 | 1-2 레이어 |
+| **Complex** | 파일 >8 또는 서비스 2+ | 3+ 레이어, 프론트+백엔드 동시 |
+
+**보조 지표**는 canonical 기준에 해당하지 않는 초기 키워드 판단 시 보정 힌트. 최종 판정은 항상 canonical의 파일 수 / 서비스 수 기준이 우선.
 
 ### Phase 4: 라우팅 결정
 
