@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: 코드 리뷰 전문가 - 프로덕션 준비도 게이트, 품질, 아키텍처, 테스트 종합 검증
+description: 코드 리뷰 전문가 (post-implementation) - 프로덕션 준비도 게이트, 기구현된 코드의 품질·아키텍처 준수·테스트 종합 검증
 model: sonnet
 effort: high
 color: slate

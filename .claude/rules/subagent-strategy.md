@@ -21,6 +21,19 @@ description: "서브에이전트 사용 전략 — 스폰 판단, prompt 구조,
 | Medium | 파일 ≤8 | 메인이 digest 생성 + Worker 1-2개 |
 | Complex | 파일 >8 또는 서비스 2+ | Scout(Haiku) → digest → Worker N개(Sonnet) |
 
+### 복잡도 × 예산 × 실행 3축 매핑
+
+각 복잡도는 `agents.yaml` `workflow_budgets`의 예산 레벨과 전형적으로 대응한다. 예산은 비용 상한이며 복잡도 판정의 결과이지 입력이 아니다.
+
+| 복잡도 | 예산 (agents.yaml) | 상한 | 실행 축 |
+|--------|-------------------|------|--------|
+| Trivial | `quick-fix` | $2.00 | 메인 직접 (에이전트 스폰 없음) |
+| Simple | `quick-fix` 또는 `standard` | $2-5 | 메인 직접 또는 에이전트 1개 |
+| Medium | `standard` | $5.00 | 메인 digest + Worker 1-2개 |
+| Complex | `thorough` | $10.00 | Scout(Haiku) → digest → Worker N개(Sonnet) |
+
+예산 정의 canonical: [`agents.yaml` `workflow_budgets`](../../agents.yaml). 실행 축은 위 Tiered Dispatch 표 참조.
+
 ### 메인이 직접 수행 (에이전트 금지)
 - 파일 탐색, 코드 분석, 구조 파악 → Read/Grep/Glob 직접 사용
 - 단일 파일 수정, 버그 수정, 설정 변경

@@ -1,6 +1,6 @@
 ---
 name: architect
-description: 시스템 아키텍트 - 구조적 무결성 관점의 아키텍처 설계, 기술 결정, 구현 전략 수립
+description: 시스템 아키텍트 (pre-implementation) - 구조적 무결성 관점의 아키텍처 설계, 기술 결정, 구현 전략 수립
 model: sonnet
 effort: high
 color: blue
