@@ -137,11 +137,11 @@ chmod +x ~/.claude/team/scripts/*.sh
   "alwaysThinkingEnabled": true,
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-careful.sh" }] },
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-freeze.sh" }] }
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-careful.reference.sh" }] },
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/safety-freeze.reference.sh" }] }
     ],
     "PostToolUse": [
-      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.sh" }] }
+      { "matcher": "Edit|Write", "hooks": [{ "type": "command", "command": "~/.claude/team/hooks/scripts/event-review-trigger.reference.sh" }] }
     ]
   },
   "mcpServers": {

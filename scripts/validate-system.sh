@@ -355,7 +355,7 @@ done
 # 13. v3.2: Safety Hook Scripts
 echo ""
 echo "--- 13. Safety Hook Scripts (v3.2) ---"
-HOOK_SCRIPTS=("safety-careful.sh" "safety-freeze.sh" "event-review-trigger.sh")
+HOOK_SCRIPTS=("safety-careful.reference.sh" "safety-freeze.reference.sh" "event-review-trigger.reference.sh")
 for script in "${HOOK_SCRIPTS[@]}"; do
     if [ -f "$HOOKS_SCRIPTS_DIR/$script" ]; then
         if [ -x "$HOOKS_SCRIPTS_DIR/$script" ]; then

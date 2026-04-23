@@ -151,10 +151,10 @@ hooks/
     safety-careful.sh
     safety-freeze.sh
     audit-agent.sh
-  scripts/                   # v3.2 레퍼런스 구현 (운영 예시)
-    safety-careful.sh
-    safety-freeze.sh
-    event-review-trigger.sh
+  scripts/                   # 레퍼런스 구현 (운영 예시, .reference.sh 접미어로 역할 자기설명)
+    safety-careful.reference.sh
+    safety-freeze.reference.sh
+    event-review-trigger.reference.sh
   event-driven-review.yaml   # 이벤트 기반 리뷰 설정
   README.md
 scripts/
@@ -165,7 +165,7 @@ scripts/
 
 | 디렉토리 | 성격 | 용도 |
 |----------|------|------|
-| `hooks/scripts/` | **v3.2 레퍼런스 구현** | 특정 서버 경로(`/home/ubuntu/`)가 하드코딩된 실제 운영 예시. 팀 시스템 설치 시 `~/.claude/team/hooks/scripts/`로 복사되어 사용됨. |
+| `hooks/scripts/*.reference.sh` | **레퍼런스 구현** | 특정 서버 경로(`/home/ubuntu/`)가 하드코딩된 실제 운영 예시. 팀 시스템 설치 시 `~/.claude/team/hooks/scripts/`로 복사되어 사용됨. `.reference.sh` 접미어로 boilerplate와 구별. |
 | `hooks/boilerplates/` | **커스터마이징 가능 템플릿** | 프로젝트 독립적인 범용 템플릿. 하드코딩 경로 없이 변수로 설정 가능. 새 프로젝트에는 이것을 사용. |
 
 `scripts/`는 이 레포의 팀 시스템에서 직접 사용하는 Hook이고, `boilerplates/`는 다른 프로젝트에 복사하여 커스터마이징할 수 있도록 설계된 템플릿입니다.
@@ -174,7 +174,7 @@ scripts/
 
 `event-driven-review.yaml`은 PostToolUse Hook과 연동되는 **이벤트 기반 코드 리뷰 설정**입니다.
 
-- `scripts/event-review-trigger.sh`가 코드 변경 이벤트를 감지하면, 이 YAML에 정의된 리뷰 규칙에 따라 자동 리뷰를 트리거합니다.
+- `scripts/event-review-trigger.reference.sh`가 코드 변경 이벤트를 감지하면, 이 YAML에 정의된 리뷰 규칙에 따라 자동 리뷰를 트리거합니다.
 - boilerplate Hook과의 관계: boilerplate는 개별 도구 호출의 차단/허용을 제어하고, event-driven-review는 코드 변경 후 리뷰 프로세스를 관리합니다. 두 시스템은 독립적으로 동작하며 함께 사용할 수 있습니다.
 
 ## 새 Hook 만들기
