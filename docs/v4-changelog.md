@@ -78,10 +78,20 @@ v4.0은 **coherence 부채 청산 릴리스**이다. v3.0 → v3.2 → v3.3 누�
 | **P1-8** | `analyze` / `spec` / `check-spec` description 재작성 (PDARR 축 명시) | [cc129ad](../commit/cc129ad) |
 | **P1-9** | `reflect` / `complete` / `organize-docs` description 재작성 | [dd19fb8](../commit/dd19fb8) |
 
-### P2 — v4.0 nice-to-have (10건, 본 릴리스에서 2건 부분 해소, 나머지 open)
+### P2 — v4.0 nice-to-have (10건, 9/10 완료)
 
-- **P2-5 부분 해소**: P1-5에서 `CLAUDE.md` "Hooks directory has TWO meanings" 제목을 "layout"으로 완화 + `.reference.sh` 접미어로 파일명 자기설명 → P2-5 원 요구(3중 네이밍 해소)의 주요 부분 달성
-- **나머지 8건**: 후속 릴리스 또는 필요시 선별 처리 ([docs/v4/plans/p2-survey.md](v4/plans/p2-survey.md) 참조)
+| # | 항목 | 커밋 |
+|---|------|------|
+| **P2-1** | Cross-reference broken links 일괄 수정 (37+건) | [77c65e7](../commit/77c65e7) Bundle E |
+| **P2-2** | `check-code` CUSTOMIZE stack 예시 분리 (references/stack-examples.md 신규) | [ea0cce6](../commit/ea0cce6) Bundle F |
+| **P2-3** | 모델 라우팅 canonical (`agents.yaml#model_routing`) | [bda963c](../commit/bda963c) Bundle G |
+| **P2-4** | PDARR 흐름 canonical (`CLAUDE.md §PDARR`) | [bda963c](../commit/bda963c) Bundle G |
+| **P2-5** | Hooks 3중 네이밍 | P1-5에서 `.reference.sh` 접미어로 자기설명 달성, 추가 경량화 drop |
+| **P2-6** | 서브에이전트 14k 오버헤드 canonical (`docs/33 §1`) | [bda963c](../commit/bda963c) Bundle G |
+| **P2-7** | 설치 스크립트 옵션 canonical (각 스크립트 `--help` 권위) | [b9bbd75](../commit/b9bbd75) |
+| **P2-8** | docs 토큰/하네스 cross-link 강화 (15↔28↔33, 29↔33) | [b9bbd75](../commit/b9bbd75) |
+| **P2-9** | `architect`/`code-reviewer` description 경계 (pre-/post-implementation) | [56f35af](../commit/56f35af) |
+| **P2-10** | PDARR 3축 매핑 테이블 (복잡도 × 예산 × 실행) | [56f35af](../commit/56f35af) |
 
 ---
 
@@ -93,9 +103,13 @@ v4.0은 **coherence 부채 청산 릴리스**이다. v3.0 → v3.2 → v3.3 누�
 |---------------|------|-------------------------|------|
 | `agents.yaml:4` | 시스템 버전 | 15+ 곳 혼재 (3.0/3.2/3.3) | 1곳 (+ `EXPECTED_VERSION` 단일 참조) |
 | `agents.yaml:263+` | 에이전트 목록 | README + validate 7곳 하드코딩 | 1곳 (validate가 동적 파싱) |
+| `agents.yaml:7-35 model_routing` | 모델 라우팅 | 4곳(subagent-strategy, docs/33, skills/workflow) 독자 선언 | 1곳 (consumer 3곳 링크) |
 | `skills/README.md:31-74` | 스킬 목록 (18개) | "17개" drift × 3곳 | 1곳 (canonical) |
 | `CLAUDE.md:56 + docs/14` | 프리셋 체계 (2축) | 9곳 중복 선언 (6 SKILL + 3 summary) | 2-tier canonical |
+| `CLAUDE.md:58 Flow bullet` | PDARR 순차 흐름 | 4곳 재선언 | 1곳 (consumer 3곳 링크) |
+| `docs/33 §1 고정 오버헤드` | 14k 오버헤드 분해 | 3곳 요약 반복 | 1곳 (consumer 2곳 링크) |
 | `.claude/rules/subagent-strategy.md:17-22` | Complexity Tier 임계값 | dispatch + docs/33 독자 주장 | 1곳 (consumers link) |
+| 각 스크립트 `--help` | 설치 옵션 | 4곳 doc 반복 선언 | 1곳 runtime canonical (consumer 4곳 링크) |
 
 ### Validate 체크 확장
 
@@ -166,16 +180,22 @@ d417e14 feat(v4 P1-6): Complexity Tier 임계값 canonical 통일
 dd19fb8 feat(v4 P1-9): reflect/complete/organize-docs description 재작성
 d25c0e8 feat(v4 P1-4): 스킬 목록 canonical 통일 — design-creative 누락 보강 + "17→18" drift 정정
 0505d08 feat(v4 P1-5): hooks/scripts/*.sh → *.reference.sh rename (Breaking B2)
+e8e5769 docs(v4): v4.0 release notes + P2 survey
+bda963c feat(v4 Bundle G): SSOT 재정렬 — 모델 라우팅·PDARR 흐름·14k 오버헤드 canonical
+56f35af feat(v4 P2-9+P2-10): architect/code-reviewer 경계 명시 + PDARR 3축 매핑 테이블
+ea0cce6 feat(v4 Bundle F / P2-2): check-code CUSTOMIZE stack 예시 분리
+77c65e7 feat(v4 Bundle E / P2-1): docs cross-reference broken links 일괄 수정 (37+건)
+b9bbd75 feat(v4 P2-7+P2-8): 설치 스크립트 옵션 canonical + docs 토큰/하네스 cross-link
 ```
 
-**총 8 커밋** (P0-A bundle + P1-2+P1-7+P1-8 bundle 덕에 14개 전략 항목을 8 커밋에 통폐합)
+**총 14 커밋** — strategy §3 P0(5건) + P1(9건) + P2(10건, P2-5 drop) = 23 항목을 14 커밋에 통폐합. Bundle 전략으로 P0-A(4건), P1-2/P1-7/P1-8(3건), Bundle G(P2-3/4/6 3건), P2-9+P2-10, Bundle E/F, P2-7+P2-8 등 다수 묶음.
 
 ---
 
 ## Statistics
 
-- **수정 파일**: 약 30개 (고유 파일 기준, 커밋 중복 제거)
-- **순수 라인 변화**: +3400 / -500 (plan 문서 3개 약 +2500줄 포함)
-- **실제 코드/문서 변화**: 약 +900 / -500 (plan 제외, 구조 재정렬 중심)
-- **중복 제거**: 프리셋 정의 9곳 → 2곳, 에이전트 이름 하드코딩 7곳 → 0곳, 버전 드리프트 15곳 → 1곳
+- **수정 파일**: 약 45개 (고유 파일 기준, 커밋 중복 제거)
+- **P2 추가**: `skills/check-code/references/stack-examples.md` 신규(+174 lines), docs/ 16 파일 broken link 정리, 8 파일 cross-link 강화
+- **중복 제거**: 프리셋 정의 9곳 → 2곳, 에이전트 이름 하드코딩 7곳 → 0곳, 버전 드리프트 15곳 → 1곳, 모델 라우팅 4곳 → 1곳 canonical + 링크, PDARR 흐름 4곳 → 1곳 canonical + 링크, 14k 오버헤드 3곳 → 1곳 canonical + 링크, 복잡도 임계값 3곳 → 1곳 canonical + 링크, 설치 옵션 4곳 → 1곳 canonical(`--help`) + 링크
+- **Broken links**: 37+건 → 0건 (docs/ 내부 cross-reference 전수 복원)
 - **신규 체크**: Check 19 "Preset canonical markers 6/6" 자동 감지 체계
