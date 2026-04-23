@@ -1,6 +1,6 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════════
-# Claude Code 토큰 낭비 자가진단 스크립트 v3.3
+# Claude Code 토큰 낭비 자가진단 스크립트
 # 사용법: bash scripts/selfcheck-token-waste.sh [프로젝트경로]
 # ═══════════════════════════════════════════════════════════════
 
@@ -31,7 +31,7 @@ MEMORY_DIR="$HOME/.claude/projects"
 
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${BOLD}  Claude Code 토큰 낭비 자가진단 (v3.3)${NC}"
+echo -e "${BOLD}  Claude Code 토큰 낭비 자가진단${NC}"
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
 echo ""
 echo -e "프로젝트: ${CYAN}$PROJECT_DIR${NC}"

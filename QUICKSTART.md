@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-v3.0 기능을 실전에서 바로 활용하기 위한 실전 가이드.
+이 가이드의 기능을 실전에서 바로 활용하기 위한 실전 가이드.
 
 ---
 
@@ -35,7 +35,7 @@ bash scripts/install-hooks.sh --preset minimal /path/to/your-project
 
 ## 1. 일상 코딩 (변경 없음)
 
-기존과 동일하게 사용. v3.0 기능은 기존 워크플로우를 **확장**한 것이지 대체가 아님.
+기존과 동일하게 사용. 추가 기능은 기존 워크플로우를 **확장**한 것이지 대체가 아님.
 
 ```
 /dispatch {작업}          # 평소대로 시작
@@ -126,7 +126,7 @@ bash scripts/install-hooks.sh --preset minimal /path/to/your-project
 
 **자동 적용** — `--team` 또는 `/workflow` 사용 시:
 
-| 기능 | 이전 | v3.0 |
+| 기능 | 이전 | 현재 |
 |------|------|------|
 | 에이전트 간 전달 | 비구조적 텍스트 | 5-field 구조 (scope/findings/recommendation/validation_status/residual_risk) |
 | 에이전트 실패 | "재시도/중단?" 매번 질문 | 탐색/리뷰 → 자동 재시도, 구현 → PM 에스컬레이션 |

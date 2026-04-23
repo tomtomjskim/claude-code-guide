@@ -1,4 +1,4 @@
-# Claude Code 셋업 가이드 v3.3
+# Claude Code 셋업 가이드
 
 **Claude Code를 효과적으로 사용하기 위한 종합 가이드 및 템플릿**
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Multi-Agent Team System v3.2 Validation Script
+# Multi-Agent Team System Validation Script
 # 시스템 일관성 검증 (읽기 전용)
 
 set -e
@@ -9,6 +9,11 @@ AGENTS_DIR="$HOME/.claude/agents"
 WORKFLOWS_DIR="$HOME/.claude/team/workflows"
 HOOKS_DIR="$HOME/.claude/team/hooks"
 AGENTS_YAML="$HOME/.claude/team/agents.yaml"
+
+# v4.0 P1-1: 버전 canonical 중앙화 (strategy.md Decision 1)
+# 이 스크립트가 검증하는 team system의 예상 버전. agents.yaml:4의 value와 일치해야 함.
+# 버전 bump 시 (1) agents.yaml:4 (2) 아래 EXPECTED_VERSION 두 곳만 동시 업데이트.
+EXPECTED_VERSION="3.2"
 
 ERRORS=0
 WARNINGS=0
@@ -30,7 +35,7 @@ else
     DOMAIN_SPECIFIC=""
 fi
 
-echo "=== Multi-Agent Team System v3.2 Validation ==="
+echo "=== Multi-Agent Team System v$EXPECTED_VERSION Validation ==="
 echo ""
 
 # 1. Check all 16 prompts have 6 required sections
@@ -48,7 +53,7 @@ done
 PROMPT_COUNT=$(ls -1 "$PROMPTS_DIR"/*.md 2>/dev/null | wc -l)
 echo "  Checked $PROMPT_COUNT prompts for 6 sections"
 
-# 2. Check all agents have v3.0 Template and Boundary sections
+# 2. Check all agents have ## Template and ## Boundary sections
 echo ""
 echo "--- 2. Subagent Definition Files ---"
 for agent in "$AGENTS_DIR"/*.md; do
@@ -121,10 +126,10 @@ echo "  Checked selective fields (isolation, memory, disallowedTools)"
 # 3. Check agents.yaml version and key sections
 echo ""
 echo "--- 3. agents.yaml Configuration ---"
-if grep -q 'version: "3.2"' "$AGENTS_YAML" 2>/dev/null; then
-    echo "  Version: 3.2 ✓"
+if grep -q "version: \"$EXPECTED_VERSION\"" "$AGENTS_YAML" 2>/dev/null; then
+    echo "  Version: $EXPECTED_VERSION ✓"
 else
-    echo "ERROR: agents.yaml version is not 3.2"
+    echo "ERROR: agents.yaml version is not $EXPECTED_VERSION"
     ERRORS=$((ERRORS + 1))
 fi
 
@@ -456,9 +461,9 @@ echo "  Checks: 18 categories (v3.0: 7 + v3.1: 5 + v3.2: 6)"
 echo ""
 
 if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-    echo "✅ System validation PASSED (v3.2) — no issues"
+    echo "✅ System validation PASSED (v$EXPECTED_VERSION) — no issues"
 elif [ $ERRORS -eq 0 ]; then
-    echo "⚠️  System validation PASSED with $WARNINGS warnings (v3.2)"
+    echo "⚠️  System validation PASSED with $WARNINGS warnings (v$EXPECTED_VERSION)"
 else
     echo "❌ System validation FAILED with $ERRORS errors, $WARNINGS warnings"
 fi

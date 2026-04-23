@@ -7,7 +7,7 @@ description: "기술 명세서 작성. 3단계 프리셋(quick/standard/thorough
 
 구현 전 명확한 기술 명세서(Specification)를 작성하여 AI Agent와 개발자 모두가 이해할 수 있는 단일 소스를 제공합니다.
 
-## 명세서 프리셋 (v3.0)
+## 명세서 프리셋
 
 ### 깊이(depth)와 실행(mode) 2축 체계
 

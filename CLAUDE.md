@@ -85,12 +85,14 @@ Skills are intentionally stack-agnostic except inside `<!-- CUSTOMIZE: ... -->` 
 
 ## Versioning
 
-The team system version is set in **two places** and `validate-system.sh` checks they match:
+The team system version is declared **once** in `agents.yaml:4` (`version: "3.2"`). `scripts/validate-system.sh` holds the expected value in a single `EXPECTED_VERSION` constant at the top of the script; the script fails if the installed `agents.yaml` diverges.
 
-- `agents.yaml` → `version: "3.2"`
-- Prompts under `prompts/` must contain the 6 required sections (`## Opening`, `## Working Mode`, `## Focus On`, `## Quality Checks`, `## Return`, `## Boundary`)
+To bump the version:
+1. Update `agents.yaml:4` `version` field
+2. Update `scripts/validate-system.sh` `EXPECTED_VERSION`
+3. Run `bash scripts/install-skills.sh <target> --team --force && bash scripts/validate-system.sh` — 0 errors expected (beyond the PyYAML-env baseline)
 
-When bumping the version, update both, then re-run `validate-system.sh` with 0 errors expected.
+Prompt template structure (orthogonal axis, not version-linked): every file under `prompts/` must contain the 6 required sections (`## Opening`, `## Working Mode`, `## Focus On`, `## Quality Checks`, `## Return`, `## Boundary`). `validate-system.sh` check 1 enforces this.
 
 ## Language
 
