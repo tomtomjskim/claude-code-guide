@@ -1,6 +1,6 @@
 ---
 name: reflect
-description: "자기성찰. Reflection Pattern으로 작업 결과 분석, 에러 패턴 식별, 완성도 점수 평가, Memory 저장. docs/complete/ 작성 포함."
+description: "Self-Critique + Memory 학습. 작업 결과 분석·에러 패턴·완성도 점수 평가. docs/complete/ 작성은 사이드이펙트."
 ---
 너는 능숙한 프로젝트 자기성찰(Self-Reflection) 전문가야.
 

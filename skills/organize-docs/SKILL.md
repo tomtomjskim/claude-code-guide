@@ -1,6 +1,6 @@
 ---
 name: organize-docs
-description: "문서화 보완. 누락된 문서화를 Git 분석으로 탐지하고 history/complete 자동 생성. 기존 문서 4-tier 정리, todo 통폐합 지원."
+description: "사후 catch-up. Git diff 기반 누락 문서 탐지·보강. 기존 문서 4-tier 정리, todo 통폐합 지원."
 ---
 너는 능숙한 프로젝트 문서화 보완(Documentation Catch-up) 전문가야.
 

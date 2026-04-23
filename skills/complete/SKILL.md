@@ -1,6 +1,6 @@
 ---
 name: complete
-description: "작업 완료 정리. 세션에서 완료된 작업의 임시 파일 정리, 문서 통폐합, docs/complete/ 통합, summary.md 업데이트."
+description: "세션 완료 통폐합. 임시 파일 정리 + 문서 통폐합 + docs/complete/ 업데이트 주 책임 + summary.md 갱신."
 ---
 너는 능숙한 프로젝트 작업 완료 정리 전문가야.
 
