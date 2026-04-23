@@ -47,15 +47,7 @@ Example (PHP MVC):
 - css/{moduleName}.scss
 - API/v1/{role}/{domain}/*.php
 
-Example (React + Express):
-- src/components/{Feature}/*.tsx
-- src/api/{feature}/*.ts
-- src/styles/{feature}.module.css
-
-Example (Django):
-- {app}/models.py, views.py, serializers.py, urls.py
-- {app}/templates/{app}/*.html
-- {app}/static/{app}/*.css
+Other stacks (React, Django): see `references/stack-examples.md#file-discovery`
 -->
 
 **자동 탐지 파일:** 프로젝트 구조에 따라 관련 파일을 자동으로 탐지합니다.
@@ -73,14 +65,7 @@ Example (PHP):
   php -l modules/admin/{domain}/{file}.php
   php -l views/admin/{domain}/{file}.php
 
-Example (TypeScript):
-  npx tsc --noEmit {file}
-  npx eslint {file}
-
-Example (Python):
-  python -m py_compile {file}
-  flake8 {file}
-  mypy {file}
+Other stacks (TypeScript, Python): see `references/stack-examples.md#syntax-check-commands`
 -->
 
 프로젝트의 문법 검사 도구로 모든 변경 파일 검증
@@ -94,13 +79,7 @@ Example (PHP):
 - modules 파일: require_once _common.php 첫 줄, 권한 체크, 입력 검증
 - views 파일: require_once 직접 사용 금지 (auto-include), CSS 직접 추가 금지
 
-Example (React):
-- Component: export default, PropTypes/TypeScript types
-- Hook: use* prefix, return value
-
-Example (Django):
-- View: permission_classes, serializer_class
-- Model: __str__, Meta class
+Other stacks (React, Django): see `references/stack-examples.md#required-structure`
 -->
 
 프로젝트 규칙에 따른 파일 구조 확인
@@ -116,13 +95,7 @@ Example (PHP 7.2):
 - [ ] Nullable types 없음 (?string)
 - [ ] Arrow functions 없음
 
-Example (Node.js 18+):
-- [ ] ES2022 features only
-- [ ] No experimental APIs
-
-Example (Python 3.8+):
-- [ ] No walrus operator if targeting 3.7
-- [ ] No match/case if targeting < 3.10
+Other stacks (Node.js 18+, Python 3.8+): see `references/stack-examples.md#language-version-compatibility`
 -->
 
 프로젝트 대상 언어 버전에 맞는 호환성 확인
@@ -137,15 +110,7 @@ Example (PHP - direct escaping):
 - [ ] 숫자 입력: intval() 처리
 - [ ] 출력: htmlspecialchars() 처리
 
-Example (Node.js - parameterized queries):
-- [ ] SQL: parameterized queries (no string concatenation)
-- [ ] Input: express-validator or joi validation
-- [ ] Output: helmet, CORS configuration
-
-Example (Django):
-- [ ] ORM usage (no raw SQL without parameterization)
-- [ ] CSRF token in forms
-- [ ] XSS: mark_safe only when explicitly safe
+Other stacks (Node.js, Django): see `references/stack-examples.md#security-patterns`
 -->
 
 프로젝트 보안 패턴에 따른 입력/출력 검증
@@ -176,14 +141,7 @@ Example (PHP/jQuery):
   - [ ] apiPost 첫 인자 전체 경로 포함
   - [ ] 응답 필드명 = 백엔드 camelCase 일치
 
-Example (React/fetch):
-  - [ ] API base URL from environment variable
-  - [ ] Error handling with try/catch
-  - [ ] Loading state management
-
-Example (Vue/axios):
-  - [ ] axios instance with interceptors
-  - [ ] Proper error handling
+Other stacks (React/fetch, Vue/axios): see `references/stack-examples.md#api-call-patterns`
 -->
 
 프로젝트 표준 API 호출 패턴 준수 확인
@@ -199,9 +157,7 @@ Example (PHP/jQuery):
   - [ ] customAlert() 사용 (native alert 금지)
   - [ ] customConfirm() 사용 (native confirm 금지)
 
-Example (React):
-  - [ ] Modal component usage (no native alert/confirm)
-  - [ ] Toast notifications via context/hook
+Other stacks (React): see `references/stack-examples.md#ui-dialog-patterns`
 -->
 
 프로젝트 표준 다이얼로그/알림 패턴 준수 확인
@@ -225,15 +181,7 @@ Example (SCSS):
   3.4 주석 금지: 주석 0건
   주요 CSS 변수: var(--main-green-color), var(--text-color), var(--bg-color) 등
 
-Example (TailwindCSS):
-  3.1 Custom CSS 최소화: @apply 사용 시 확인
-  3.2 Design token 준수: 커스텀 값 대신 Tailwind 클래스
-  3.3 Responsive: sm/md/lg breakpoint 적용
-
-Example (CSS Modules):
-  3.1 Naming: camelCase export
-  3.2 No global styles
-  3.3 Variables from theme
+Other stacks (TailwindCSS, CSS Modules): see `references/stack-examples.md#style-rules`
 -->
 
 프로젝트 스타일 규칙에 따른 검수 수행
@@ -265,15 +213,7 @@ Example (PHP - direct escaping):
   - [ ] 숫자: intval() 캐스팅
   - [ ] Parameter binding 미사용 (프로젝트 규칙)
 
-Example (Node.js - parameterized):
-  // OK: db.query('SELECT * FROM table WHERE id = ?', [id])
-  // BAD: db.query(`SELECT * FROM table WHERE id = ${id}`)
-  - [ ] Parameterized queries 사용
-  - [ ] No string interpolation in queries
-
-Example (Django ORM):
-  - [ ] ORM 사용 (raw SQL 최소화)
-  - [ ] raw() 사용 시 params= 필수
+Other stacks (Node.js parameterized, Django ORM): see `references/stack-examples.md#sql-security-pattern`
 -->
 
 ### 4.4 응답 포맷 변환
@@ -506,6 +446,8 @@ Example (PHP DDD):
 - .claude/team/prompts/ - 에이전트별 프롬프트
 - .claude/team/protocols/handoff-protocol.md - Handoff Protocol
 - .claude/team/workflows/failure-policy.yaml - Failure Recovery Policy
+
+Other stacks (React DDD, Django): see `references/stack-examples.md#reference-documents`
 -->
 
 - 프로젝트 UI 스타일 가이드
