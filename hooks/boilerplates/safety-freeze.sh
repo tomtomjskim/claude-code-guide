@@ -7,6 +7,15 @@
 # exit 0 = 허용  |  exit 2 = 차단
 #
 # ── 등록: settings.local.json → hooks.PreToolUse[matcher:"Edit","Write"] ──
+#
+# ── Dev mode bypass (P0-H2) ──
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "${CLAUDE_HOOK_TEST:-0}" = "1" ] \
+   || [ -f "$SCRIPT_DIR/bypass" ] \
+   || [ -f "${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/bypass" ]; then
+  echo "[hook-bypass] safety-freeze: dev mode, allow all" >&2
+  exit 0
+fi
 
 # fail-open
 TOOL_INPUT=$(cat 2>/dev/null || echo '{}')

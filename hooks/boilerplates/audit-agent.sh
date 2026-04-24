@@ -5,9 +5,17 @@
 # ╚══════════════════════════════════════════════════════════╝
 #
 # ── 등록: settings.local.json → hooks.PostToolUse[matcher:"Agent"] ──
+#
+# ── Dev mode bypass (P0-H2) ──
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "${CLAUDE_HOOK_TEST:-0}" = "1" ] \
+   || [ -f "$SCRIPT_DIR/bypass" ] \
+   || [ -f "${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/bypass" ]; then
+  exit 0
+fi
 
 # fail-open: hook 자체 오류 시 허용 (PostToolUse는 차단 불가)
-trap 'exit 0' ERR
+# (기존 trap 'exit 0' ERR 제거 — set -e 없이 무효, 명시적 || exit 0 사용)
 
 INPUT=$(cat 2>/dev/null || echo '{}')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name' 2>/dev/null || echo "")

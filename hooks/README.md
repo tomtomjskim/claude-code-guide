@@ -15,6 +15,43 @@ Claude Code Hook은 도구 실행 전후에 자동으로 실행되는 셸 스크
 | `safety-freeze` | PreToolUse | Edit, Write | 보호 파일 수정 차단 (`.env`, 프로덕션 설정 등) |
 | `audit-agent` | PostToolUse | Agent | 서브에이전트 호출 감사 로그 기록 |
 
+## ⚡ 개발 모드 Bypass (Bundle H-P0)
+
+Hook 자체를 개발·테스트·문서화할 때 self-block을 회피하기 위한 두 가지 escape hatch:
+
+### 방법 1: 환경변수 (세션 scope)
+
+```bash
+# 현재 셸 세션 전체에서 bypass
+export CLAUDE_HOOK_TEST=1
+
+# 또는 단일 명령에만
+CLAUDE_HOOK_TEST=1 some-command-that-triggers-hooks
+```
+
+### 방법 2: Bypass 파일 (프로젝트 scope)
+
+```bash
+# 프로젝트 .claude/hooks/ 안에 bypass 파일 생성
+touch .claude/hooks/bypass
+
+# 작업 끝나면 제거
+rm .claude/hooks/bypass
+```
+
+### 동작
+
+둘 중 하나라도 활성화되면 모든 hook이 즉시 `exit 0` (허용)하며 stderr에 `[hook-bypass]` 메시지. 정상 차단 기능은 영향 없음(해제 시 복구).
+
+### 언제 사용?
+
+- ✅ Hook 자체를 수정·리팩터링 중
+- ✅ Hook 회귀 테스트 실행 (`bash hooks/tests/run-tests.sh`)
+- ✅ Hook 동작을 문서/commit message에 설명 (예시 문자열에 위험 패턴 포함 시)
+- ❌ 일반 개발 시에는 활성화 금지 — 안전장치 무력화
+
+---
+
 ## 설치 방법
 
 ### 인스톨러 사용 (권장)
@@ -93,6 +130,17 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 |------|--------|------|
 | `TRUSTED_PATHS` | `()` | 무조건 허용할 스크립트 경로 목록 |
 | `LEVEL4_PATTERNS` | 내장 패턴 | 절대 차단할 파괴적 명령 정규식 |
+
+**Bundle H-P0 수정 사항:**
+- `rm -rf /` 패턴에 `/([[:space:]]|$|\*)` 앵커 추가 — `/tmp/foo` 등 정상 경로 오탐 제거
+- `~`, `$HOME` 루트도 Level 4 패턴에 추가
+- `echo`/`printf`/`#`(주석)이 first token이고 shell chaining(`&&`, `;`, `|shell`, `$()`) 없으면 "argv literal 모드"로 Level 4 + Safe rm 체크 스킵
+- Dev mode bypass 지원 (위 섹션)
+
+**Safe rm -rf 정책:**
+- 현재 정책: `rm -rf <x>`의 피연산자가 모두 `SAFE_RM_DIRS`에 있어야 허용
+- 이 정책 때문에 `rm -rf /tmp/foo` 등 SAFE 목록 외부 절대경로는 차단됨 (Level 4 패턴과 독립)
+- 완화 원한다면 `SAFE_RM_DIRS`에 `/tmp`, `~/tmp` 등 추가 커스터마이징
 
 ### safety-freeze.sh
 

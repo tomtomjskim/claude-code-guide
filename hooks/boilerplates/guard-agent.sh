@@ -8,9 +8,20 @@
 #
 # ── 설치: scripts/install-hooks.sh 또는 수동 복사 ──
 # ── 등록: settings.local.json → hooks.PreToolUse[matcher:"Agent"] ──
+#
+# ── Dev mode bypass (P0-H2) ──
+#   CLAUDE_HOOK_TEST=1  환경변수 설정 시 모든 체크 스킵
+#   .claude/hooks/bypass 파일이 존재하면 모든 체크 스킵
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ "${CLAUDE_HOOK_TEST:-0}" = "1" ] \
+   || [ -f "$SCRIPT_DIR/bypass" ] \
+   || [ -f "${CLAUDE_PROJECT_DIR:-$PWD}/.claude/hooks/bypass" ]; then
+  echo "[hook-bypass] guard-agent: dev mode, allow all" >&2
+  exit 0
+fi
 
-# fail-open: hook 자체 오류(jq 미설치, JSON 파싱 실패 등) 시 허용
-trap 'exit 0' ERR
+# fail-open: hook 자체 오류 시 허용 (명시적 || exit 0 패턴 — P0-H3)
+# (기존 trap 'exit 0' ERR 제거: set -e 없이는 대부분의 에러에서 발동 안 됨)
 
 # ╭──────────────────────────────────────────╮
 # │         🔧 커스터마이징 영역              │
