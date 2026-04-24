@@ -2,13 +2,61 @@
 
 <!-- CLAUDE-SETUP-GUIDE v1 -->
 
+**저장소**: https://github.com/tomtomjskim/claude-code-guide  
+**이 파일 raw URL**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/SETUP.md  
+**원라이너 raw URL**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh
+
+---
+
 ## 이 파일의 목적
 
 `claude-code-guide`를 어떤 프로젝트에든 **자연어 한 줄로 도입**하기 위한 머신 가독(machine-readable) 설치 가이드. Claude Code가 이 파일을 읽으면 아래 Wizard를 대화형으로 실행한다.
 
 ---
 
-## 사용자 진입 (자연어)
+## Zero-context Bootstrap (새 프로젝트에서 첫 호출)
+
+사용자가 claude-code-guide가 전혀 설치돼 있지 않은 프로젝트에서 Claude Code 세션을 시작했다면, 아래 3가지 진입 경로 중 하나를 택한다.
+
+### 진입 1: 원라이너 (가장 간단, 1줄)
+
+터미널에서:
+```bash
+curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+```
+
+### 진입 2: Claude Code에 복사-붙여넣기 (대화형)
+
+Claude Code 세션에서 아래를 그대로 붙여넣기:
+
+```
+다음 GitHub 저장소의 자동 셋업 스크립트로 이 프로젝트를 셋업해줘:
+https://github.com/tomtomjskim/claude-code-guide
+
+실행 방법:
+curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+
+SETUP.md wizard에 따라 프로젝트 분석 → profile 추천 → 확인 후 실행.
+```
+
+Claude가 SETUP.md(또는 quick-setup.sh)를 WebFetch/실행하여 아래 Wizard Steps 진행.
+
+### 진입 3: 전역 `/setup-wizard` 스킬 선설치 (한 번만)
+
+한 번 실행:
+```bash
+git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg
+bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
+```
+
+이후 모든 프로젝트에서:
+```
+/setup-wizard
+```
+
+---
+
+## 사용자 진입 (자연어 — 이미 설치됨 또는 저장소 지식 보유 시)
 
 사용자가 Claude Code 세션에서 다음 중 하나를 타이핑:
 
@@ -18,6 +66,8 @@
 - "@claude-code-guide 적용"
 
 Claude Code는 이 `SETUP.md`(또는 `scripts/quick-setup.sh`)를 읽고 **아래 Wizard**를 진행한다.
+
+**Claude가 저장소 위치를 모르는 경우**: 사용자에게 GitHub URL을 요청하거나, `~/.claude/CLAUDE.md` memory에 등록된 저장소 링크 활용 (README.md의 "Claude Code Memory에 북마크" 섹션 참조).
 
 ---
 

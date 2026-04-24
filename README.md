@@ -6,21 +6,56 @@
 
 ---
 
-## 🚀 Quick Install (한 줄)
+## 🚀 Quick Install
 
-Claude Code 세션에서 "**claude-code-guide 설치해줘**"라고 말하거나, 아래 원라이너 실행:
+**GitHub 저장소**: https://github.com/tomtomjskim/claude-code-guide
+
+### 방법 A — 원라이너 (최초 Bootstrap, zero-context)
+
+아무 프로젝트 디렉토리에서 터미널에 한 줄:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
 ```
 
-**프로파일 옵션** (기본: `auto` — 프로젝트 분석 후 자동 추천):
+또는 Claude Code 세션에서 **아래 문장을 그대로 복사-붙여넣기**:
+
+> 다음 GitHub 저장소의 자동 셋업 스크립트로 이 프로젝트를 셋업해줘:
+> https://github.com/tomtomjskim/claude-code-guide
+>
+> 실행 명령:
+> `curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash`
+>
+> 먼저 분석하고 profile 추천받은 뒤 확인하고 실행.
+
+Claude Code가 `SETUP.md`를 WebFetch하여 wizard로 안내.
+
+### 방법 B — 전역 `/setup-wizard` 스킬 (최초 1회 설치 후 영구)
+
+한 번만:
+
+```bash
+git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg
+bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
+```
+
+이후 어느 프로젝트에서든 Claude Code에서 타이핑:
+
+```
+/setup-wizard
+```
+
+자동 분석 → 프로파일 추천 → 대화형 설치.
+
+### 방법 C — 프로파일 옵션 명시
+
+자동 감지(`auto`) 대신 프로파일 직접 지정:
 
 ```bash
 # 1인 개발 (5 스킬 + minimal hooks)
 curl ... | bash -s -- --profile solo
 
-# 2-5인 팀 (18 스킬 + standard hooks)
+# 2-5인 팀 (19 스킬 + standard hooks)
 curl ... | bash -s -- --profile team
 
 # 대형/프로덕션 (team + 팀 시스템 + validate)
@@ -36,7 +71,30 @@ curl ... | bash -s -- --profile team --target /path/to/project
 curl ... | bash -s -- --dry-run
 ```
 
-대화형 상세 가이드: [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 진입점.
+---
+
+### 📌 Claude Code Memory에 북마크 (권장)
+
+Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md` 또는 memory에 아래 한 블록 추가:
+
+```markdown
+## claude-code-guide (PDARR 워크플로우 + Safety Hooks + 팀 시스템)
+
+- **저장소**: https://github.com/tomtomjskim/claude-code-guide
+- **설치**: `curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash`
+- **자연어 트리거**: "claude-code-guide 설치", "PDARR 워크플로우 적용"
+- **대화형 가이드**: https://github.com/tomtomjskim/claude-code-guide/blob/main/SETUP.md
+- **릴리즈 노트**: https://github.com/tomtomjskim/claude-code-guide/blob/main/docs/v4-changelog.md
+```
+
+이후 어느 세션에서든 "claude-code-guide 설치해줘" 한마디로 Claude가 위 URL 활용하여 설치 진행.
+
+---
+
+**빠른 참조 링크:**
+- [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
+- [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
+- [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트
 
 ---
 
