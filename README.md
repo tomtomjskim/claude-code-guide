@@ -65,7 +65,7 @@ curl ... | bash -s -- --dry-run
 - **v3.2 신규**: Blast-Radius Classification (4단계) + Diff-Aware Phase 0
 - **v3.2 신규**: Session Resume (파일 기반 워크플로우 상태 관리)
 - **v3.2 참조**: [gstack](https://github.com/garrytan/gstack) (Garry Tan's AI workflow platform) 실체화 패턴
-- **v3.2 신규**: **18개 Custom Skills** — PDARR 워크플로우를 실제 슬래시 커맨드(`.claude/skills/`)로 제공. 설치 스크립트로 프로젝트에 즉시 적용.
+- **v3.2 신규**: **19개 Custom Skills** — PDARR 워크플로우를 실제 슬래시 커맨드(`.claude/skills/`)로 제공. 설치 스크립트로 프로젝트에 즉시 적용.
 - **v3.3 신규**: 스킬 경량화 가이드 — 스킬 크기 기준, 본체/참조 분리 전략, 경량 템플릿
 - **v3.3 신규**: 토큰 낭비 자가진단 — Cloud AI MCP 자동 활성화 감지, 7대 낭비 요소, 시나리오별 프로필
 - **v3.3 신규**: `selfcheck-token-waste.sh` 자동 진단 스크립트 — 7항목 자동 점검
@@ -85,7 +85,7 @@ curl ... | bash -s -- --dry-run
 
 ```
 claude-code-guide/
-├── skills/               # 🆕 18개 PDARR 워크플로우 커스텀 스킬 (.claude/skills/ 호환)
+├── skills/               # 🆕 19개 PDARR 워크플로우 커스텀 스킬 (.claude/skills/ 호환)
 │   ├── dispatch/         # 스마트 라우터
 │   ├── prd/              # PRD 작성
 │   ├── analyze/          # 코드베이스 분석
@@ -222,7 +222,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | 13 | [핸드오프 & 실패 복구](docs/13-handoff-and-failure.md) | 실전 가이드 (설정, 예시, 템플릿) |
 | **14** | **[프리셋 시스템](docs/14-preset-system.md)** | **깊이(depth) x 실행(mode) 2축 체계. analyze/spec/check-code 프리셋** |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
-| -- | **[Skills README](skills/README.md)** | **18개 커스텀 스킬 설치/커스터마이징 가이드** |
+| -- | **[Skills README](skills/README.md)** | **19개 커스텀 스킬 설치/커스터마이징 가이드** |
 | -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |
 | -- | **[v3 Changelog](docs/v3-changelog.md)** | **v3.0→v3.2 전체 변경 이력 (릴리즈 노트)** |
 

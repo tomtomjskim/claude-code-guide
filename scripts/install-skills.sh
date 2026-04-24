@@ -65,6 +65,8 @@ list_skills() {
     echo "  organize-docs Documentation catch-up"
     echo "  workflow      Full PDARR orchestrator"
     echo "  profile       Performance profiling"
+    echo "  design-creative CREATIVE mode design (landing/prototype)"
+    echo "  setup-wizard  Auto-install claude-code-guide (profile-aware)"
 }
 
 while [[ $# -gt 0 ]]; do
