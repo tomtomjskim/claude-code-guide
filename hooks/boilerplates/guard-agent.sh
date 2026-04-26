@@ -53,8 +53,14 @@ fi
 # 으로 분리 관리.
 BLOCKED_TYPES="Explore"
 
-# 세션당 최대 Agent 호출 횟수 (0 = 무제한)
-MAX_AGENT_CALLS=10
+# 세션당 최대 Agent 호출 횟수 (P2-H12)
+#
+# ⚠️ heuristic — 보안 경계 아님. 실 사용 시나리오(PM 오케스트레이션 +
+#    specialist 4-6명 + retry 버퍼) 고려 시 10은 과도하게 타이트.
+#    기본 50으로 완화. 더 엄격 원하면 MAX_AGENT_CALLS=10 으로 override.
+# 비활성: MAX_AGENT_CALLS=0 (무제한)
+# 환경변수 우선: 호출자가 export 한 값이 있으면 그 값 사용
+MAX_AGENT_CALLS="${MAX_AGENT_CALLS:-50}"
 
 # 단순 작업 감지 임계값 (P1-H6)
 # ⚠️ heuristic — 보안 경계 아님. "짧은 prompt = 단순 작업"이라는 가정.

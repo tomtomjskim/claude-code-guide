@@ -99,8 +99,8 @@ SRC_COUNT=$(find . -type f \( -name "*.ts" -o -name "*.py" -o -name "*.go" \
 | 기여자 | 소스 파일 | 추천 프로파일 | 스킬 수 | 설치 시간 |
 |-------|----------|--------------|--------|----------|
 | 1 | <50 | **`solo`** | 5 (dispatch/stage/check-code/reflect/flow) | 1분 |
-| 2-5 | 50-500 | **`team`** | 18 (전체 PDARR) | 2분 |
-| 5+ | 500+ | **`enterprise`** | 18 + 팀 시스템(`--team`) | 3분 + validate |
+| 2-5 | 50-500 | **`team`** | 19 (전체 PDARR) | 2분 |
+| 5+ | 500+ | **`enterprise`** | 19 + 팀 시스템(`--team`) | 3분 + validate |
 | 기존 프로젝트 리뷰 도입만 | - | **`review-only`** | 3 (check-code/check-spec/qa-test) | 1분 |
 
 ### Step 3: 사용자 확인 (Claude가 대화로)
@@ -115,7 +115,7 @@ Claude: 🔍 프로젝트 분석 결과:
   → 추천 프로파일: **team**
 
   설치 내용:
-  - 18개 PDARR 스킬 (/dispatch, /prd, /analyze, /spec, /run, /check-code 등)
+  - 19개 PDARR 스킬 (/dispatch, /prd, /analyze, /spec, /run, /check-code 등)
   - 4개 Safety hooks (guard-agent, safety-careful, safety-freeze, audit-agent)
   - settings.local.json에 hooks 등록
 
@@ -218,7 +218,7 @@ bash scripts/install-hooks.sh --preset minimal <target>
 - **적합**: 개인 프로젝트, 사이드 프로젝트, 학습용
 - **제외**: 팀 워크플로우(PRD, Spec, Workflow), E2E QA 자동화
 
-### team — 2-5인 팀 (18 스킬, standard hooks) **기본값**
+### team — 2-5인 팀 (19 스킬, standard hooks) **기본값**
 
 ```bash
 bash scripts/install-skills.sh <target>
@@ -226,9 +226,9 @@ bash scripts/install-hooks.sh <target>
 ```
 
 - **적합**: 일반 프로덕션, 중형 팀, PDARR 풀 워크플로우
-- **포함**: 18 스킬 + guard-agent/safety-careful/safety-freeze/audit-agent hooks
+- **포함**: 19 스킬 + guard-agent/safety-careful/safety-freeze/audit-agent hooks
 
-### enterprise — 대형/프로덕션 (18 스킬 + 팀 시스템)
+### enterprise — 대형/프로덕션 (19 스킬 + 팀 시스템)
 
 ```bash
 bash scripts/install-skills.sh --team <target>
@@ -293,7 +293,7 @@ bash scripts/install-hooks.sh --preset minimal <target>
 - [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트
 - [`QUICKSTART.md`](QUICKSTART.md) — 실전 활용 패턴
 - [`CLAUDE.md`](CLAUDE.md) — 본 레포의 Claude Code 규칙 (예시)
-- [`skills/README.md`](skills/README.md) — 18 스킬 인덱스
+- [`skills/README.md`](skills/README.md) — 19 스킬 인덱스
 - [`hooks/README.md`](hooks/README.md) — Hook 보일러플레이트 가이드
 
 ---

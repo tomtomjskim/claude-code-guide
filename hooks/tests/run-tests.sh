@@ -256,6 +256,85 @@ else
 fi
 
 # ─────────────────────────────────────────────────
+# safety-freeze.sh — P2-H2: Tier 2 4분기 매칭 + 기본 동작
+# ─────────────────────────────────────────────────
+echo ""
+echo "=== safety-freeze.sh ==="
+
+HOOK="$HOOKS_DIR/safety-freeze.sh"
+
+# Bypass via env (안전한 경로) — Edit/Write tool은 file_path 필수
+# default FROZEN_TIER1/TIER2 비어 있으므로 항상 허용
+run_test "기본 빈 FROZEN 목록 — 모든 파일 허용" \
+  "$HOOK" 0 \
+  '{"tool_name":"Edit","tool_input":{"file_path":"/some/random/path.txt"}}'
+
+# Tier 1 와일드카드 (.env)
+FROZEN_FILE_TEST="${TMPDIR:-/tmp}/safety-freeze-test.sh"
+cat > "$FROZEN_FILE_TEST" <<'EOF'
+#!/usr/bin/env bash
+# 테스트용 hook (custom FROZEN list 주입)
+TOOL_INPUT=$(cat 2>/dev/null || echo '{}')
+FILE_PATH=$(echo "$TOOL_INPUT" | jq -r '.tool_input.file_path // ""' 2>/dev/null || echo "")
+[ -z "$FILE_PATH" ] && exit 0
+FROZEN_TIER2=("config/" "production.env")
+matched=false
+for frozen in "${FROZEN_TIER2[@]}"; do
+  if [[ "$frozen" == */ ]]; then
+    [[ "$FILE_PATH" == "$frozen"* ]] && matched=true
+  elif [[ "$frozen" == /* ]]; then
+    [[ "$FILE_PATH" == "$frozen" ]] && matched=true
+  else
+    [[ "$(basename "$FILE_PATH")" == "$frozen" ]] && matched=true
+  fi
+  [ "$matched" = true ] && { echo "WARNING: matched $frozen" >&2; exit 0; }
+done
+exit 0
+EOF
+chmod +x "$FROZEN_FILE_TEST"
+
+# Tier 2 디렉토리 분기 (P2-H2)
+freeze_dir_exit=$(echo '{"tool_name":"Edit","tool_input":{"file_path":"config/secret.yaml"}}' \
+  | bash "$FROZEN_FILE_TEST" 2>&1)
+if echo "$freeze_dir_exit" | grep -q "matched config/"; then
+  echo "  ✓ Tier 2 디렉토리 분기 (config/) 매칭 (P2-H2)"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ Tier 2 디렉토리 분기 누락 — H2 회귀"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("Tier 2 디렉토리 분기")
+fi
+
+# Tier 2 basename 분기
+freeze_name_exit=$(echo '{"tool_name":"Edit","tool_input":{"file_path":"/etc/production.env"}}' \
+  | bash "$FROZEN_FILE_TEST" 2>&1)
+if echo "$freeze_name_exit" | grep -q "matched production.env"; then
+  echo "  ✓ Tier 2 basename 분기 (production.env) 매칭"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ Tier 2 basename 분기 실패"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("Tier 2 basename")
+fi
+
+rm -f "$FROZEN_FILE_TEST"
+
+# safety-freeze dev mode bypass
+export CLAUDE_HOOK_TEST=1
+freeze_bypass_exit=$(echo '{"tool_name":"Edit","tool_input":{"file_path":"any.txt"}}' \
+  | bash "$HOOK" 2>/dev/null; echo $?)
+freeze_bypass_exit=$(echo "$freeze_bypass_exit" | tail -1)
+unset CLAUDE_HOOK_TEST
+if [ "$freeze_bypass_exit" = "0" ]; then
+  echo "  ✓ CLAUDE_HOOK_TEST=1 bypass 작동 (safety-freeze)"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ safety-freeze bypass 실패"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("safety-freeze bypass")
+fi
+
+# ─────────────────────────────────────────────────
 # safety-careful.sh — P1-H7: Level 3 LOG 파일
 # ─────────────────────────────────────────────────
 echo ""

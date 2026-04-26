@@ -89,18 +89,36 @@ for frozen in "${FROZEN_TIER1[@]}"; do
   fi
 done
 
-# Tier 2 체크
+# Tier 2 체크 (P2-H2 — Tier 1과 동일 4분기 구조)
 for frozen in "${FROZEN_TIER2[@]}"; do
   if [[ -z "$frozen" ]]; then continue; fi
-  if [[ "$frozen" == /* ]]; then
-    # 절대 경로: 완전 일치
-    [[ "$FILE_PATH" == "$frozen" ]] || continue
+  matched=false
+  # 와일드카드 패턴
+  if [[ "$frozen" == *"*"* ]]; then
+    # shellcheck disable=SC2053
+    if [[ "$(basename "$FILE_PATH")" == $frozen ]]; then
+      matched=true
+    fi
+  # 디렉토리 경로 (P2-H2 누락 분기 추가)
+  elif [[ "$frozen" == */ ]]; then
+    if [[ "$FILE_PATH" == "$frozen"* ]]; then
+      matched=true
+    fi
+  # 절대 경로: 완전 일치
+  elif [[ "$frozen" == /* ]]; then
+    if [[ "$FILE_PATH" == "$frozen" ]]; then
+      matched=true
+    fi
   else
     # 파일명: basename 비교
-    [[ "$(basename "$FILE_PATH")" == "$frozen" ]] || continue
+    if [[ "$(basename "$FILE_PATH")" == "$frozen" ]]; then
+      matched=true
+    fi
   fi
-  echo "WARNING: 보호 파일 수정 — $FILE_PATH (사용자 승인 필요)" >&2
-  exit 0
+  if [ "$matched" = true ]; then
+    echo "WARNING: 보호 파일 수정 — $FILE_PATH (pattern: $frozen, 사용자 승인 필요)" >&2
+    exit 0
+  fi
 done
 
 exit 0

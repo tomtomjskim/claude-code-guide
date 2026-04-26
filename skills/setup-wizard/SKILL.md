@@ -100,7 +100,7 @@ echo "기여자: ${CONTRIB}명 / 소스 파일: ${SRC_FILES}"
   - /dispatch, /stage, /check-code, /reflect, /flow
   - guard-agent + safety-careful
 
-**team** (18 스킬 + standard hooks, 기본값):
+**team** (19 스킬 + standard hooks, 기본값):
   - 전체 PDARR 워크플로우 (dispatch, prd, analyze, spec, run, check-code, ...)
   - 4 hooks: guard-agent, safety-careful, safety-freeze, audit-agent
   - settings.local.json 자동 등록
@@ -211,7 +211,7 @@ references/stack-examples.md에 감지된 스택 예시가 카탈로그화되어
 - 소스 파일: 180개
 
 ## 설치 결과
-- 스킬: 18/18 ✓
+- 스킬: 19/19 ✓
 - Hooks: 4 matchers 등록 ✓
 - settings.local.json 갱신 ✓
 
@@ -282,4 +282,4 @@ ls ~/.claude/skills/setup-wizard/SKILL.md
 - [SETUP.md](../../SETUP.md) — 이 스킬의 원본 wizard 가이드
 - [scripts/quick-setup.sh](../../scripts/quick-setup.sh) — 실제 설치 스크립트
 - [docs/v4-changelog.md](../../docs/v4-changelog.md) — v4.0 릴리즈 노트
-- [skills/README.md](../README.md) — 전체 18 스킬 인덱스
+- [skills/README.md](../README.md) — 전체 19 스킬 인덱스

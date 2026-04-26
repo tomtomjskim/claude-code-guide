@@ -117,7 +117,7 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
 | `BLOCKED_TYPES` | `"Explore"` | 차단할 서브에이전트 타입 (공백 구분) |
-| `MAX_AGENT_CALLS` | `10` | 세션당 최대 Agent 호출 횟수 (0=무제한) |
+| `MAX_AGENT_CALLS` | `50` | 세션당 최대 Agent 호출 횟수 (0=무제한, env override 가능, P2-H12) |
 | `MIN_PROMPT_LENGTH` | `200` | 이 길이 미만의 prompt는 단순 작업으로 간주 (P1-H6: `0`으로 비활성, env override 가능) |
 | `MIN_FILE_COUNT` | `2` | 이 개수 이하 파일 + 짧은 prompt → 차단 (env override 가능) |
 | `MIN_EFFICIENT_FILES` | `4` | 이 개수 미만 파일 → 토큰 효율 경고 |

@@ -20,7 +20,9 @@
 #
 # ============================================================================
 
-set -e
+set -eo pipefail
+# pipefail: pipe 안 어떤 명령이라도 fail 하면 전체 fail (P2-H4)
+# 예: `git clone ... | tail -3` 에서 git clone 실패 시 tail이 0 반환해도 잡힘
 
 # -----------------------------
 # 기본값
@@ -54,11 +56,17 @@ done
 # 유틸
 # -----------------------------
 log() { echo "$@" >&2; }
+# run(): 실행 또는 dry-run 출력 (P2-H3 — eval 제거, 배열 처리)
+# 사용: run cmd arg1 arg2 ...
+#   - DRY_RUN=1: 명령 echo만 (한 줄)
+#   - DRY_RUN=0: 명령 실제 실행 (eval 안 씀, 직접 invoke)
+# 외부 사용자 ingress 안전성 확보 — 메타문자/공백 인자 안전
 run() {
   if [ "$DRY_RUN" = "1" ]; then
+    # 인자 표시용으로만 join
     echo "[DRY-RUN] $*"
   else
-    eval "$@"
+    "$@"
   fi
 }
 
@@ -161,7 +169,12 @@ fi
 TMPDIR=$(mktemp -d)
 log ""
 log "📦 Cloning claude-code-guide..."
-run "git clone --depth 1 \"$REPO_URL\" \"$TMPDIR/ccg\" 2>&1 | tail -3"
+# pipe 호출은 eval 없는 run()으로는 어려워 직접 실행 (pipefail이 git clone 실패 잡음)
+if [ "$DRY_RUN" = "1" ]; then
+  echo "[DRY-RUN] git clone --depth 1 \"$REPO_URL\" \"$TMPDIR/ccg\" 2>&1 | tail -3"
+else
+  git clone --depth 1 "$REPO_URL" "$TMPDIR/ccg" 2>&1 | tail -3
+fi
 
 if [ "$DRY_RUN" = "0" ] && [ ! -d "$TMPDIR/ccg" ]; then
   echo "❌ Clone 실패. 네트워크 확인." >&2
@@ -171,31 +184,29 @@ fi
 CCG="$TMPDIR/ccg"
 
 # -----------------------------
-# 프로파일별 스킬/훅 설치
+# 프로파일별 스킬/훅 설치 (P2-H3 — 배열 기반, eval 제거)
 # -----------------------------
-SKILLS_FLAGS=""
-HOOKS_FLAGS=""
+SKILLS_FLAGS=()
+HOOKS_FLAGS=()
 INSTALL_TEAM=0
 VALIDATE_AFTER=0
 
 case "$PROFILE" in
   solo)
-    SKILLS_FLAGS="--skills dispatch,stage,check-code,reflect,flow"
-    HOOKS_FLAGS="--preset minimal"
+    SKILLS_FLAGS=(--skills dispatch,stage,check-code,reflect,flow)
+    HOOKS_FLAGS=(--preset minimal)
     ;;
   team)
-    # 전체 설치 (기본)
-    HOOKS_FLAGS=""
+    # 전체 설치 (기본 — 빈 플래그)
     ;;
   enterprise)
-    SKILLS_FLAGS="--team"
-    HOOKS_FLAGS=""
+    SKILLS_FLAGS=(--team)
     INSTALL_TEAM=1
     VALIDATE_AFTER=1
     ;;
   review-only)
-    SKILLS_FLAGS="--skills check-code,check-spec,qa-test"
-    HOOKS_FLAGS="--preset minimal"
+    SKILLS_FLAGS=(--skills check-code,check-spec,qa-test)
+    HOOKS_FLAGS=(--preset minimal)
     ;;
   *)
     echo "❌ Unknown profile: $PROFILE" >&2
@@ -204,16 +215,16 @@ case "$PROFILE" in
     ;;
 esac
 
-[ "$FORCE" = "1" ] && SKILLS_FLAGS="$SKILLS_FLAGS --force"
-[ "$FORCE" = "1" ] && HOOKS_FLAGS="$HOOKS_FLAGS --force"
+[ "$FORCE" = "1" ] && SKILLS_FLAGS+=(--force)
+[ "$FORCE" = "1" ] && HOOKS_FLAGS+=(--force)
 
 log ""
 log "⚙️  Installing skills ($PROFILE profile)..."
-run "bash \"$CCG/scripts/install-skills.sh\" $SKILLS_FLAGS \"$TARGET\""
+run bash "$CCG/scripts/install-skills.sh" "${SKILLS_FLAGS[@]}" "$TARGET"
 
 log ""
 log "🔒 Installing hooks..."
-run "bash \"$CCG/scripts/install-hooks.sh\" $HOOKS_FLAGS \"$TARGET\""
+run bash "$CCG/scripts/install-hooks.sh" "${HOOKS_FLAGS[@]}" "$TARGET"
 
 # -----------------------------
 # enterprise: 팀 시스템 검증
