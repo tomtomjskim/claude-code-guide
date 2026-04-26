@@ -94,7 +94,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 **빠른 참조 링크:**
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
-- [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트
+- [`docs/v4.1-changelog.md`](docs/v4.1-changelog.md) — **v4.1 릴리즈 노트** (셋업 인프라 + Hook 안정화)
+- [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트 (SSOT 부채 청산)
 
 ---
 

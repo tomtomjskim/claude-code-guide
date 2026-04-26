@@ -2,6 +2,7 @@
 
 **Release Date**: 2026-04-23
 **Upgraded From**: v3.2 (canonical 유지 — v4는 *구조 재정렬 릴리스*로 버전 숫자 bump 없음)
+**Next Release**: [v4.1](v4.1-changelog.md) (2026-04-26, 셋업 인프라 + Hook 안정화)
 **Strategy Doc**: [`docs/v4/strategy.md`](v4/strategy.md)
 **Plans**: [`docs/v4/plans/`](v4/plans/)
 
