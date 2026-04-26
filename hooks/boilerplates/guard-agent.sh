@@ -103,6 +103,14 @@ if echo "test" | grep -qP "test" 2>/dev/null; then
   GREP_MODE="-P"
 else
   GREP_MODE="-E"
+  # 1회 안내 (P2-M1) — ERE fallback 사용 중임을 알림 (영문 word boundary 정확도 영향)
+  # 같은 세션 동안 반복 출력 방지
+  GREP_NOTICE_FILE="${TMPDIR:-/tmp}/.guard-grep-notice"
+  if [ ! -f "$GREP_NOTICE_FILE" ]; then
+    echo "[guard-agent] note: grep -P (PCRE) 미지원 — ERE fallback 사용 중." >&2
+    echo "  영문 word boundary (\\b) 정확도 손실 가능. 정확한 PCRE 원하면: brew install grep" >&2
+    touch "$GREP_NOTICE_FILE" 2>/dev/null
+  fi
 fi
 
 # grep 래퍼: PCRE 우선, 미지원 시 ERE 호환 패턴으로 자동 전환 (P1-H8)

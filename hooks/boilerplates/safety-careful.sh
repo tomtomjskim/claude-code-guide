@@ -131,9 +131,19 @@ fi
 
 # Safe rm -rf 예외: 모든 피연산자가 safe 목록에 있어야 허용
 # (argv literal 모드에서는 이 체크도 스킵 — echo/printf 안 문자열은 실행 대상 아님)
-if [ "$ARGV_LITERAL_MODE" = false ] && echo "$COMMAND" | grep -qEi 'rm[[:space:]]+-rf' 2>/dev/null; then
-  # rm ... -rf 이후의 피연산자 추출: rm과 플래그를 제거하고 경로만 남김
-  OPERANDS=$(echo "$COMMAND" | sed -E 's/.*rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*//' | tr '&;|' '\n' | head -1 | tr ' ' '\n' | grep -v '^-' | grep -v '^$')
+# rm 변형 매칭: -rf, -fr, -r -f, --recursive --force 등 (P2-M2 견고화)
+if [ "$ARGV_LITERAL_MODE" = false ] \
+   && echo "$COMMAND" | grep -qEi 'rm[[:space:]]+(-[a-zA-Z]*[rR][a-zA-Z]*[fF][a-zA-Z]*|-[a-zA-Z]*[fF][a-zA-Z]*[rR][a-zA-Z]*|-[rR][[:space:]]+-[fF]|-[fF][[:space:]]+-[rR]|--recursive[[:space:]]+--force|--force[[:space:]]+--recursive)' 2>/dev/null; then
+  # 피연산자 추출 (P2-M2 단순화):
+  #   1. "rm " 이후 문자열만 남김
+  #   2. shell 연산자(&;|)로 분리해 첫 명령만
+  #   3. 공백 분리 후 - 로 시작하는 모든 플래그 제거 (short -rf, long --recursive 모두 처리)
+  OPERANDS=$(echo "$COMMAND" \
+    | sed -E 's/.*rm[[:space:]]+//' \
+    | tr '&;|' '\n' | head -1 \
+    | tr ' ' '\n' \
+    | grep -v '^-' \
+    | grep -v '^$')
 
   if [ -n "$OPERANDS" ]; then
     ALL_SAFE=true

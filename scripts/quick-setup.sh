@@ -46,7 +46,33 @@ while [[ $# -gt 0 ]]; do
     --force)   FORCE=1; shift ;;
     --skip-stack) SKIP_STACK_CUSTOMIZE=1; shift ;;
     --help|-h)
-      sed -n '/^# =\{70,\}$/,/^# =\{70,\}$/p' "$0" | head -25 | sed 's/^# \{0,1\}//'
+      # P2-L1: 헤더 sed 의존 제거 — 직접 inline 출력
+      cat <<'HELP'
+claude-code-guide Quick Setup
+
+Usage:
+  curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh \
+    | bash -s -- [--profile <name>] [--target <path>] [--dry-run] [--force] [--skip-stack]
+
+  로컬 clone 후:
+    bash scripts/quick-setup.sh --profile team --target /path/to/project
+
+Profiles:
+  solo         1인 개발, 핵심 5 스킬 + minimal hooks (guard+careful=2)
+  team         2-5인 팀, 19 스킬 + standard hooks (4개) — auto 감지 기본
+  enterprise   대형/프로덕션, team + 팀 시스템(--team) + validate
+  review-only  리뷰 도입용, check-code/check-spec/qa-test 3 스킬만
+  auto         프로젝트 분석 후 자동 추천 (default)
+
+Options:
+  --profile <name>     프로파일 선택 (solo|team|enterprise|review-only|auto)
+  --target <path>      설치 대상 (default: $PWD)
+  --dry-run            실행 명령만 출력, 실제 변경 없음
+  --force              기존 설치 덮어쓰기
+  --skip-stack         스택별 CUSTOMIZE 안내 생략
+
+GitHub: https://github.com/tomtomjskim/claude-code-guide
+HELP
       exit 0 ;;
     *) echo "❌ Unknown arg: $1. Use --help." >&2; exit 1 ;;
   esac
@@ -136,15 +162,20 @@ detect_profile() {
 detect_stack() {
   local stacks=()
 
+  # 단순 시그널 (P2-L4 — 명시적 if/then 구조로 우선순위 모호성 제거)
   [ -f "$TARGET/package.json" ] && stacks+=("nodejs")
   if [ -f "$TARGET/tsconfig.json" ] || grep -q '"typescript"' "$TARGET/package.json" 2>/dev/null; then
     stacks+=("typescript")
   fi
-  [ -f "$TARGET/pyproject.toml" ] || [ -f "$TARGET/requirements.txt" ] || [ -f "$TARGET/setup.py" ] && stacks+=("python")
+  if [ -f "$TARGET/pyproject.toml" ] || [ -f "$TARGET/requirements.txt" ] || [ -f "$TARGET/setup.py" ]; then
+    stacks+=("python")
+  fi
   [ -f "$TARGET/go.mod" ] && stacks+=("go")
   [ -f "$TARGET/composer.json" ] && stacks+=("php")
   [ -f "$TARGET/Cargo.toml" ] && stacks+=("rust")
-  [ -f "$TARGET/pom.xml" ] || [ -f "$TARGET/build.gradle" ] && stacks+=("java")
+  if [ -f "$TARGET/pom.xml" ] || [ -f "$TARGET/build.gradle" ]; then
+    stacks+=("java")
+  fi
 
   if [ ${#stacks[@]} -eq 0 ]; then
     echo "unknown"

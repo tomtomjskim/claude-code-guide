@@ -2,6 +2,11 @@
 
 **저장소**: https://github.com/tomtomjskim/claude-code-guide
 
+> **Fork 사용 시 (P2-L2)**: 아래 모든 raw URL은 이 저장소(`tomtomjskim/claude-code-guide`)의 main 브랜치 기준. 자체 fork에 있다면 sed 일괄 치환:
+> ```bash
+> sed -i.bak 's|tomtomjskim/claude-code-guide|<your-org>/<your-fork>|g' BOOTSTRAP.md
+> ```
+
 Claude Code 세션 또는 터미널에서 **복사-붙여넣기**로 바로 사용할 수 있는 명령/프롬프트 모음.
 
 ---

@@ -150,11 +150,11 @@ curl ... | bash -s -- --profile team --target /my-project
 
 ### Step 5: 스택별 CUSTOMIZE 자동 교체 (선택)
 
-감지된 스택이 PHP가 아니면 Claude가 다음 제안:
+감지된 스택이 PHP/MySQL이 아니면 Claude가 다음 제안:
 
 ```
 Claude: 감지 스택 "TypeScript/Node.js".
-  skills/check-code/SKILL.md의 <!-- CUSTOMIZE --> 블록은 PHP 기본 예시입니다.
+  skills/check-code/SKILL.md의 <!-- CUSTOMIZE --> 블록은 PHP/MySQL 기본 예시입니다.
   references/stack-examples.md의 TypeScript 섹션으로 교체할까요? (y/n)
 
 User: y
@@ -208,15 +208,16 @@ bash ~/.claude/team/scripts/validate-system.sh
 
 ## 프로파일 정의 (canonical)
 
-### solo — 1인 개발 (5 스킬, minimal hooks)
+### solo — 1인 개발 (5 스킬, minimal hooks = 2)
 
 ```bash
 bash scripts/install-skills.sh --skills dispatch,stage,check-code,reflect,flow <target>
 bash scripts/install-hooks.sh --preset minimal <target>
 ```
 
+- **포함 hooks**: `guard-agent` + `safety-careful` (2개)
 - **적합**: 개인 프로젝트, 사이드 프로젝트, 학습용
-- **제외**: 팀 워크플로우(PRD, Spec, Workflow), E2E QA 자동화
+- **제외**: 팀 워크플로우(PRD, Spec, Workflow), E2E QA 자동화, `safety-freeze` + `audit-agent`
 
 ### team — 2-5인 팀 (19 스킬, standard hooks) **기본값**
 
@@ -240,13 +241,14 @@ bash scripts/validate-system.sh
 - **적합**: 16 에이전트 병렬 팀 사용, Handoff Protocol, Tiebreaker, Model Routing
 - **검증**: validate-system.sh 통과 필수
 
-### review-only — 리뷰 도입 (3 스킬, minimal hooks)
+### review-only — 리뷰 도입 (3 스킬, minimal hooks = 2)
 
 ```bash
 bash scripts/install-skills.sh --skills check-code,check-spec,qa-test <target>
 bash scripts/install-hooks.sh --preset minimal <target>
 ```
 
+- **포함 hooks**: `guard-agent` + `safety-careful` (2개)
 - **적합**: 기존 프로젝트에 리뷰 시스템만 추가, 워크플로우는 기존 유지
 - **제외**: dispatch/prd/analyze/spec/run 등 워크플로우 스킬
 

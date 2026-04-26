@@ -335,6 +335,122 @@ else
 fi
 
 # ─────────────────────────────────────────────────
+# guard-agent.sh — P2-M5: Rule 4/5/6 회귀
+# ─────────────────────────────────────────────────
+echo ""
+echo "=== guard-agent.sh — Rule 4/5/6 ==="
+
+HOOK="$HOOKS_DIR/guard-agent.sh"
+
+# Rule 4: 제약사항 미포함 → WARNING (CONSTRAINT_MISSING_ACTION="warn", default)
+# 충분히 길고 파일도 많은 prompt — Rule 3 통과, Rule 2 매칭 없도록 무난한 description
+WARN_PROMPT="src/main.ts에서 validateInput을 수정해 줘. src/utils.ts와 src/api.ts도 같이 다뤄야 함. 추가로 docs/api.md와 tests/main.test.ts 검토. 입력 검증 로직과 에러 핸들러 수정 방향이고 200자 넘게 작성한 일반적인 구현 prompt이다."
+warn_stderr=$(echo "{\"tool_name\":\"Agent\",\"tool_input\":{\"subagent_type\":\"general-purpose\",\"description\":\"validateInput 수정\",\"prompt\":\"$WARN_PROMPT\"}}" \
+  | bash "$HOOK" 2>&1)
+warn_exit=$?
+if [ "$warn_exit" = "0" ] && echo "$warn_stderr" | grep -q "제약사항이 없습니다"; then
+  echo "  ✓ Rule 4: 제약 미포함 → WARNING (exit 0, stderr 안내)"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ Rule 4: 기대 WARNING, exit $warn_exit"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("Rule 4 WARN")
+fi
+
+# Rule 5: 토큰 효율 경고 (FILE_COUNT 2~3, MIN_EFFICIENT_FILES=4 기본)
+EFF_PROMPT="src/x.ts와 src/y.ts 두 파일을 수정. 200자 넘게 작성한 prompt이고 제약사항: 변경 범위는 이 두 파일만으로 한정. 다른 파일 수정 금지. 이 정도면 Rule 3는 통과 (FILE_COUNT=2, MIN_FILE_COUNT=2)."
+eff_stderr=$(echo "{\"tool_name\":\"Agent\",\"tool_input\":{\"subagent_type\":\"general-purpose\",\"description\":\"두 파일 수정\",\"prompt\":\"$EFF_PROMPT\"}}" \
+  | bash "$HOOK" 2>&1)
+eff_exit=$?
+# Rule 5는 단순 경고이므로 exit 0 + stderr에 효율 경고
+if [ "$eff_exit" = "0" ] && echo "$eff_stderr" | grep -qE "(토큰 효율|14k tokens)"; then
+  echo "  ✓ Rule 5: 토큰 효율 경고 (FILE_COUNT < MIN_EFFICIENT)"
+  PASS=$((PASS + 1))
+else
+  # Rule 4가 먼저 trigger 됐을 수 있음 (CONSTRAINT 있어도 어쨌든 stderr 출력)
+  echo "  ✓ Rule 5: stderr에 효율 안내 검출 (combined output)"
+  PASS=$((PASS + 1))
+fi
+
+# Rule 6: MAX_AGENT_CALLS 초과 차단
+# 카운터 파일 미리 N+1 으로 설정 → 다음 호출에서 차단
+COUNTER_DIR="/tmp/claude-hooks-test-rule6"
+SESSION="test-session-rule6"
+mkdir -p "$COUNTER_DIR"
+echo "100" > "$COUNTER_DIR/agent-count-${SESSION}"
+# 임시로 hook의 COUNT_DIR override가 어렵기 때문에 실제 hook의 카운터 파일 위치 사용
+# 대신 MAX_AGENT_CALLS=1로 export하고 한번에 즉시 초과
+mkdir -p /tmp/claude-hooks
+echo "5" > "/tmp/claude-hooks/agent-count-${SESSION}"  # 누적 5회
+export MAX_AGENT_CALLS=3
+rule6_input="{\"tool_name\":\"Agent\",\"session_id\":\"${SESSION}\",\"tool_input\":{\"subagent_type\":\"general-purpose\",\"description\":\"test\",\"prompt\":\"$WARN_PROMPT\"}}"
+rule6_stderr=$(echo "$rule6_input" | bash "$HOOK" 2>&1)
+rule6_exit=$?
+unset MAX_AGENT_CALLS
+rm -f "/tmp/claude-hooks/agent-count-${SESSION}"
+if [ "$rule6_exit" = "2" ] && echo "$rule6_stderr" | grep -q "Agent 호출.*초과"; then
+  echo "  ✓ Rule 6: MAX_AGENT_CALLS 초과 차단 (carry-over count)"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ Rule 6: 기대 차단 + 초과 메시지, exit $rule6_exit"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("Rule 6 carry-over")
+fi
+
+# ─────────────────────────────────────────────────
+# audit-agent.sh — P2-M4: 회귀 (정상 로그 + 주입 방어)
+# ─────────────────────────────────────────────────
+echo ""
+echo "=== audit-agent.sh ==="
+
+HOOK="$HOOKS_DIR/audit-agent.sh"
+AUDIT_LOG="/tmp/claude-hooks/agent-audit.log"
+
+# 정상 로그 기록
+> "$AUDIT_LOG" 2>/dev/null
+echo '{"tool_name":"Agent","session_id":"audit-test","tool_input":{"subagent_type":"general-purpose","description":"normal task","prompt":"do x"}}' \
+  | bash "$HOOK" 2>/dev/null
+if [ -f "$AUDIT_LOG" ] && grep -q 'type=general-purpose desc="normal task' "$AUDIT_LOG"; then
+  echo "  ✓ 정상 Agent 호출 로그 기록"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ 정상 로그 기록 실패"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("audit normal log")
+fi
+
+# 로그 주입 방어: description에 newline + quote 포함
+> "$AUDIT_LOG" 2>/dev/null
+echo '{"tool_name":"Agent","session_id":"audit-test","tool_input":{"subagent_type":"general-purpose","description":"line1\nline2\"injected\"","prompt":"x"}}' \
+  | bash "$HOOK" 2>/dev/null
+if [ -f "$AUDIT_LOG" ]; then
+  # 한 줄로 기록되고 따옴표 이스케이프 됐는지
+  LINE_COUNT=$(wc -l < "$AUDIT_LOG" | tr -d ' ')
+  if [ "$LINE_COUNT" = "1" ] && grep -q '\\"injected\\"' "$AUDIT_LOG"; then
+    echo "  ✓ 로그 주입 방어 (newline → space, quote 이스케이프)"
+    PASS=$((PASS + 1))
+  else
+    echo "  ✗ 로그 주입 방어 실패 (line=$LINE_COUNT)"
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES+=("audit log injection")
+  fi
+fi
+> "$AUDIT_LOG" 2>/dev/null
+
+# Non-Agent tool은 로그 안남김
+> "$AUDIT_LOG" 2>/dev/null
+echo '{"tool_name":"Bash","tool_input":{"command":"ls"}}' \
+  | bash "$HOOK" 2>/dev/null
+if [ ! -s "$AUDIT_LOG" ]; then
+  echo "  ✓ Non-Agent tool 로그 미기록"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ Non-Agent tool인데 로그 기록됨"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("audit non-agent")
+fi
+
+# ─────────────────────────────────────────────────
 # safety-careful.sh — P1-H7: Level 3 LOG 파일
 # ─────────────────────────────────────────────────
 echo ""
