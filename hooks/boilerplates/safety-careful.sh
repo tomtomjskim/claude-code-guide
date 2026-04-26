@@ -8,6 +8,15 @@
 #
 # ── 등록: settings.local.json → hooks.PreToolUse[matcher:"Bash"] ──
 #
+# ── Fail 정책 (P2-H9, 의도된 비대칭) ──
+#   ▸ fail-open  (시스템 에러):  jq 미설치 / JSON 파싱 실패 / hook 자체 오류
+#                                → exit 0, 명령 허용 (hook이 실행을 깨뜨리지 않음)
+#   ▸ fail-closed (보안 에러):   pattern 매칭 (Level 4, Safe rm 외부)
+#                                → exit 2, 명령 차단 (위험 명령 leak 방지)
+#   비대칭 근거: 시스템 에러로 차단하면 hook 자체가 가용성 위협 →
+#                개발 흐름 막힘. pattern 매칭은 의도적으로 정의된 경계라 차단이 안전.
+#   오탐 발생 시: CUSTOMIZE 영역에서 패턴 조정 또는 CLAUDE_HOOK_TEST=1 bypass.
+#
 # ── Dev mode bypass (P0-H2) ──
 #   CLAUDE_HOOK_TEST=1  환경변수 설정 시 모든 체크 스킵
 #   .claude/hooks/bypass 파일이 존재하면 모든 체크 스킵

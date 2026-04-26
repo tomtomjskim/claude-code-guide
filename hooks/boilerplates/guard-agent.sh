@@ -9,6 +9,15 @@
 # ── 설치: scripts/install-hooks.sh 또는 수동 복사 ──
 # ── 등록: settings.local.json → hooks.PreToolUse[matcher:"Agent"] ──
 #
+# ── Fail 정책 (P2-H9, 의도된 비대칭) ──
+#   ▸ fail-open  (시스템 에러):  jq 미설치 / JSON 파싱 실패 → exit 0 (Agent 허용)
+#   ▸ fail-closed (정책 위반):   subagent_type 블랙리스트 / 강한 탐색 의도 패턴
+#                                → exit 2 (차단)
+#   비대칭 근거: jq 같은 시스템 도구 부재로 Agent 호출 자체를 막으면 사용자
+#                작업 흐름이 깨짐. 정책 매칭(BLOCKED_TYPES, ANALYSIS_*)은
+#                의도적으로 정의된 경계라 차단이 안전. 오탐은 CUSTOMIZE 또는
+#                CLAUDE_HOOK_TEST=1 로 우회.
+#
 # ── Dev mode bypass (P0-H2) ──
 #   CLAUDE_HOOK_TEST=1  환경변수 설정 시 모든 체크 스킵
 #   .claude/hooks/bypass 파일이 존재하면 모든 체크 스킵
@@ -28,10 +37,20 @@ fi
 # │    프로젝트에 맞게 아래 변수를 수정하세요    │
 # ╰──────────────────────────────────────────╯
 
-# 차단할 subagent_type (공백 구분)
-# - "Explore": 탐색 전용 에이전트
-# - "Plan": 계획 수립 에이전트
-# - 비워두면 타입 기반 차단 비활성화
+# 차단할 subagent_type (공백 구분) — P2-H11 설계 의도 명시
+#
+# 설계 원칙: "탐색-only 에이전트"만 기본 차단. 구현 가능한 에이전트는 허용.
+#   ▸ Explore  : 탐색 전용 (Read/Grep/Glob만) — 메인이 직접 하는 게 토큰 효율적
+#   ▸ Plan     : 계획 수립 — 계획은 보통 토큰 가치 충분히 함
+#                (단, 단순 계획에 Plan 스폰 시 비효율, MIN_PROMPT_LENGTH로 추가 가드)
+#   ▸ general-purpose : 범용 — 구현/리뷰까지 가능, 차단 시 정상 워크플로우 막힘
+#
+# 보수적 차단 원하면 "Explore Plan general-purpose" 등으로 확장.
+# 비워두면 타입 기반 차단 비활성화 (Rule 1 스킵).
+#
+# 참고: subagent 토큰 효율은 BLOCKED_TYPES 외에도 Rule 3 (단순 작업)·Rule 5
+# (토큰 효율 경고)에서 별도로 가드. 모델 비용 자체는 model_routing(agents.yaml)
+# 으로 분리 관리.
 BLOCKED_TYPES="Explore"
 
 # 세션당 최대 Agent 호출 횟수 (0 = 무제한)

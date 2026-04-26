@@ -177,6 +177,74 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 | `LOG_DIR` | `/tmp/claude-hooks` | 감사 로그 저장 디렉토리 |
 | `PROMPT_PREVIEW_LENGTH` | `120` | 로그에 기록할 prompt 미리보기 길이 |
 
+---
+
+## Bundle H-P2: 정책·구조 명시
+
+### Fail 정책 일관성 (P2-H9)
+
+모든 hook은 **의도적으로 비대칭**인 fail 정책을 사용:
+
+| 에러 종류 | 정책 | 이유 |
+|----------|------|------|
+| **시스템 에러** (jq 미설치, JSON 파싱 실패, hook 자체 오류) | **fail-open** (`exit 0`, 명령 허용) | hook 가용성 문제로 사용자 작업 흐름이 깨지면 안 됨 |
+| **정책 매칭** (Level 4 / Safe rm 외부 / BLOCKED_TYPES / ANALYSIS_*) | **fail-closed** (`exit 2`, 차단) | 의도적으로 정의된 안전 경계 — 차단이 안전 |
+
+**비대칭 근거:** 시스템 에러로 차단하면 hook 자체가 가용성 위협. pattern 매칭은 정의된 정책이라 매칭 시 차단이 안전. 오탐 발생 시 CUSTOMIZE 영역 조정 또는 `CLAUDE_HOOK_TEST=1` bypass.
+
+각 hook 파일 헤더 주석에 동일한 정책 명시. 이 비대칭은 수정하지 말 것 — 변경 시 보안/가용성 trade-off 재평가 필요.
+
+### Skill 네임스페이스 우선순위 (P2-H10)
+
+`claude-code-guide`의 일부 스킬 이름(`check-code`, `dispatch`, `flow`, `reflect`, `stage` 등)은 사용자가 글로벌(`~/.claude/skills/`)과 프로젝트(`<proj>/.claude/skills/`) 양쪽에 설치할 수 있어 **충돌 가능**.
+
+**Claude Code 일반 동작 (검증 필요):**
+- 프로젝트 로컬(`.claude/skills/`)이 사용자 글로벌(`~/.claude/skills/`)보다 우선이 일반적
+- 이름 같으면 프로젝트 정의가 우선 로드
+
+**충돌 회피 권고:**
+
+1. **글로벌은 setup-wizard만**: 어느 프로젝트에서든 `/setup-wizard` 호출 가능. 다른 스킬은 프로젝트별 설치
+   ```bash
+   bash scripts/install-skills.sh --skills setup-wizard ~/
+   ```
+2. **양쪽 다 설치 시 동기화**: 같은 버전 사용 (`--force`로 갱신)
+3. **프로젝트가 우선**: 프로젝트별 CUSTOMIZE 영역 변경이 글로벌 기본값을 override 한다고 가정
+4. **확인 명령**:
+   ```bash
+   ls ~/.claude/skills/        # 글로벌
+   ls .claude/skills/           # 현재 프로젝트
+   diff <(ls ~/.claude/skills) <(ls .claude/skills)  # 충돌 감지
+   ```
+
+설치 우선순위가 본인 환경에서 어떻게 작동하는지 모호하면, 글로벌 setup-wizard 설치 후 프로젝트별로 다시 install-skills.sh로 모든 스킬 설치 — 프로젝트 로컬이 명시적 진실이 됨.
+
+### BLOCKED_TYPES 설계 의도 (P2-H11)
+
+기본 `BLOCKED_TYPES="Explore"` 인 이유:
+
+| Subagent type | 차단? | 근거 |
+|---------------|-------|------|
+| **Explore** | ✓ 차단 | 탐색 전용 (Read/Grep/Glob만 가능) — 메인이 직접 하는 게 토큰 효율적 (~14k 오버헤드 회피) |
+| **Plan** | ✗ 허용 | 계획 수립은 보통 토큰 가치 충분. 단순 계획에 스폰 시 Rule 3 (MIN_PROMPT_LENGTH)이 별도 가드 |
+| **general-purpose** | ✗ 허용 | 범용 — 구현/리뷰까지 가능. 차단 시 정상 워크플로우 막힘 |
+| **{전문 에이전트}** (developer/qa/architect 등) | ✗ 허용 | 명확한 역할 → 의도적 사용 |
+
+**보수적 차단 원하면 확장:**
+```bash
+BLOCKED_TYPES="Explore Plan general-purpose"  # 더 엄격
+BLOCKED_TYPES=""                              # 타입 기반 차단 비활성화
+```
+
+토큰 효율은 BLOCKED_TYPES 외에도 다음 Rule이 별도 가드:
+- Rule 3: 단순 작업(짧은 prompt + 적은 파일) 차단 — `MIN_PROMPT_LENGTH`
+- Rule 5: 토큰 효율 경고 (파일 수 < `MIN_EFFICIENT_FILES`)
+- Rule 6: 세션당 호출 횟수 제한 — `MAX_AGENT_CALLS`
+
+모델 비용 자체는 hook이 아닌 `agents.yaml`의 `model_routing` 으로 분리 관리.
+
+---
+
 ## 업그레이드
 
 이미 설치된 Hook을 최신 보일러플레이트로 업그레이드하려면:
