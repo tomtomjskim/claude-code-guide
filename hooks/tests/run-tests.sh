@@ -213,6 +213,74 @@ run_test "subagent_type Explore 차단" \
   '{"tool_name":"Agent","tool_input":{"subagent_type":"Explore","description":"explore code","prompt":"x"}}' \
   "BLOCKED"
 
+# ─────────────────────────────────────────────────
+# P1-H5: 2-tier ANALYSIS_PATTERN 매칭
+# ─────────────────────────────────────────────────
+
+# WEAK 동사 단독 (SCOPE 없음) → 차단 안함 (이전엔 오탐으로 차단)
+# prompt 200자 이상 + 파일 3개 이상으로 Rule 3 회피
+LONG_PROMPT="이 함수의 동작을 확인해 봐. 입력 검증과 에러 처리가 제대로 작동하는지 보고싶어. validateInput 함수, errorHandler 함수, 그리고 unit-test 케이스 일부를 살펴보자. 추가로 docs/api.md와 src/handlers/payment.ts, src/utils/validator.ts 파일도 함께 검토."
+run_test "WEAK 동사 '확인해 봐' 단독 (SCOPE 없음) → 허용" \
+  "$HOOK" 0 \
+  "{\"tool_name\":\"Agent\",\"tool_input\":{\"subagent_type\":\"general-purpose\",\"description\":\"validateInput 함수 동작 확인\",\"prompt\":\"$LONG_PROMPT\"}}"
+
+# WEAK 동사 + SCOPE 힌트 → 차단 (진짜 광범위 탐색)
+run_test "WEAK '파악해' + SCOPE '전체' → 차단" \
+  "$HOOK" 2 \
+  '{"tool_name":"Agent","tool_input":{"subagent_type":"general-purpose","description":"전체 코드베이스 파악해 줘","prompt":"이 프로젝트의 모든 모듈을 파악해서 어떤 패턴이 사용되는지 정리. src/, lib/, test/ 디렉토리 모두 포함하여 상세히 분석. 200자 이상 길이로 작성한 prompt이고 파일도 여러 개 명시되어야 Rule 3 통과."}}' \
+  "분석/탐색"
+
+# STRONG 단독 매칭 → 차단
+run_test "STRONG 'explore the codebase' 단독 → 차단" \
+  "$HOOK" 2 \
+  '{"tool_name":"Agent","tool_input":{"subagent_type":"general-purpose","description":"Explore the entire codebase","prompt":"Look at src/main.ts and src/utils.ts and src/api.ts. This is a long prompt to bypass Rule 3 simple-task heuristic which requires 200+ characters and multiple files mentioned in the prompt content."}}' \
+  "분석/탐색"
+
+# ─────────────────────────────────────────────────
+# P1-H6: MIN_PROMPT_LENGTH=0 비활성화
+# ─────────────────────────────────────────────────
+
+# 짧은 prompt + 적은 파일 → 기본은 차단되지만 MIN_PROMPT_LENGTH=0 시 허용
+export MIN_PROMPT_LENGTH=0
+disabled_exit=$(echo '{"tool_name":"Agent","tool_input":{"subagent_type":"general-purpose","description":"short task","prompt":"do x"}}' \
+  | bash "$HOOK" 2>/dev/null; echo $?)
+disabled_exit=$(echo "$disabled_exit" | tail -1)
+unset MIN_PROMPT_LENGTH
+if [ "$disabled_exit" = "0" ]; then
+  echo "  ✓ MIN_PROMPT_LENGTH=0 → Rule 3 비활성 작동"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ MIN_PROMPT_LENGTH=0 비활성 실패 (exit $disabled_exit)"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("MIN_PROMPT_LENGTH=0")
+fi
+
+# ─────────────────────────────────────────────────
+# safety-careful.sh — P1-H7: Level 3 LOG 파일
+# ─────────────────────────────────────────────────
+echo ""
+echo "=== safety-careful.sh — P1-H7 LEVEL3_LOG ==="
+
+HOOK="$HOOKS_DIR/safety-careful.sh"
+TEST_LOG="${TMPDIR:-/tmp}/claude-hook-level3-test.log"
+rm -f "$TEST_LOG" 2>/dev/null
+
+# Level 3 명령 실행 → log 파일에 기록
+export LEVEL3_LOG="$TEST_LOG"
+echo '{"tool_name":"Bash","tool_input":{"command":"docker rm -f my-container"}}' \
+  | bash "$HOOK" 2>/dev/null
+unset LEVEL3_LOG
+
+if [ -f "$TEST_LOG" ] && grep -q "WARNING" "$TEST_LOG"; then
+  echo "  ✓ LEVEL3_LOG 파일에 WARNING 기록됨"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ LEVEL3_LOG 파일 기록 실패"
+  FAIL=$((FAIL + 1))
+  FAILED_NAMES+=("LEVEL3_LOG")
+fi
+rm -f "$TEST_LOG" 2>/dev/null
+
 # ──────────────────────────────────────────
 # 결과 요약
 # ──────────────────────────────────────────

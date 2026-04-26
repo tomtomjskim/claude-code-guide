@@ -37,14 +37,26 @@ BLOCKED_TYPES="Explore"
 # 세션당 최대 Agent 호출 횟수 (0 = 무제한)
 MAX_AGENT_CALLS=10
 
-# 단순 작업 감지 임계값
-# prompt가 이 길이 미만이고 파일이 이 개수 이하이면 차단
-MIN_PROMPT_LENGTH=200
-MIN_FILE_COUNT=2
+# 단순 작업 감지 임계값 (P1-H6)
+# ⚠️ heuristic — 보안 경계 아님. "짧은 prompt = 단순 작업"이라는 가정.
+#    실제 보안 결정은 prompt 내용 검토 필요. 이 휴리스틱은 토큰 효율 권고용.
+# 비활성: MIN_PROMPT_LENGTH=0 환경변수로 설정 (Rule 3 전체 스킵)
+# 환경변수 우선: 호출자가 export 한 값이 있으면 그 값을, 없으면 default 사용
+MIN_PROMPT_LENGTH="${MIN_PROMPT_LENGTH:-200}"
+MIN_FILE_COUNT="${MIN_FILE_COUNT:-2}"
 
-# 탐색/분석 패턴 (PCRE, 대소문자 무시)
-# 프로젝트 언어에 맞게 패턴 추가/제거
-ANALYSIS_PATTERN='(explore\s+(the\s+)?code|search\s+(for|through)\s+files|find\s+(all|every|the)\s+(file|usage|reference|instance)|분석해|탐색해|조사해|파악해|찾아봐|검색해|살펴봐|확인해\s*봐)'
+# 탐색/분석 패턴 (PCRE, 대소문자 무시) — P1-H5: 2-tier 매칭으로 오탐 축소
+#
+# STRONG 패턴: 단독 매칭만으로 차단 (명확한 광범위 탐색 의도)
+ANALYSIS_STRONG_PATTERN='(explore\s+(the\s+)?(entire\s+)?(code|codebase|project)|search\s+through\s+(all|every|the\s+entire)|find\s+(all|every)\s+(file|usage|reference|instance|occurrence)|코드베이스\s*전체\s*(탐색|분석|조사)|전수\s*조사|모든\s*파일\s*검색|전체\s*분석)'
+#
+# WEAK 패턴: SCOPE_HINT와 같이 매칭해야만 차단 (일반 동사라 단독 매칭 시 오탐)
+# 예: "이 함수 확인해 봐" 는 SCOPE 없으므로 통과,
+#     "전체 코드 확인해 봐" 는 SCOPE("전체") + WEAK("확인해") 매칭 → 차단
+ANALYSIS_WEAK_PATTERN='(분석해|탐색해|조사해|파악해|찾아봐|검색해|살펴봐|확인해\s*봐)'
+
+# 광범위 SCOPE 힌트 — WEAK 매칭과 같이 나오면 진짜 탐색 의도로 판단
+SCOPE_HINT_PATTERN='(전체|모든|전수|every\s+(file|module)|all\s+(files|modules)|across|throughout|entire\s+(codebase|repo|project)|코드베이스|디렉토리\s*전체)'
 
 # 제약사항 키워드 (이 중 하나라도 있으면 "제약 있음"으로 판단)
 CONSTRAINT_PATTERN='(금지|forbidden|must not|하지\s*마|do not|only modify|변경 범위|scope|제약)'
@@ -68,15 +80,30 @@ else
   GREP_MODE="-E"
 fi
 
-# grep 래퍼: PCRE 우선, 미지원 시 ERE 호환 패턴으로 자동 전환
+# grep 래퍼: PCRE 우선, 미지원 시 ERE 호환 패턴으로 자동 전환 (P1-H8)
+#
+# PCRE → ERE 변환 시 정확도 손실 항목:
+#   - \b (word boundary): 한글에 영향 미미하나 영어 단어 경계 정확도 ↓
+#   - (?=...) lookahead: 미지원 → 패턴 제거 시 부정어 검사 정확도 ↓
+#   - (?:...) non-capturing: ERE는 capturing group (...)으로 변환 가능
+#
+# 정확한 PCRE 필요 시: brew install grep (gnu-grep) → ggrep 사용 가능
+# 또는 settings에서 USE_PCRE 환경변수 강제 (현재 자동 감지)
 grep_compat() {
   local pattern="$1"
   if [ "$GREP_MODE" = "-P" ]; then
     grep -qi "$GREP_MODE" "$pattern" 2>/dev/null
   else
-    # ERE: \s → [[:space:]], \b → 제거 (근사치)
+    # ERE 변환 (P1-H8 개선):
     local ere_pattern
-    ere_pattern=$(echo "$pattern" | sed -E 's/\\s/[[:space:]]/g; s/\\b//g')
+    ere_pattern=$(echo "$pattern" | sed -E '
+      s/\\s/[[:space:]]/g
+      s/\\S/[^[:space:]]/g
+      s/\\b//g
+      s/\(\?:/(/g
+      s/\(\?=[^)]*\)//g
+      s/\(\?![^)]*\)//g
+    ')
     grep -qi "$GREP_MODE" "$ere_pattern" 2>/dev/null
   fi
 }
@@ -103,19 +130,42 @@ if [ -n "$BLOCKED_TYPES" ]; then
   done
 fi
 
-# ── Rule 2: 분석/탐색 패턴 감지 (부정형 제외) ──
+# ── Rule 2: 분석/탐색 패턴 감지 (P1-H5 — 2-tier 매칭) ──
 COMBINED="$DESCRIPTION $PROMPT"
 
 # 부정어 패턴: 매칭 앞에 이 단어가 있으면 오탐으로 간주
 NEGATION_PATTERN='(not|don'\''t|do not|하지|금지|않|마세요|마십시오|없이|말고)'
 
-if echo "$COMBINED" | grep_compat "$ANALYSIS_PATTERN"; then
+# 매칭 전략:
+#   1. STRONG 패턴 단독 매칭 → 강한 탐색 의도 (즉시 차단 후보)
+#   2. WEAK + SCOPE 동시 매칭 → 약한 동사 + 광범위 scope (차단 후보)
+#   3. WEAK만 매칭 → "이 함수 확인해 봐" 같은 일반 검토 (스킵, 차단 안함)
+ANALYSIS_REASON=""
+ANALYSIS_PATTERN_USED=""
+
+if echo "$COMBINED" | grep_compat "$ANALYSIS_STRONG_PATTERN"; then
+  ANALYSIS_REASON="STRONG (광범위 탐색 의도)"
+  ANALYSIS_PATTERN_USED="$ANALYSIS_STRONG_PATTERN"
+elif echo "$COMBINED" | grep_compat "$ANALYSIS_WEAK_PATTERN" \
+     && echo "$COMBINED" | grep_compat "$SCOPE_HINT_PATTERN"; then
+  ANALYSIS_REASON="WEAK + SCOPE_HINT"
+  ANALYSIS_PATTERN_USED="$ANALYSIS_WEAK_PATTERN"
+fi
+
+if [ -n "$ANALYSIS_REASON" ]; then
   # 부정형 체크: 매칭된 구간 앞 40자에 부정어가 있으면 스킵
   IS_NEGATED=false
   if [ "$GREP_MODE" = "-P" ]; then
-    MATCH_CONTEXT=$(echo "$COMBINED" | grep -oiP ".{0,40}($ANALYSIS_PATTERN)" 2>/dev/null | head -1)
+    MATCH_CONTEXT=$(echo "$COMBINED" | grep -oiP ".{0,40}($ANALYSIS_PATTERN_USED)" 2>/dev/null | head -1)
   else
-    ERE_ANALYSIS=$(echo "$ANALYSIS_PATTERN" | sed -E 's/\\s/[[:space:]]/g; s/\\b//g')
+    ERE_ANALYSIS=$(echo "$ANALYSIS_PATTERN_USED" | sed -E '
+      s/\\s/[[:space:]]/g
+      s/\\S/[^[:space:]]/g
+      s/\\b//g
+      s/\(\?:/(/g
+      s/\(\?=[^)]*\)//g
+      s/\(\?![^)]*\)//g
+    ')
     MATCH_CONTEXT=$(echo "$COMBINED" | grep -oiE ".{0,40}($ERE_ANALYSIS)" 2>/dev/null | head -1)
   fi
   if [ -n "$MATCH_CONTEXT" ]; then
@@ -125,19 +175,22 @@ if echo "$COMBINED" | grep_compat "$ANALYSIS_PATTERN"; then
   fi
 
   if [ "$IS_NEGATED" = false ]; then
-    echo "[BLOCKED] 분석/탐색 목적의 Agent 호출 감지. 메인에서 직접 Read/Grep/Glob을 사용하세요." >&2
-    echo "감지된 패턴: description='$DESCRIPTION'" >&2
+    echo "[BLOCKED] 분석/탐색 목적의 Agent 호출 감지 ($ANALYSIS_REASON)" >&2
+    echo "메인에서 직접 Read/Grep/Glob을 사용하세요." >&2
+    echo "감지된 description: '$DESCRIPTION'" >&2
+    echo "(오탐이면 prompt에 부정어 추가 또는 CLAUDE_HOOK_TEST=1 사용)" >&2
     exit 2
   fi
 fi
 
-# ── Rule 3: 단순 작업 감지 ──
+# ── Rule 3: 단순 작업 감지 (P1-H6 — heuristic, MIN_PROMPT_LENGTH=0 비활성) ──
 PROMPT_LEN=${#PROMPT}
 FILE_COUNT=$(echo "$PROMPT" | grep -oE '[a-zA-Z0-9_/.-]+\.(ts|tsx|js|jsx|py|php|css|scss|md|json|yaml|yml|sh|go|rs|java|rb|swift|kt)' | sort -u | wc -l | tr -d ' ')
 
-if [ "$PROMPT_LEN" -lt "$MIN_PROMPT_LENGTH" ] && [ "$FILE_COUNT" -le "$MIN_FILE_COUNT" ]; then
+if [ "$MIN_PROMPT_LENGTH" -gt 0 ] && [ "$PROMPT_LEN" -lt "$MIN_PROMPT_LENGTH" ] && [ "$FILE_COUNT" -le "$MIN_FILE_COUNT" ]; then
   echo "[BLOCKED] 단순 작업(prompt ${PROMPT_LEN}자, 파일 ${FILE_COUNT}개)에 서브에이전트는 비효율적입니다." >&2
   echo "메인에서 직접 수행하세요. ${MIN_FILE_COUNT}개 초과 파일에 걸친 구현 작업만 서브에이전트를 사용합니다." >&2
+  echo "(이 휴리스틱 비활성화: MIN_PROMPT_LENGTH=0 설정)" >&2
   exit 2
 fi
 

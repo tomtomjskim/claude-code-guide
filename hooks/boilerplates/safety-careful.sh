@@ -62,6 +62,12 @@ LEVEL3_PATTERNS=(
   'kubectl[[:space:]]+delete'                # K8s 리소스 삭제
 )
 
+# Level 3 WARNING 로그 파일 경로 (P1-H7)
+# stderr만으로는 Claude Code가 모델 컨텍스트로 surface 하지 않을 수 있음
+# 파일 로그로 영속 기록하여 사후 추적 + 분석 가능
+# 비활성화: LEVEL3_LOG="" (빈 문자열)
+LEVEL3_LOG="${LEVEL3_LOG:-${TMPDIR:-/tmp}/claude-hook-level3.log}"
+
 # rm -rf 허용 디렉토리 (빌드 아티팩트 등)
 SAFE_RM_DIRS=(
   "node_modules"
@@ -147,10 +153,16 @@ if [ "$ARGV_LITERAL_MODE" = false ] && echo "$COMMAND" | grep -qEi 'rm[[:space:]
   fi
 fi
 
-# Level 3: 경고 (허용하되 stderr 출력)
+# Level 3: 경고 (허용하되 stderr 출력 + 옵션 로그 파일 — P1-H7)
 for pattern in "${LEVEL3_PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qEi "$pattern" 2>/dev/null; then
-    echo "WARNING: 주의 필요한 명령 — $pattern" >&2
+    msg="WARNING: 주의 필요한 명령 — $pattern (cmd: ${COMMAND:0:120})"
+    echo "$msg" >&2
+    # 영속 로그 (stderr가 모델 컨텍스트로 surface 안 될 가능성 대비)
+    if [ -n "$LEVEL3_LOG" ]; then
+      mkdir -p "$(dirname "$LEVEL3_LOG")" 2>/dev/null
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $msg" >> "$LEVEL3_LOG" 2>/dev/null || true
+    fi
     exit 0
   fi
 done

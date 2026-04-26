@@ -118,11 +118,27 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 |------|--------|------|
 | `BLOCKED_TYPES` | `"Explore"` | 차단할 서브에이전트 타입 (공백 구분) |
 | `MAX_AGENT_CALLS` | `10` | 세션당 최대 Agent 호출 횟수 (0=무제한) |
-| `MIN_PROMPT_LENGTH` | `200` | 이 길이 미만의 prompt는 단순 작업으로 간주 |
-| `MIN_FILE_COUNT` | `2` | 이 개수 이하 파일 + 짧은 prompt → 차단 |
+| `MIN_PROMPT_LENGTH` | `200` | 이 길이 미만의 prompt는 단순 작업으로 간주 (P1-H6: `0`으로 비활성, env override 가능) |
+| `MIN_FILE_COUNT` | `2` | 이 개수 이하 파일 + 짧은 prompt → 차단 (env override 가능) |
 | `MIN_EFFICIENT_FILES` | `4` | 이 개수 미만 파일 → 토큰 효율 경고 |
-| `ANALYSIS_PATTERN` | 내장 패턴 | 탐색/분석 의도 감지 정규식 (PCRE/ERE 자동 전환) |
+| `ANALYSIS_STRONG_PATTERN` | 내장 (P1-H5) | 강한 탐색 의도 — 단독 매칭 시 차단 |
+| `ANALYSIS_WEAK_PATTERN` | 내장 (P1-H5) | 약한 동사 — `SCOPE_HINT`와 같이 매칭 시에만 차단 |
+| `SCOPE_HINT_PATTERN` | 내장 (P1-H5) | 광범위 scope 키워드 (전체/모든/all 등) |
 | `CONSTRAINT_MISSING_ACTION` | `"warn"` | 제약사항 미포함 시 동작 (`warn` / `block`) |
+
+**Bundle H-P1 수정 사항:**
+- **P1-H5 ANALYSIS_PATTERN 2-tier**: 단일 단어 한국어("확인해 봐", "살펴봐", "파악해" 등) 단독 매칭으로 인한 오탐 제거. 이제 `STRONG`(단독 차단) + `WEAK + SCOPE`(같이 매칭 시 차단) 구조. 예시:
+  - `"이 함수 확인해 봐"` → SCOPE 없음 → 통과
+  - `"전체 코드베이스를 파악해 줘"` → WEAK("파악해") + SCOPE("전체") → 차단
+  - `"explore the codebase"` → STRONG 단독 → 차단
+- **P1-H6 MIN_PROMPT_LENGTH heuristic 명시**: 보안 경계 아님을 코드 주석/README에 명시. `MIN_PROMPT_LENGTH=0`으로 Rule 3 전체 비활성. env var로 override 가능 (CUSTOMIZE 블록에 `${MIN_PROMPT_LENGTH:-200}` 형식)
+- **P1-H8 grep_compat 정확도 개선**: PCRE → ERE 변환 시 `(?:...)`, `(?=...)`, `(?!...)` 처리 추가. 한글 word boundary 정확도 손실은 코드 주석으로 명시. 정확한 PCRE 원하면 `brew install grep` 권장.
+
+**오탐 시 우회 방법 (우선순위 순):**
+1. prompt에 부정어 추가: `"...분석하지 말고 X만 수정해"`, `"코드 탐색 없이"`
+2. 환경변수로 hook 일시 비활성: `CLAUDE_HOOK_TEST=1`
+3. CUSTOMIZE 블록에서 `BLOCKED_TYPES=""`, `MIN_PROMPT_LENGTH=0` 등 직접 조정
+4. `.claude/hooks/bypass` 파일 생성 (프로젝트 scope)
 
 ### safety-careful.sh
 
@@ -130,12 +146,17 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 |------|--------|------|
 | `TRUSTED_PATHS` | `()` | 무조건 허용할 스크립트 경로 목록 |
 | `LEVEL4_PATTERNS` | 내장 패턴 | 절대 차단할 파괴적 명령 정규식 |
+| `LEVEL3_PATTERNS` | 내장 패턴 | 경고 명령 정규식 (허용 + WARNING) |
+| `LEVEL3_LOG` | `${TMPDIR:-/tmp}/claude-hook-level3.log` | Level 3 WARNING 영속 로그 파일 (P1-H7) |
 
 **Bundle H-P0 수정 사항:**
 - `rm -rf /` 패턴에 `/([[:space:]]|$|\*)` 앵커 추가 — `/tmp/foo` 등 정상 경로 오탐 제거
 - `~`, `$HOME` 루트도 Level 4 패턴에 추가
 - `echo`/`printf`/`#`(주석)이 first token이고 shell chaining(`&&`, `;`, `|shell`, `$()`) 없으면 "argv literal 모드"로 Level 4 + Safe rm 체크 스킵
 - Dev mode bypass 지원 (위 섹션)
+
+**Bundle H-P1 수정 사항:**
+- **P1-H7 Level 3 영속 로그**: stderr만으로는 Claude Code가 모델 컨텍스트로 surface 안 할 가능성 → `LEVEL3_LOG` 파일에 timestamp + 명령 기록. `LEVEL3_LOG=""`로 비활성. 로그 분석 예: `tail -20 /tmp/claude-hook-level3.log`
 
 **Safe rm -rf 정책:**
 - 현재 정책: `rm -rf <x>`의 피연산자가 모두 `SAFE_RM_DIRS`에 있어야 허용
