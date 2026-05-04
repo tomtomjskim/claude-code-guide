@@ -47,12 +47,17 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 28 | [토큰 낭비 자가진단](28-token-waste-selfcheck.md) | Cloud AI MCP, 7대 낭비 요소, 자동 진단, 시나리오별 프로필 |
 | 29 | [하네스 엔지니어링](29-harness-engineering.md) | 5컴포넌트 통합 아키텍처, hooks 패턴, 시나리오별 설계 |
 | 30 | [Advisor Strategy](30-advisor-strategy.md) | executor+advisor 패턴, API 구현, PDARR 연계, 비용 벤치마크 |
+| 31 | [듀얼 모드 디자인 전략](31-design-strategy.md) | SYSTEMATIC/CREATIVE 디자인 모드, 디자인 게이트, 토큰 브릿지 |
+| 32 | [디자인 시스템 확장 규칙](32-design-system-extension.md) | 토큰 추가/변경/제거 절차, 폰트 변경 규칙 |
 | 33 | [서브에이전트 효율성](33-subagent-efficiency.md) | 12가지 효율화 전략, 성능 리스크 분석, Tiered Dispatch, Result Pipe |
+| 34 | [DESIGN.md 운영 모델](34-design-md-operating-model.md) | DESIGN.md 개념 주입, 토큰 보일러플레이트, 버전 관리, 실행 태스크 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |
 |------|------|------|
 | Workflow Guide (상세) | [`.claude/workflow-commands-guide.md`](../.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 (셋업, Agent 전략, 팀 패턴) |
+| DESIGN.md System Guide | [`design-md-system-guide.html`](design-md-system-guide.html) | DESIGN.md 시스템 학습용 HTML 다이어그램과 검색 가능한 UI/UX 용어 사전 |
+| v4.2 Changelog | [`v4.2-changelog.md`](v4.2-changelog.md) | DESIGN.md 운영 모델 릴리즈 노트 |
 
 ---
 

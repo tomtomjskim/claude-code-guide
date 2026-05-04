@@ -94,6 +94,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 **빠른 참조 링크:**
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
+- [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
+- [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — **v4.2 릴리즈 노트** (DESIGN.md 운영 모델)
 - [`docs/v4.1-changelog.md`](docs/v4.1-changelog.md) — **v4.1 릴리즈 노트** (셋업 인프라 + Hook 안정화)
 - [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트 (SSOT 부채 청산)
 
@@ -132,6 +134,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v3.3 신규**: Advisor Strategy 가이드 — executor+advisor 모델 패턴, API 구현, PDARR 연계
 - **v3.3 신규**: 듀얼 모드 디자인 전략 — SYSTEMATIC/CREATIVE 모드 자동 판별, design-gate.sh 자동 검사, `/design-creative` 스킬
 - **v3.3 신규**: 디자인 시스템 확장 규칙 — 토큰 추가/변경 절차, 폰트 수정 규칙, 체크리스트
+- **v4.2 신규**: `DESIGN.md` 운영 모델 — Google design.md 스펙 기반 토큰 문서, 주입 워크플로우, 보일러플레이트, 버전 관리
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
@@ -165,7 +168,7 @@ claude-code-guide/
 │   ├── event-driven-review.yaml
 │   └── scripts/          # v3.2 레퍼런스 구현
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh + preflight-collect.sh
-├── docs/                 # 33편 가이드 문서 (v3.3: 서브에이전트 효율성, 디자인 전략, 스킬 경량화 등)
+├── docs/                 # 34편 가이드 문서 (v4.2: DESIGN.md 운영 모델 포함)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
 ├── QUICKSTART.md
 └── README.md
