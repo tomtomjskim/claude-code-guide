@@ -51,6 +51,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 32 | [디자인 시스템 확장 규칙](32-design-system-extension.md) | 토큰 추가/변경/제거 절차, 폰트 변경 규칙 |
 | 33 | [서브에이전트 효율성](33-subagent-efficiency.md) | 12가지 효율화 전략, 성능 리스크 분석, Tiered Dispatch, Result Pipe |
 | 34 | [DESIGN.md 운영 모델](34-design-md-operating-model.md) | DESIGN.md 개념 주입, 토큰 보일러플레이트, 버전 관리, 실행 태스크 |
+| 35 | [DESIGN.md 도입 평가 케이스](35-design-md-adoption-cases.md) | 비권장 시그널, 부분 도입 권장 요소, 케이스 스터디, downstream 평가 절차 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |
