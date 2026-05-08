@@ -6,6 +6,16 @@
 > v2.0 변경 (2026-03-25): completion_status 4상태, retry 계층 분리, 파일 상태 체인, 세션 재개 지원
 > v1.0 → v2.0 마이그레이션: validation_status deprecated (v3.0 제거 예정)
 
+## Context Source Hygiene
+
+핸드오프는 에이전트 간 전달 계약이지 자동 backlog 승격 장치가 아닙니다.
+
+- handoff, backlog, roadmap, gap-review, brainstorm, retrospective 문서는 사용자가 명시적으로 요청했거나 현재 구현에 특정 spec이 필요할 때만 active context로 사용합니다.
+- 해당 문서를 참조할 때는 먼저 참조 이유와 범위를 밝힙니다.
+- 결과 보고에서는 `현재 사용자 요청`, `문서상 backlog`, `배포/검증 전용 항목`을 분리합니다.
+- 문서상 backlog를 사용자 확인 없이 다음 작업 큐로 승격하지 않습니다.
+- 기본 next-step 브리핑은 최신 사용자 지시와 실제 커밋/diff/worktree 상태를 기준으로 합니다.
+
 ## Handoff Schema
 
 ```yaml

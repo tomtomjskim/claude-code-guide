@@ -78,6 +78,18 @@ Skills are intentionally stack-agnostic except inside `<!-- CUSTOMIZE: ... -->` 
 - Do not hard-code project paths (`docs/prd/`, `docs/spec/`, etc. are conventions enforced by `templates/project-structure/`).
 - `dispatch`, `flow`, `stage`, `reflect`, `complete`, `organize-docs`, `workflow`, `prd` are stack-independent and should stay that way.
 
+## Context source hygiene
+
+Do not silently promote handoff, backlog, roadmap, gap-review, brainstorm, or retrospective documents into the active task queue.
+
+- Use those documents as briefing sources only when the user explicitly asks for document-based review/briefing, or when a specific implementation requires a specific spec.
+- If you consult one of those documents, state the exact reason and scope before using it.
+- Keep these categories separate in responses: current user-requested work, document-sourced backlog, and deploy/verification-only items.
+- Do not present document-sourced backlog as "next work" without explicit user confirmation.
+- Default next-step briefings must be based on the latest user instruction plus actual commits, diff, and working-tree state.
+
+This rule prevents stale handoff or planning documents from contaminating the current session.
+
 ## Subagent use inside this repo
 
 `.claude/rules/subagent-strategy.md` is binding for work in this repo. Key points:
