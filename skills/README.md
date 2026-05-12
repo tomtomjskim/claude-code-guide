@@ -37,7 +37,8 @@ bash scripts/install-skills.sh --list
 | 스킬 | 커맨드 | 역할 |
 |------|--------|------|
 | **dispatch** | `/dispatch {작업}` | 복잡도 판단 → 최적 실행 경로 라우팅 |
-| **prd** | `/prd {기능}` | PRD 문서 생성 + 1차 복잡도 판단 |
+| **prd** | `/prd {기능}` / `/prd --vibe {기능}` | PRD 문서 생성 + 1차 복잡도 판단. `--vibe`는 인터뷰+리서치 가이드 모드 |
+| **breakdown** | `/breakdown {프로젝트}` | PRD를 기능 단위로 분해 + 우선순위·의존성·Goal 실행 순서 |
 | **analyze** | `/analyze {기능}` | 코드베이스 분석 + 2차 복잡도 판단 + 실행 전략 |
 | **spec** | `/spec` | 기술 명세서 작성 (architecture, API, DB schema) |
 
@@ -165,6 +166,7 @@ skills/
 ├── README.md              # 이 파일
 ├── dispatch/SKILL.md      # 스마트 라우터
 ├── prd/SKILL.md           # PRD 작성
+├── breakdown/SKILL.md     # PRD → 기능 분해 + Goal 실행 순서
 ├── analyze/SKILL.md       # 분석 + 실행 전략
 ├── spec/SKILL.md          # 기술 명세서
 ├── test/SKILL.md          # TDD 테스트

@@ -61,7 +61,9 @@ Changing one does not change the others.
 
 ## PDARR + preset system
 
-- **Flow**: `/dispatch` → `/prd` → `/analyze` → `/spec` → `/run` → `/check-code` → `/reflect` → `/complete` → `/stage`
+- **Flow**: `/dispatch` → `/prd` → `/breakdown` → `/analyze` → `/spec` → `/run` (또는 `/goal` 단위) → `/check-code` → `/reflect` → `/complete` → `/stage`
+  - `/breakdown`은 PRD에 기능이 2개 이상일 때만. 1기능 PRD는 생략하고 `/analyze` 직행.
+  - Goal 단위 실행(1기능=1Goal, 빌드/테스트/시각확인 1루프)을 쓸 때는 `/breakdown`이 Goal 실행 순서를 사전 결정.
 - **2-axis presets** — canonical details in [`docs/14-preset-system.md`](docs/14-preset-system.md):
   - depth axis (`--quick` / standard / `--thorough`): applies to `analyze`, `spec`, `check-spec`, `check-code`
   - depth axis with 4-label alias (`--minimal`/`--basic`/`--standard`/`--full` ↔ quick/standard/thorough): applies to `qa-test`

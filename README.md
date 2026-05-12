@@ -95,7 +95,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
-- [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — **v4.2 릴리즈 노트** (DESIGN.md 운영 모델)
+- [`docs/v4.3-changelog.md`](docs/v4.3-changelog.md) — **v4.3 릴리즈 노트** (PDARR + Goal-runtime 정렬: `/breakdown`, `/prd --vibe`)
+- [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — v4.2 릴리즈 노트 (DESIGN.md 운영 모델)
 - [`docs/v4.1-changelog.md`](docs/v4.1-changelog.md) — **v4.1 릴리즈 노트** (셋업 인프라 + Hook 안정화)
 - [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트 (SSOT 부채 청산)
 

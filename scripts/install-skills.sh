@@ -42,6 +42,7 @@ list_skills() {
     echo "[PLAN]"
     echo "  dispatch      Smart router - routes tasks by complexity"
     echo "  prd           PRD (Product Requirements Document) creation"
+    echo "  breakdown     PRD → feature breakdown + Goal execution order"
     echo "  analyze       Codebase analysis + execution strategy"
     echo "  spec          Technical specification writing"
     echo ""
