@@ -123,6 +123,24 @@ echo "기여자: ${CONTRIB}명 / 소스 파일: ${SRC_FILES}"
 
 사용자 답변을 받아 다음 Phase 진행.
 
+### Phase 3A: Project Context 질문
+
+프로파일 확정 후, 설치 전 프로젝트 운영 컨텍스트를 확인합니다. 모르면 기본값을
+`미정`으로 두고 나중에 `CLAUDE.md` 또는 프로젝트 문서에서 보강하도록 안내합니다.
+
+```markdown
+프로젝트 컨텍스트 확인:
+- issue tracker: GitHub issues / Linear / Jira / local docs / 미정
+- triage labels: needs-info, ready-for-agent, ready-for-human, wontfix 사용 여부
+- domain docs: CONTEXT.md / docs/domain/ / LLM Wiki / 미정
+- ADR path: docs/adr/ / 미정
+- prototype path: docs/prototypes/ / tmp only / 미정
+```
+
+이 정보는 `/analyze`, `/qa-test`, `/test`가 `diagnose`, `zoom-out`, tracer bullet
+TDD를 적용할 때 기준으로 사용됩니다. GitHub issue/label/comment write는 dry-run
+요약 후 사용자 확인을 기본값으로 둡니다.
+
 ### Phase 4: 원라이너 실행
 
 사용자 확인 후, 다음 명령 실행:
@@ -219,6 +237,7 @@ references/stack-examples.md에 감지된 스택 예시가 카탈로그화되어
 1. Claude Code 재시작 (hooks 로드)
 2. `/dispatch "첫 번째 작업"` 테스트
 3. (선택) CUSTOMIZE 블록 TypeScript로 교체: references/stack-examples.md
+4. (선택) issue tracker, domain docs, ADR path를 프로젝트 CLAUDE.md에 기록
 
 ## 관련 문서
 - 릴리즈 노트: https://github.com/tomtomjskim/claude-code-guide/blob/main/docs/v4-changelog.md

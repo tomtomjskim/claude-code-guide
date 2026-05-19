@@ -88,6 +88,26 @@ references/: 참조 파일 전체 합산 ≤ 500줄
 5. 체크리스트는 항목만 나열하고 설명은 생략한다
 ```
 
+### 2.4 외부 스킬 도입 기준
+
+외부 skill repo의 좋은 패턴은 그대로 복사하지 말고 기존 PDARR 스킬에 먼저
+흡수합니다.
+
+| 패턴 | 우선 반영 위치 | 이유 |
+|------|----------------|------|
+| `diagnose` | `qa-test`, `check-code` | 원인 불명 버그의 재현 루프와 회귀 검증이 QA gate에 맞음 |
+| `tracer bullet TDD` | `test` | Red 단계에서 작은 vertical slice를 고정해야 함 |
+| `zoom-out` | `analyze` | unfamiliar code의 entry point와 영향 범위를 먼저 좁힘 |
+| `prototype` | `spec`, `design-creative` | throwaway 실험은 설계 질문과 폐기/흡수 기준이 필요함 |
+| `triage`, `to-issues` | GitHub/plugin workflow | issue write가 있으므로 dry-run과 사용자 확인이 필요함 |
+
+채택하지 않을 기본값:
+
+- 최신 원격 설치 명령을 canonical로 두지 않는다.
+- GitHub issue/label/comment write를 승인 없이 실행하지 않는다.
+- raw 작업 메모를 공개 문서 뷰어에 복사하지 않는다.
+- terse communication mode를 안전/승인 메시지보다 우선하지 않는다.
+
 ---
 
 ## 3. 경량화 전략
