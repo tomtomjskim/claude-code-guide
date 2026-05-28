@@ -320,6 +320,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, 프로젝트별 커스텀 게이트 가이드 |
 | 32 | [디자인 시스템 확장 규칙](docs/32-design-system-extension.md) | 토큰 추가/변경 절차, 폰트 수정 규칙 |
 | 33 | [서브에이전트 효율성](docs/33-subagent-efficiency.md) | 12가지 전략, A/B 벤치마크, Tiered Dispatch, Result Pipe |
+| 36 | [Agent Tools And Hermes Web UI](docs/36-agent-tools-and-hermes-web-ui.md) | Hermes Agent gateway, Office Web UI, Electron webview 진단 기준 |
 
 ---
 
