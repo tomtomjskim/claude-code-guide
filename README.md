@@ -96,6 +96,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
 - [`docs/v4.5-changelog.md`](docs/v4.5-changelog.md) — **v4.5 릴리즈 노트** (Agent Operating Kernel adapter)
+- [`templates/CLAUDE.routing-card.md`](templates/CLAUDE.routing-card.md) — agent/model/effort 라우팅 카드
 - [`templates/CLAUDE.kernel-evaluation.md`](templates/CLAUDE.kernel-evaluation.md) — 커널 시험 적용 비교 평가 템플릿
 - [`docs/v4.4-changelog.md`](docs/v4.4-changelog.md) — **v4.4 릴리즈 노트** (external agent skill adoption)
 - [`docs/v4.3-changelog.md`](docs/v4.3-changelog.md) — **v4.3 릴리즈 노트** (PDARR + Goal-runtime 정렬: `/breakdown`, `/prd --vibe`)
@@ -141,6 +142,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v4.2 신규**: `DESIGN.md` 운영 모델 — Google design.md 스펙 기반 토큰 문서, 주입 워크플로우, 보일러플레이트, 버전 관리
 - **v4.4 신규**: External agent skill adoption — diagnose, zoom-out, tracer bullet, project context 운영 패턴
 - **v4.5 신규**: Agent Operating Kernel adapter — 고위험 작업용 scope/decision/verification 운영 계약
+- **v4.5 신규**: Agent/Model Routing Card — 작업 유형별 agent/model/effort 선택 기준
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
@@ -539,6 +541,7 @@ qa-e2e는 depth 축 미적용 — --tc TC-N으로 범위 제어
 - [CLAUDE.md](templates/CLAUDE.md) - 프로젝트 설정 파일
 - [Agent Operating Kernel adapter](templates/CLAUDE.kernel.md) - 고위험 작업용 운영 계약
 - [Agent Operating Kernel evaluation](templates/CLAUDE.kernel-evaluation.md) - 시험 적용 후 비교 평가
+- [Agent/Model Routing Card](templates/CLAUDE.routing-card.md) - 성능/효율 라우팅 기준
 - [체크리스트](templates/checklists/) - 워크플로우 체크리스트
 
 ### 에이전트 템플릿 (v3.0)
