@@ -232,6 +232,8 @@ bash scripts/install-skills.sh --team /path/to/your-project
 # 또는 팀 시스템만 수동 설치
 mkdir -p ~/.claude/team
 cp agents.yaml ~/.claude/team/
+mkdir -p ~/.claude/team/agents
+cp agents/*.md ~/.claude/team/agents/
 cp -r prompts/ ~/.claude/team/prompts/
 cp -r workflows/ ~/.claude/team/workflows/
 cp -r context/ ~/.claude/team/context/

@@ -86,10 +86,11 @@ Before acting, read and follow `/Users/<name>/.agents/common-agents/code-reviewe
 변경된 동작:
 
 1. `agents.yaml`, `prompts/`, `workflows/`, `context/`, `hooks/`, `scripts/`는 기존처럼 `~/.claude/team/`에 복사한다.
-2. `agents/*.md`는 `~/.agents/adapters/claude/`에 복사한다.
-3. `~/.claude/agents/*.md`는 해당 adapter를 symlink로 참조한다.
-4. 기존 파일이 있고 `--force`가 없으면 덮어쓰지 않는다.
-5. `--force`로 교체할 때는 `~/.agents/backups/`에 백업한다.
+2. `agents/*.md`는 validator용 team package로 `~/.claude/team/agents/`에 복사한다.
+3. active Claude agent adapter는 `~/.agents/adapters/claude/`에 복사한다.
+4. `~/.claude/agents/*.md`는 해당 adapter를 symlink로 참조한다.
+5. 기존 active adapter 파일이 있고 `--force`가 없으면 덮어쓰지 않는다.
+6. `--force`로 교체할 때는 `~/.agents/backups/`에 백업한다.
 
 ## 5. 검증
 
@@ -113,7 +114,7 @@ Claude team system 검증:
 bash ~/.claude/team/scripts/validate-system.sh
 ```
 
-이 검증은 agent symlink뿐 아니라 YAML 파싱, `~/.claude/settings.json`, hooks, skills까지 함께 본다. Python `yaml` 모듈(PyYAML)이 없거나 isolated HOME에 settings가 없으면 shared agent 설치가 정상이어도 실패할 수 있다.
+이 검증은 agent symlink가 아니라 `~/.claude/team/agents/`의 team package agent 정의를 본다. 또한 YAML 파싱, `~/.claude/settings.json`, `~/.claude/settings.local.json`, hooks, skills까지 함께 본다. Python `yaml` 모듈(PyYAML)이 없거나 settings hooks가 없으면 shared agent 설치가 정상이어도 실패할 수 있다.
 
 검증 실패가 `~/.claude/team` 미설치 때문이면 `scripts/install-skills.sh --team <target>`을 먼저 실행한다. 기존 프로젝트 특화 전역 agent가 있는 경우 `--force` 없이 실행해 충돌 파일을 확인한다.
 

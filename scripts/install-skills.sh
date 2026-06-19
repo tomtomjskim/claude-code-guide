@@ -172,11 +172,12 @@ if [ "$INSTALL_TEAM" = true ]; then
     echo "--- Installing Team System ---"
 
     TEAM_DIR="$HOME/.claude/team"
+    TEAM_AGENTS_DIR="$TEAM_DIR/agents"
     SHARED_AGENTS_HOME="${SHARED_AGENTS_HOME:-$HOME/.agents}"
     SHARED_CLAUDE_ADAPTERS="$SHARED_AGENTS_HOME/adapters/claude"
     AGENTS_DST="$HOME/.claude/agents"
 
-    mkdir -p "$TEAM_DIR"/{prompts,workflows,context,hooks/scripts,scripts}
+    mkdir -p "$TEAM_DIR"/{agents,prompts,workflows,context,hooks/scripts,scripts}
     mkdir -p "$SHARED_CLAUDE_ADAPTERS" "$AGENTS_DST"
 
     # Copy team components
@@ -185,6 +186,7 @@ if [ "$INSTALL_TEAM" = true ]; then
     [ -d "$REPO_DIR/workflows" ] && cp -r "$REPO_DIR/workflows/"*.yaml "$TEAM_DIR/workflows/" 2>/dev/null && echo "  OK    workflows/ ($(ls -1 "$REPO_DIR/workflows/"*.yaml | wc -l) files)"
     [ -d "$REPO_DIR/context" ] && cp -r "$REPO_DIR/context/"* "$TEAM_DIR/context/" 2>/dev/null && echo "  OK    context/"
     [ -d "$REPO_DIR/hooks" ] && cp -r "$REPO_DIR/hooks/"* "$TEAM_DIR/hooks/" 2>/dev/null && echo "  OK    hooks/"
+    [ -d "$REPO_DIR/agents" ] && cp -r "$REPO_DIR/agents/"*.md "$TEAM_AGENTS_DIR/" 2>/dev/null && echo "  OK    team agents/ ($(ls -1 "$REPO_DIR/agents/"*.md | wc -l) files)"
     if [ -d "$REPO_DIR/agents" ]; then
         AGENT_COUNT=0
         AGENT_SKIPPED=0
@@ -242,6 +244,7 @@ if [ "$INSTALL_TEAM" = true ]; then
 
     echo ""
     echo "Team system installed to ~/.claude/team/"
+    echo "Validator agents are installed to ~/.claude/team/agents/."
     echo "Claude agents are installed via ~/.agents/adapters/claude/ symlinks."
     echo "Run 'bash ~/.claude/team/scripts/validate-system.sh' to verify."
 fi
