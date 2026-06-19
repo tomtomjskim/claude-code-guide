@@ -25,7 +25,7 @@ print_usage() {
     echo "  --force           Overwrite existing skills"
     echo "  --skills <list>   Install specific skills only (comma-separated)"
     echo "                    e.g., --skills dispatch,run,check-code"
-    echo "  --team            Also install team system (agents, prompts, workflows, hooks)"
+    echo "  --team            Also install team system; agents go through ~/.agents/adapters/claude symlinks"
     echo "  --list            List available skills and exit"
     echo "  --help            Show this help"
     echo ""
@@ -172,10 +172,12 @@ if [ "$INSTALL_TEAM" = true ]; then
     echo "--- Installing Team System ---"
 
     TEAM_DIR="$HOME/.claude/team"
+    SHARED_AGENTS_HOME="${SHARED_AGENTS_HOME:-$HOME/.agents}"
+    SHARED_CLAUDE_ADAPTERS="$SHARED_AGENTS_HOME/adapters/claude"
     AGENTS_DST="$HOME/.claude/agents"
 
     mkdir -p "$TEAM_DIR"/{prompts,workflows,context,hooks/scripts,scripts}
-    mkdir -p "$AGENTS_DST"
+    mkdir -p "$SHARED_CLAUDE_ADAPTERS" "$AGENTS_DST"
 
     # Copy team components
     [ -f "$REPO_DIR/agents.yaml" ] && cp "$REPO_DIR/agents.yaml" "$TEAM_DIR/" && echo "  OK    agents.yaml"
@@ -183,7 +185,55 @@ if [ "$INSTALL_TEAM" = true ]; then
     [ -d "$REPO_DIR/workflows" ] && cp -r "$REPO_DIR/workflows/"*.yaml "$TEAM_DIR/workflows/" 2>/dev/null && echo "  OK    workflows/ ($(ls -1 "$REPO_DIR/workflows/"*.yaml | wc -l) files)"
     [ -d "$REPO_DIR/context" ] && cp -r "$REPO_DIR/context/"* "$TEAM_DIR/context/" 2>/dev/null && echo "  OK    context/"
     [ -d "$REPO_DIR/hooks" ] && cp -r "$REPO_DIR/hooks/"* "$TEAM_DIR/hooks/" 2>/dev/null && echo "  OK    hooks/"
-    [ -d "$REPO_DIR/agents" ] && cp -r "$REPO_DIR/agents/"*.md "$AGENTS_DST/" 2>/dev/null && echo "  OK    agents/ ($(ls -1 "$REPO_DIR/agents/"*.md | wc -l) files)"
+    if [ -d "$REPO_DIR/agents" ]; then
+        AGENT_COUNT=0
+        AGENT_SKIPPED=0
+        AGENT_BACKUP_DIR="$SHARED_AGENTS_HOME/backups/claude-team-agents-$(date +%Y%m%d-%H%M%S)"
+
+        for agent_file in "$REPO_DIR/agents/"*.md; do
+            [ -f "$agent_file" ] || continue
+            agent_name=$(basename "$agent_file")
+            adapter_path="$SHARED_CLAUDE_ADAPTERS/$agent_name"
+            link_path="$AGENTS_DST/$agent_name"
+
+            if { [ -e "$adapter_path" ] || [ -L "$adapter_path" ]; } && [ "$FORCE" = false ]; then
+                if [ ! -e "$link_path" ] && [ ! -L "$link_path" ]; then
+                    ln -s "$adapter_path" "$link_path"
+                    echo "  OK    ~/.claude/agents/$agent_name -> shared adapter"
+                    AGENT_COUNT=$((AGENT_COUNT + 1))
+                else
+                    echo "  SKIP  agents/$agent_name (shared adapter exists, use --force to overwrite)"
+                    AGENT_SKIPPED=$((AGENT_SKIPPED + 1))
+                fi
+                continue
+            fi
+
+            if { [ -e "$adapter_path" ] || [ -L "$adapter_path" ]; } && [ "$FORCE" = true ]; then
+                mkdir -p "$AGENT_BACKUP_DIR/adapters"
+                mv "$adapter_path" "$AGENT_BACKUP_DIR/adapters/"
+            fi
+
+            cp "$agent_file" "$adapter_path"
+
+            if [ -L "$link_path" ]; then
+                mkdir -p "$AGENT_BACKUP_DIR/links"
+                mv "$link_path" "$AGENT_BACKUP_DIR/links/"
+            elif [ -e "$link_path" ]; then
+                if [ "$FORCE" = false ]; then
+                    echo "  SKIP  ~/.claude/agents/$agent_name (file exists, use --force to replace with symlink)"
+                    AGENT_SKIPPED=$((AGENT_SKIPPED + 1))
+                    continue
+                fi
+                mkdir -p "$AGENT_BACKUP_DIR/global"
+                mv "$link_path" "$AGENT_BACKUP_DIR/global/"
+            fi
+
+            ln -s "$adapter_path" "$link_path"
+            AGENT_COUNT=$((AGENT_COUNT + 1))
+        done
+
+        echo "  OK    agents/ ($AGENT_COUNT symlinked via ~/.agents/adapters/claude, $AGENT_SKIPPED skipped)"
+    fi
     [ -d "$REPO_DIR/scripts" ] && cp "$REPO_DIR/scripts/"*.sh "$TEAM_DIR/scripts/" 2>/dev/null && echo "  OK    scripts/"
 
     # Set executable permissions
@@ -192,6 +242,7 @@ if [ "$INSTALL_TEAM" = true ]; then
 
     echo ""
     echo "Team system installed to ~/.claude/team/"
+    echo "Claude agents are installed via ~/.agents/adapters/claude/ symlinks."
     echo "Run 'bash ~/.claude/team/scripts/validate-system.sh' to verify."
 fi
 

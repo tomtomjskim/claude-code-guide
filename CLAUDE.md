@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `skills/` → copied into target project's `.claude/skills/` by `scripts/install-skills.sh`
 - `hooks/boilerplates/` → copied into target's `.claude/hooks/` by `scripts/install-hooks.sh` (also patches `.claude/settings.local.json` via `jq`)
-- `agents/`, `prompts/`, `workflows/`, `context/`, `agents.yaml` → copied into `~/.claude/team/` and `~/.claude/agents/` by `install-skills.sh --team`
+- `agents/`, `prompts/`, `workflows/`, `context/`, `agents.yaml` → team assets copied into `~/.claude/team/`; agent frontmatter copied into `~/.agents/adapters/claude/` and symlinked from `~/.claude/agents/` by `install-skills.sh --team`
 
 There is no `package.json`, no test runner, no lint config at the repo root. The deliverables are bash + markdown + YAML.
 
@@ -54,6 +54,7 @@ When designing a new feature, ask "which of the five does this live in?" before 
 
 - `hooks/boilerplates/*.sh` — **user-facing templates** shipped by `install-hooks.sh`. Each contains a `🔧 커스터마이징 영역` block. Edit here to change what ships to new projects.
 - `hooks/scripts/*.reference.sh` — **reference implementation** for the team system. Installed under `~/.claude/team/hooks/scripts/` by `--team`. Do not edit these for project-level customization.
+- `agents/*.md` — Claude team agent adapters. `install-skills.sh --team` installs them through `~/.agents/adapters/claude/` and leaves `~/.claude/agents/*.md` as symlinks. Do not put project-specific rules in global adapters; keep them in `<repo>/.claude/agents/`.
 
 **This repo's own active hooks** are registered in `.claude/settings.local.json` (gitignored) pointing *directly* to `hooks/boilerplates/{guard-agent,audit-agent}.sh`. Downstream projects that run `install-hooks.sh` get a per-project copy at `.claude/hooks/<hook>.sh` (intended fork point for CUSTOMIZE blocks) — this repo bypasses that copy layer because it doesn't customize the hooks, keeping `hooks/boilerplates/` as the SSOT.
 
