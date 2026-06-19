@@ -53,12 +53,14 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 34 | [DESIGN.md 운영 모델](34-design-md-operating-model.md) | DESIGN.md 개념 주입, 토큰 보일러플레이트, 버전 관리, 실행 태스크 |
 | 35 | [DESIGN.md 도입 평가 케이스](35-design-md-adoption-cases.md) | 비권장 시그널, 부분 도입 권장 요소, 케이스 스터디, downstream 평가 절차 |
 | 36 | [Agent Tools And Hermes Web UI](36-agent-tools-and-hermes-web-ui.md) | Hermes Agent gateway, Office Web UI, Electron webview 진단 기준 |
+| 37 | [Codex App 지침과 Hook Hardening](37-codex-app-instructions-hardening.md) | Codex App `AGENTS.md`, custom agent, trusted scope, hook pilot 운영 기준 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |
 |------|------|------|
 | Workflow Guide (상세) | [`.claude/workflow-commands-guide.md`](../.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 (셋업, Agent 전략, 팀 패턴) |
 | DESIGN.md System Guide | [`design-md-system-guide.html`](design-md-system-guide.html) | DESIGN.md 시스템 학습용 HTML 다이어그램과 검색 가능한 UI/UX 용어 사전 |
+| v4.6 Changelog | [`v4.6-changelog.md`](v4.6-changelog.md) | Codex App instruction/hook hardening parity 릴리즈 노트 |
 | v4.5 Changelog | [`v4.5-changelog.md`](v4.5-changelog.md) | Agent Operating Kernel adapter 릴리즈 노트 |
 | v4.4 Changelog | [`v4.4-changelog.md`](v4.4-changelog.md) | 외부 agent skill 패턴 도입 릴리즈 노트 |
 | v4.3 Changelog | [`v4.3-changelog.md`](v4.3-changelog.md) | PDARR + Goal-runtime 정렬 (`/breakdown` 신규, `/prd --vibe` 모드) |
