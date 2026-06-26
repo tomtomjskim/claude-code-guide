@@ -95,6 +95,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
+- [`docs/v4.8-changelog.md`](docs/v4.8-changelog.md) — **v4.8 릴리즈 노트** (Goal Audit Skill Pilot)
+- [`docs/39-goal-audit-skill-pilot.md`](docs/39-goal-audit-skill-pilot.md) — 장기 목표, resume, 다음 작업 루프 audit 기준
 - [`docs/v4.7-changelog.md`](docs/v4.7-changelog.md) — **v4.7 릴리즈 노트** (Shared Agent Rules)
 - [`docs/38-shared-agent-rules.md`](docs/38-shared-agent-rules.md) — Claude/Codex 공통 agent rule 디렉터리 운영 기준
 - [`docs/v4.6-changelog.md`](docs/v4.6-changelog.md) — **v4.6 릴리즈 노트** (Codex App instruction/hook hardening parity)
@@ -149,6 +151,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v4.5 신규**: Agent/Model Routing Card — 작업 유형별 agent/model/effort 선택 기준
 - **v4.6 신규**: Codex App instruction/hook hardening parity — `AGENTS.md`, `.codex/agents/*.toml`, trusted scope, hook pilot 운영 기준
 - **v4.7 신규**: Shared Agent Rules — `~/.agents/common-agents` 원천, Claude/Codex adapter, 프로젝트 agent 우선순위
+- **v4.8 신규**: Goal Audit Skill Pilot — `/goal-audit` 스킬, Codex `$goal-audit` 대응, 기대/실제 결과 비교 파일럿
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
@@ -161,7 +164,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 
 ```
 claude-code-guide/
-├── skills/               # 🆕 19개 PDARR 워크플로우 커스텀 스킬 (.claude/skills/ 호환)
+├── skills/               # 🆕 20개 PDARR 워크플로우 커스텀 스킬 (.claude/skills/ 호환)
 │   ├── dispatch/         # 스마트 라우터
 │   ├── prd/              # PRD 작성
 │   ├── analyze/          # 코드베이스 분석
@@ -170,6 +173,7 @@ claude-code-guide/
 │   ├── check-code/       # 코드 검수 (6단계)
 │   ├── workflow/         # PDARR 오케스트레이터
 │   ├── design-creative/  # 🆕 CREATIVE 모드 디자인 스킬
+│   ├── goal-audit/       # 🆕 장기 목표와 다음 작업 루프 audit
 │   └── ...               # + 10개 더 (test, reflect, stage 등)
 ├── agents.yaml           # 16 에이전트 설정 (모델 라우팅, 토큰 예산, blast-radius)
 ├── agents/               # 15 서브에이전트 frontmatter 정의 (.md)
@@ -182,7 +186,7 @@ claude-code-guide/
 │   ├── event-driven-review.yaml
 │   └── scripts/          # v3.2 레퍼런스 구현
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh + preflight-collect.sh
-├── docs/                 # 38편 가이드 문서 (v4.7: Shared Agent Rules 포함)
+├── docs/                 # 39편 가이드 문서 (v4.8: Goal Audit Skill Pilot 포함)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿, kernel adapter
 ├── QUICKSTART.md
 └── README.md
@@ -305,7 +309,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | 13 | [핸드오프 & 실패 복구](docs/13-handoff-and-failure.md) | 실전 가이드 (설정, 예시, 템플릿) |
 | **14** | **[프리셋 시스템](docs/14-preset-system.md)** | **깊이(depth) x 실행(mode) 2축 체계. analyze/spec/check-code 프리셋** |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
-| -- | **[Skills README](skills/README.md)** | **19개 커스텀 스킬 설치/커스터마이징 가이드** |
+| -- | **[Skills README](skills/README.md)** | **20개 커스텀 스킬 설치/커스터마이징 가이드** |
 | -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |
 | -- | **[v3 Changelog](docs/v3-changelog.md)** | **v3.0→v3.2 전체 변경 이력 (릴리즈 노트)** |
 

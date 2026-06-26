@@ -75,6 +75,7 @@ bash scripts/install-skills.sh --list
 | **workflow** | `/workflow {기능}` | PDARR 전체 사이클 자동 실행 |
 | **profile** | `/profile {대상}` | 성능 프로파일링 코드 삽입 |
 | **design-creative** | `/design-creative {대상}` | CREATIVE 모드 디자인 (랜딩페이지·프로토타입). 토큰 매핑 단계 필수 |
+| **goal-audit** | `/goal-audit` | 장기 목표, resume, 반복 다음 작업 루프의 계속/완료/차단/재계획/핸드오프 판정 |
 | **setup-wizard** | `/setup-wizard [--profile X]` | claude-code-guide 자동 설치 마법사. 프로젝트 분석 → 프로파일 추천 → 원라이너 실행. 전역 설치 후 모든 프로젝트에서 호출 가능 |
 
 ---
@@ -193,6 +194,7 @@ skills/
 │       └── pdarr-agent-prompt.md
 ├── profile/SKILL.md       # 성능 프로파일링
 ├── design-creative/SKILL.md  # CREATIVE 모드 디자인 (랜딩/프로토타입)
+├── goal-audit/SKILL.md    # 장기 목표와 다음 작업 루프 audit
 └── setup-wizard/SKILL.md  # claude-code-guide 자동 설치 마법사
 ```
 

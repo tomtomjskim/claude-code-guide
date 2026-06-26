@@ -67,6 +67,7 @@ list_skills() {
     echo "  workflow      Full PDARR orchestrator"
     echo "  profile       Performance profiling"
     echo "  design-creative CREATIVE mode design (landing/prototype)"
+    echo "  goal-audit    Long-running goal and next-step loop audit"
     echo "  setup-wizard  Auto-install claude-code-guide (profile-aware)"
 }
 
