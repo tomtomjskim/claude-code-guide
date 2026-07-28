@@ -99,10 +99,11 @@ bash scripts/manage-install.sh uninstall --target <project>
 - 새 enterprise manifest는 Claude home의 `team/`만 소유한다. 과거 state의
   `claude-home:agents/*`는 v4.8 재설치 때 파일을 건드리지 않고 소유권만
   relinquish하며, 이후 repair/uninstall 대상에서 제외한다.
-- standalone installer는 target과 project `.claude`, skill/hook destination
-  symlink를 거부하고 Hook 이름을 catalog allowlist로 제한한다. 비transaction
-  `--team`은 adapter/active pair 중 하나라도 있으면 `--force` 없이는 둘 다
-  변경하지 않는다.
+- standalone installer는 target과 project `.claude`, skill/hook/team/shared adapter
+  destination의 모든 directory component와 file leaf symlink를 거부하고 Hook 이름을
+  catalog allowlist로 제한한다. 따라서 `--force`도 symlink를 따라 외부 파일을
+  덮어쓰지 않는다. 비transaction `--team`은 adapter/active pair 중 하나라도 있으면
+  `--force` 없이는 둘 다 변경하지 않는다.
 
 여기서 `doctor`와 `--dry-run`의 읽기 전용 범위는 managed target 파일과 install-state다.
 동시 lifecycle 작업을 배제하기 위한 XDG state home의 target별 lock directory/file은

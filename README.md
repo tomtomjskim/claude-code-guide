@@ -159,7 +159,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v4.6 신규**: Codex App instruction/hook hardening parity — `AGENTS.md`, `.codex/agents/*.toml`, trusted scope, hook pilot 운영 기준
 - **v4.7 신규**: Shared Agent Rules — `~/.agents/common-agents` 원천, Claude/Codex adapter, 프로젝트 agent 우선순위
 - **v4.8 신규**: session별 private Hook state, crash-safe install WAL,
-  standalone installer symlink/traversal 차단, legacy active-agent ownership 이관
+  standalone installer의 모든 destination component/leaf symlink 및 traversal 차단,
+  legacy active-agent ownership 이관
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용

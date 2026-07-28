@@ -104,6 +104,79 @@ class StandaloneInstallerSafetyTest(unittest.TestCase):
 
         self.assertEqual(list(outside.iterdir()), [])
 
+    def test_skill_installer_rejects_symlinked_leaf_before_force_copy(self):
+        outside = self.root / "outside-skill.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        destination = (
+            self.target
+            / ".claude"
+            / "skills"
+            / "dispatch"
+            / "SKILL.md"
+        )
+        destination.parent.mkdir(parents=True)
+        destination.symlink_to(outside)
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--force",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(outside.read_text(encoding="utf-8"), "outside\n")
+        self.assertTrue(destination.is_symlink())
+
+    def test_skill_installer_rejects_dangling_leaf_before_force_copy(self):
+        missing = self.root / "missing-skill.md"
+        destination = (
+            self.target
+            / ".claude"
+            / "skills"
+            / "dispatch"
+            / "SKILL.md"
+        )
+        destination.parent.mkdir(parents=True)
+        destination.symlink_to(missing)
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--force",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertFalse(missing.exists())
+        self.assertTrue(destination.is_symlink())
+
+    def test_skill_installer_rejects_symlinked_nested_directory(self):
+        outside = self.root / "outside-references"
+        outside.mkdir()
+        skill_root = self.target / ".claude" / "skills" / "reflect"
+        skill_root.mkdir(parents=True)
+        (skill_root / "references").symlink_to(
+            outside,
+            target_is_directory=True,
+        )
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--force",
+            "--skills",
+            "reflect",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(list(outside.iterdir()), [])
+
     def test_hook_installer_rejects_non_catalog_traversal_name(self):
         outside_destination = self.target / "scripts"
         outside_destination.mkdir()
@@ -208,6 +281,76 @@ class StandaloneInstallerSafetyTest(unittest.TestCase):
         self.assertEqual(os.readlink(active), str(missing_target))
         self.assertFalse(adapter.exists())
         self.assertFalse(adapter.is_symlink())
+
+    def test_team_installer_rejects_symlinked_team_root(self):
+        outside = self.root / "outside-team"
+        outside.mkdir()
+        claude_home = Path(self.env["CLAUDE_CONFIG_DIR"])
+        claude_home.mkdir()
+        (claude_home / "team").symlink_to(
+            outside,
+            target_is_directory=True,
+        )
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--team",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_team_installer_rejects_symlinked_team_leaf(self):
+        outside = self.root / "outside-prompt.md"
+        outside.write_text("outside\n", encoding="utf-8")
+        prompt = (
+            Path(self.env["CLAUDE_CONFIG_DIR"])
+            / "team"
+            / "prompts"
+            / "pm.md"
+        )
+        prompt.parent.mkdir(parents=True)
+        prompt.symlink_to(outside)
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--team",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(outside.read_text(encoding="utf-8"), "outside\n")
+        self.assertTrue(prompt.is_symlink())
+
+    def test_team_installer_rejects_symlinked_shared_adapter_root(self):
+        outside = self.root / "outside-adapters"
+        outside.mkdir()
+        adapters = (
+            Path(self.env["SHARED_AGENTS_HOME"])
+            / "adapters"
+            / "claude"
+        )
+        adapters.parent.mkdir(parents=True)
+        adapters.symlink_to(outside, target_is_directory=True)
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--team",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("symlink", result.stderr.lower())
+        self.assertEqual(list(outside.iterdir()), [])
 
 
 if __name__ == "__main__":

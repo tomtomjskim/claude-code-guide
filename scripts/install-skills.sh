@@ -13,33 +13,134 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_SRC="$REPO_DIR/skills"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
-prepare_project_directory() {
-    local path="$1"
-    local resolved
+prepare_safe_tree_directory() {
+    local root="${1%/}"
+    local path="${2%/}"
+    local label="${3:-install path}"
+    local root_resolved resolved relative component current
+    local -a components
+
+    if [ -z "$root" ] || [ "$root" = "/" ]; then
+        echo "ERROR: $label root must not be the filesystem root" >&2
+        exit 1
+    fi
+    if [ -L "$root" ]; then
+        echo "ERROR: $label root must not be a symlink: $root" >&2
+        exit 1
+    fi
+    if [ -e "$root" ] && [ ! -d "$root" ]; then
+        echo "ERROR: $label root must be a directory: $root" >&2
+        exit 1
+    fi
+    mkdir -p "$root"
+    root_resolved="$(cd "$root" && pwd -P)"
+
     case "$path" in
-        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        "$root")
+            relative=""
+            ;;
+        "$root/"*)
+            relative="${path#"$root"/}"
+            ;;
         *)
-            echo "ERROR: project install path escapes target: $path" >&2
+            echo "ERROR: $label escapes its allowed root: $path" >&2
             exit 1
             ;;
     esac
-    if [ -L "$path" ]; then
-        echo "ERROR: project install path must not be a symlink: $path" >&2
-        exit 1
+
+    current="$root"
+    if [ -n "$relative" ]; then
+        IFS='/' read -r -a components <<< "$relative"
+        for component in "${components[@]}"; do
+            if [ -z "$component" ] || [ "$component" = "." ] || [ "$component" = ".." ]; then
+                echo "ERROR: unsafe $label component: $path" >&2
+                exit 1
+            fi
+            current="$current/$component"
+            if [ -L "$current" ]; then
+                echo "ERROR: $label must not contain a symlink: $current" >&2
+                exit 1
+            fi
+            if [ -e "$current" ] && [ ! -d "$current" ]; then
+                echo "ERROR: $label component must be a directory: $current" >&2
+                exit 1
+            fi
+            mkdir -p "$current"
+        done
     fi
-    if [ -e "$path" ] && [ ! -d "$path" ]; then
-        echo "ERROR: project install path must be a directory: $path" >&2
-        exit 1
-    fi
-    mkdir -p "$path"
+
     resolved="$(cd "$path" && pwd -P)"
     case "$resolved" in
-        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        "$root_resolved"|"$root_resolved/"*) ;;
         *)
-            echo "ERROR: project install path resolves outside target: $path" >&2
+            echo "ERROR: $label resolves outside its allowed root: $path" >&2
             exit 1
             ;;
     esac
+}
+
+prepare_project_directory() {
+    prepare_safe_tree_directory "$TARGET" "$1" "project install path"
+}
+
+copy_file_safely() {
+    local root="$1"
+    local source="$2"
+    local destination="$3"
+    local label="${4:-install destination}"
+    local parent
+
+    if [ -L "$source" ] || [ ! -f "$source" ]; then
+        echo "ERROR: source must be a regular non-symlink file: $source" >&2
+        exit 1
+    fi
+
+    parent="$(dirname "$destination")"
+    prepare_safe_tree_directory "$root" "$parent" "$label"
+    if [ -L "$destination" ]; then
+        echo "ERROR: $label leaf must not be a symlink: $destination" >&2
+        exit 1
+    fi
+    if [ -e "$destination" ] && [ ! -f "$destination" ]; then
+        echo "ERROR: $label leaf must be a regular file: $destination" >&2
+        exit 1
+    fi
+    cp "$source" "$destination"
+}
+
+copy_tree_safely() {
+    local root="$1"
+    local source_root="${2%/}"
+    local destination_root="${3%/}"
+    local label="${4:-install destination}"
+    local source relative
+
+    if [ -L "$source_root" ] || [ ! -d "$source_root" ]; then
+        echo "ERROR: source tree must be a non-symlink directory: $source_root" >&2
+        exit 1
+    fi
+    if find "$source_root" -type l -print -quit | grep -q .; then
+        echo "ERROR: source tree must not contain symlinks: $source_root" >&2
+        exit 1
+    fi
+
+    prepare_safe_tree_directory "$root" "$destination_root" "$label"
+    while IFS= read -r -d '' source; do
+        relative="${source#"$source_root"/}"
+        prepare_safe_tree_directory \
+            "$root" \
+            "$destination_root/$relative" \
+            "$label"
+    done < <(find "$source_root" -mindepth 1 -type d -print0 | sort -z)
+
+    while IFS= read -r -d '' source; do
+        relative="${source#"$source_root"/}"
+        copy_file_safely \
+            "$root" \
+            "$source" \
+            "$destination_root/$relative" \
+            "$label"
+    done < <(find "$source_root" -type f -print0 | sort -z)
 }
 
 publish_managed_file() {
@@ -239,8 +340,11 @@ for skill_dir in "${SKILL_DIRS[@]}"; do
             "${skill_dir%/}" \
             "skills/$skill_name"
     else
-        mkdir -p "$target_dir"
-        cp -R "$skill_dir". "$target_dir"/
+        copy_tree_safely \
+            "$TARGET/.claude" \
+            "${skill_dir%/}" \
+            "$target_dir" \
+            "skill destination"
     fi
     echo "  OK    $skill_name"
     INSTALLED=$((INSTALLED + 1))
@@ -257,7 +361,19 @@ if [ "$INSTALL_TEAM" = true ]; then
     SHARED_CLAUDE_ADAPTERS="$SHARED_AGENTS_HOME/adapters/claude"
     AGENTS_DST="$CLAUDE_HOME/agents"
 
-    mkdir -p "$TEAM_DIR"/{agents,prompts,workflows,context,hooks/scripts,scripts}
+    prepare_safe_tree_directory "$CLAUDE_HOME" "$CLAUDE_HOME" "Claude config"
+    for destination in \
+        "$TEAM_DIR/agents" \
+        "$TEAM_DIR/prompts" \
+        "$TEAM_DIR/workflows" \
+        "$TEAM_DIR/context" \
+        "$TEAM_DIR/hooks/scripts" \
+        "$TEAM_DIR/scripts"; do
+        prepare_safe_tree_directory \
+            "$CLAUDE_HOME" \
+            "$destination" \
+            "team destination"
+    done
 
     # Copy team components
     if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
@@ -283,13 +399,65 @@ if [ "$INSTALL_TEAM" = true ]; then
         done
         echo "  OK    scripts/"
     else
-        mkdir -p "$SHARED_CLAUDE_ADAPTERS" "$AGENTS_DST"
-        [ -f "$REPO_DIR/agents.yaml" ] && cp "$REPO_DIR/agents.yaml" "$TEAM_DIR/" && echo "  OK    agents.yaml"
-        [ -d "$REPO_DIR/prompts" ] && cp -r "$REPO_DIR/prompts/"*.md "$TEAM_DIR/prompts/" 2>/dev/null && echo "  OK    prompts/ ($(ls -1 "$REPO_DIR/prompts/"*.md | wc -l) files)"
-        [ -d "$REPO_DIR/workflows" ] && cp -r "$REPO_DIR/workflows/"*.yaml "$TEAM_DIR/workflows/" 2>/dev/null && echo "  OK    workflows/ ($(ls -1 "$REPO_DIR/workflows/"*.yaml | wc -l) files)"
-        [ -d "$REPO_DIR/context" ] && cp -r "$REPO_DIR/context/"* "$TEAM_DIR/context/" 2>/dev/null && echo "  OK    context/"
-        [ -d "$REPO_DIR/hooks" ] && cp -r "$REPO_DIR/hooks/"* "$TEAM_DIR/hooks/" 2>/dev/null && echo "  OK    hooks/"
-        [ -d "$REPO_DIR/agents" ] && cp -r "$REPO_DIR/agents/"*.md "$TEAM_AGENTS_DIR/" 2>/dev/null && echo "  OK    team agents/ ($(ls -1 "$REPO_DIR/agents/"*.md | wc -l) files)"
+        prepare_safe_tree_directory \
+            "$SHARED_AGENTS_HOME" \
+            "$SHARED_AGENTS_HOME" \
+            "shared agents root"
+        prepare_safe_tree_directory \
+            "$SHARED_AGENTS_HOME" \
+            "$SHARED_CLAUDE_ADAPTERS" \
+            "shared adapter destination"
+        prepare_safe_tree_directory \
+            "$CLAUDE_HOME" \
+            "$AGENTS_DST" \
+            "active agent destination"
+        if [ -f "$REPO_DIR/agents.yaml" ]; then
+            copy_file_safely \
+                "$CLAUDE_HOME" \
+                "$REPO_DIR/agents.yaml" \
+                "$TEAM_DIR/agents.yaml" \
+                "team destination"
+            echo "  OK    agents.yaml"
+        fi
+        PROMPT_COUNT=0
+        for source in "$REPO_DIR/prompts/"*.md; do
+            [ -f "$source" ] || continue
+            copy_file_safely \
+                "$CLAUDE_HOME" \
+                "$source" \
+                "$TEAM_DIR/prompts/$(basename "$source")" \
+                "team destination"
+            PROMPT_COUNT=$((PROMPT_COUNT + 1))
+        done
+        echo "  OK    prompts/ ($PROMPT_COUNT files)"
+        WORKFLOW_COUNT=0
+        for source in "$REPO_DIR/workflows/"*.yaml; do
+            [ -f "$source" ] || continue
+            copy_file_safely \
+                "$CLAUDE_HOME" \
+                "$source" \
+                "$TEAM_DIR/workflows/$(basename "$source")" \
+                "team destination"
+            WORKFLOW_COUNT=$((WORKFLOW_COUNT + 1))
+        done
+        echo "  OK    workflows/ ($WORKFLOW_COUNT files)"
+        [ -d "$REPO_DIR/context" ] \
+            && copy_tree_safely "$CLAUDE_HOME" "$REPO_DIR/context" "$TEAM_DIR/context" "team destination" \
+            && echo "  OK    context/"
+        [ -d "$REPO_DIR/hooks" ] \
+            && copy_tree_safely "$CLAUDE_HOME" "$REPO_DIR/hooks" "$TEAM_DIR/hooks" "team destination" \
+            && echo "  OK    hooks/"
+        TEAM_AGENT_COUNT=0
+        for source in "$REPO_DIR/agents/"*.md; do
+            [ -f "$source" ] || continue
+            copy_file_safely \
+                "$CLAUDE_HOME" \
+                "$source" \
+                "$TEAM_AGENTS_DIR/$(basename "$source")" \
+                "team destination"
+            TEAM_AGENT_COUNT=$((TEAM_AGENT_COUNT + 1))
+        done
+        echo "  OK    team agents/ ($TEAM_AGENT_COUNT files)"
         if [ -d "$REPO_DIR/agents" ]; then
             AGENT_COUNT=0
             AGENT_SKIPPED=0
@@ -311,14 +479,24 @@ if [ "$INSTALL_TEAM" = true ]; then
                 fi
 
                 if { [ -e "$adapter_path" ] || [ -L "$adapter_path" ]; } && [ "$FORCE" = true ]; then
-                    mkdir -p "$AGENT_BACKUP_DIR/adapters"
+                    prepare_safe_tree_directory \
+                        "$SHARED_AGENTS_HOME" \
+                        "$AGENT_BACKUP_DIR/adapters" \
+                        "agent backup destination"
                     mv "$adapter_path" "$AGENT_BACKUP_DIR/adapters/"
                 fi
 
-                cp "$agent_file" "$adapter_path"
+                copy_file_safely \
+                    "$SHARED_AGENTS_HOME" \
+                    "$agent_file" \
+                    "$adapter_path" \
+                    "shared adapter destination"
 
                 if [ -L "$link_path" ]; then
-                    mkdir -p "$AGENT_BACKUP_DIR/links"
+                    prepare_safe_tree_directory \
+                        "$SHARED_AGENTS_HOME" \
+                        "$AGENT_BACKUP_DIR/links" \
+                        "agent backup destination"
                     mv "$link_path" "$AGENT_BACKUP_DIR/links/"
                 elif [ -e "$link_path" ]; then
                     if [ "$FORCE" = false ]; then
@@ -326,7 +504,10 @@ if [ "$INSTALL_TEAM" = true ]; then
                         AGENT_SKIPPED=$((AGENT_SKIPPED + 1))
                         continue
                     fi
-                    mkdir -p "$AGENT_BACKUP_DIR/global"
+                    prepare_safe_tree_directory \
+                        "$SHARED_AGENTS_HOME" \
+                        "$AGENT_BACKUP_DIR/global" \
+                        "agent backup destination"
                     mv "$link_path" "$AGENT_BACKUP_DIR/global/"
                 fi
 
@@ -336,12 +517,22 @@ if [ "$INSTALL_TEAM" = true ]; then
 
             echo "  OK    agents/ ($AGENT_COUNT symlinked via ~/.agents/adapters/claude, $AGENT_SKIPPED skipped)"
         fi
-        [ -d "$REPO_DIR/scripts" ] && cp "$REPO_DIR/scripts/"*.sh "$TEAM_DIR/scripts/" 2>/dev/null && echo "  OK    scripts/"
+        SCRIPT_COUNT=0
+        for source in "$REPO_DIR/scripts/"*.sh; do
+            [ -f "$source" ] || continue
+            copy_file_safely \
+                "$CLAUDE_HOME" \
+                "$source" \
+                "$TEAM_DIR/scripts/$(basename "$source")" \
+                "team destination"
+            SCRIPT_COUNT=$((SCRIPT_COUNT + 1))
+        done
+        echo "  OK    scripts/ ($SCRIPT_COUNT files)"
     fi
 
     # Set executable permissions
-    chmod +x "$TEAM_DIR/hooks/scripts/"*.sh 2>/dev/null
-    chmod +x "$TEAM_DIR/scripts/"*.sh 2>/dev/null
+    find "$TEAM_DIR/hooks/scripts" "$TEAM_DIR/scripts" \
+        -type f -name '*.sh' -exec chmod +x {} +
 
     echo ""
     echo "Team system installed to $TEAM_DIR/"

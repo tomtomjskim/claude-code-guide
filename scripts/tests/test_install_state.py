@@ -1206,28 +1206,36 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertEqual(concurrent.read_text(encoding="utf-8"), "preserve me\n")
 
     def test_new_manifest_rejects_active_claude_agent_ownership(self):
-        result = self.run_cli(
-            "begin",
-            "--target",
-            self.target,
-            "--output",
-            self.transaction,
-            "--claude-home",
-            self.claude_home,
-            "--source",
-            REPO_ROOT,
-            "--profile",
-            "enterprise",
-            "--source-revision",
-            "test-revision",
-            "--managed-file",
-            "claude-home:agents/code-reviewer.md",
-            "--include-home",
-            expected=2,
-        )
+        for index, managed_path in enumerate(
+            (
+                "claude-home:agents/code-reviewer.md",
+                "claude-home:team",
+            )
+        ):
+            with self.subTest(managed_path=managed_path):
+                transaction = self.root / f"rejected-transaction-{index}"
+                result = self.run_cli(
+                    "begin",
+                    "--target",
+                    self.target,
+                    "--output",
+                    transaction,
+                    "--claude-home",
+                    self.claude_home,
+                    "--source",
+                    REPO_ROOT,
+                    "--profile",
+                    "enterprise",
+                    "--source-revision",
+                    "test-revision",
+                    "--managed-file",
+                    managed_path,
+                    "--include-home",
+                    expected=2,
+                )
 
-        self.assertIn("team/", result.stderr)
-        self.assertFalse(self.transaction.exists())
+                self.assertIn("team/", result.stderr)
+                self.assertFalse(transaction.exists())
 
     def test_v48_reinstall_relinquishes_legacy_active_agent_ownership(self):
         source_agent = REPO_ROOT / "agents" / "code-reviewer.md"

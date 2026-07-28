@@ -228,9 +228,11 @@ def validate_scoped_path(scope: str, value: str) -> PurePosixPath:
 
 def validate_new_manifest_path(scope: str, value: str) -> PurePosixPath:
     relative = validate_scoped_path(scope, value)
-    if scope == "claude-home" and relative.parts[0] != "team":
+    if scope == "claude-home" and (
+        relative.parts[0] != "team" or len(relative.parts) < 2
+    ):
         raise InstallStateError(
-            "new Claude-home managed paths must stay under team/: "
+            "new Claude-home managed paths must stay under team/<path>: "
             f"{value}"
         )
     return relative
