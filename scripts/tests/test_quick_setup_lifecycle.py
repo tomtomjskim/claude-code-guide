@@ -1,8 +1,10 @@
 import json
 import os
+import signal
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -166,7 +168,8 @@ class QuickSetupLifecycleTest(unittest.TestCase):
             0,
             msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
         )
-        self.assertIn("--branch v4.5.0", result.stdout)
+        self.assertIn("preview only", result.stderr.lower())
+        self.assertIn("v4.5.0", result.stdout)
         self.assertFalse((self.target / ".claude").exists())
 
     def test_stdin_execution_does_not_misdetect_parent_as_local_checkout(self):
@@ -204,7 +207,37 @@ class QuickSetupLifecycleTest(unittest.TestCase):
             0,
             msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
         )
-        self.assertIn("--branch v4.5.0", result.stdout)
+        self.assertIn("preview only", result.stderr.lower())
+        self.assertIn("v4.5.0", result.stdout)
+
+    def test_remote_apply_rejects_moving_or_short_refs_before_network_access(self):
+        env = dict(self.env)
+        env.pop("CLAUDE_CODE_GUIDE_SOURCE")
+        for source_ref in ("main", "v4.5.0", "abcdef1"):
+            with self.subTest(source_ref=source_ref):
+                result = subprocess.run(
+                    [
+                        "bash",
+                        "-s",
+                        "--",
+                        "--profile",
+                        "solo",
+                        "--target",
+                        str(self.target),
+                        "--skip-stack",
+                        "--ref",
+                        source_ref,
+                    ],
+                    input=QUICK_SETUP.read_text(encoding="utf-8"),
+                    text=True,
+                    capture_output=True,
+                    env=env,
+                    cwd=self.target,
+                    check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("40-character commit", result.stderr)
+                self.assertFalse((self.target / ".claude").exists())
 
     def test_enterprise_install_validates_with_explicit_project_and_claude_home(self):
         self.run_command(
@@ -383,9 +416,137 @@ class QuickSetupLifecycleTest(unittest.TestCase):
         self.assertEqual(result.returncode, 42)
         self.assertEqual(existing.read_text(encoding="utf-8"), "keep-original\n")
         self.assertFalse((self.target / ".claude" / "skills" / "dispatch").exists())
-        self.assertFalse((self.target / ".claude" / "hooks" / "partial.sh").exists())
+        self.assertEqual(
+            (
+                self.target / ".claude" / "hooks" / "partial.sh"
+            ).read_text(encoding="utf-8"),
+            "partial\n",
+        )
         self.assertFalse(
             (self.target / ".claude" / "claude-code-guide-install-state.json").exists()
+        )
+
+    def test_preexisting_install_lock_blocks_a_second_install(self):
+        lock = self.target / ".claude" / ".claude-code-guide-install.lock"
+        lock.mkdir(parents=True)
+        result = subprocess.run(
+            [
+                "bash",
+                str(QUICK_SETUP),
+                "--profile",
+                "solo",
+                "--target",
+                str(self.target),
+                "--skip-stack",
+            ],
+            text=True,
+            capture_output=True,
+            env=self.env,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("install lock", result.stderr.lower())
+
+    def test_force_overlays_managed_files_without_deleting_user_additions(self):
+        extra = (
+            self.target
+            / ".claude"
+            / "skills"
+            / "dispatch"
+            / "USER-NOTES.md"
+        )
+        extra.parent.mkdir(parents=True)
+        extra.write_text("keep this file\n", encoding="utf-8")
+
+        self.run_command(
+            "bash",
+            QUICK_SETUP,
+            "--profile",
+            "solo",
+            "--target",
+            self.target,
+            "--skip-stack",
+            "--force",
+        )
+
+        self.assertEqual(extra.read_text(encoding="utf-8"), "keep this file\n")
+        self.assertTrue(
+            (
+                self.target
+                / ".claude"
+                / "skills"
+                / "dispatch"
+                / "SKILL.md"
+            ).is_file()
+        )
+
+    def test_term_signal_rolls_back_and_releases_install_lock(self):
+        slow_source = self.root / "slow-install-guide"
+        shutil.copytree(
+            REPO_ROOT,
+            slow_source,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+        )
+        marker = self.root / "hooks-started"
+        (slow_source / "scripts" / "install-hooks.sh").write_text(
+            "\n".join(
+                [
+                    "#!/bin/bash",
+                    f"touch {marker}",
+                    "sleep 30",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        env = {
+            **self.env,
+            "CLAUDE_CODE_GUIDE_SOURCE": str(slow_source),
+        }
+        process = subprocess.Popen(
+            [
+                "bash",
+                str(QUICK_SETUP),
+                "--profile",
+                "solo",
+                "--target",
+                str(self.target),
+                "--skip-stack",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 10
+        while not marker.exists() and process.poll() is None:
+            if time.monotonic() >= deadline:
+                process.kill()
+                self.fail("hook installer did not reach the signal checkpoint")
+            time.sleep(0.05)
+
+        os.killpg(process.pid, signal.SIGTERM)
+        stdout, stderr = process.communicate(timeout=10)
+        self.assertNotEqual(
+            process.returncode,
+            0,
+            msg=f"stdout:\n{stdout}\nstderr:\n{stderr}",
+        )
+        self.assertFalse((self.target / ".claude" / "skills" / "dispatch").exists())
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / ".claude-code-guide-install.lock"
+            ).exists()
+        )
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).exists()
         )
 
 

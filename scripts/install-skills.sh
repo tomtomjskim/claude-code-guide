@@ -158,11 +158,11 @@ for skill_dir in "${SKILL_DIRS[@]}"; do
     fi
 
     if [ -d "$target_dir" ] && [ "$FORCE" = true ]; then
-        rm -rf "$target_dir"
         OVERWRITTEN=$((OVERWRITTEN + 1))
     fi
 
-    cp -r "$skill_dir" "$target_dir"
+    mkdir -p "$target_dir"
+    cp -R "$skill_dir". "$target_dir"/
     echo "  OK    $skill_name"
     INSTALLED=$((INSTALLED + 1))
 done
@@ -193,7 +193,7 @@ if [ "$INSTALL_TEAM" = true ]; then
 
     echo ""
     echo "Team system installed to $TEAM_DIR/"
-    echo "Run 'bash $TEAM_DIR/scripts/validate-system.sh --claude-home $CLAUDE_HOME' to verify."
+    echo "Run 'bash $TEAM_DIR/scripts/validate-system.sh --project $TARGET --claude-home $CLAUDE_HOME' to verify."
 fi
 
 # --- Summary ---

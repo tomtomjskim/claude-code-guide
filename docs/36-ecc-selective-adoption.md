@@ -20,8 +20,9 @@ ECC의 대규모 agent/skill/command catalog는 기존 PDARR 체계와 중복되
 ## 설치 경계
 
 로컬 clone에서 `quick-setup.sh`를 실행하면 해당 checkout을 source로 사용한다.
-원격 bootstrap은 `--ref <tag-or-commit>`으로 내려받을 source를 고정한다.
-`main`을 사용할 수는 있지만 moving target 경고를 출력한다.
+원격 bootstrap dry-run은 이름 ref도 미리볼 수 있지만 실제 apply는 검토된
+full 40-character commit SHA만 허용한다. checkout 후 `HEAD`가 요청 SHA와 정확히
+일치하는지도 확인하며 branch, tag, short SHA, `main`은 네트워크 apply 전에 중단한다.
 
 설치 완료 시 target에 아래 상태 파일이 생긴다.
 
@@ -29,10 +30,13 @@ ECC의 대규모 agent/skill/command catalog는 기존 PDARR 체계와 중복되
 .claude/claude-code-guide-install-state.json
 ```
 
-파일에는 schema version, guide version, profile, 관리 파일의 상대 경로와 hash만
-기록한다. 변경 전·설치 후 파일 본문은 target이나 Git에 두지 않고
+파일에는 schema version, guide version, profile, target identity, resolved source
+revision, 관리 파일의 상대 경로·hash·mode·uid·gid를 기록한다. 변경 전·설치 후
+파일 본문은 target이나 Git에 두지 않고
 `CLAUDE_CODE_GUIDE_STATE_HOME` 또는 XDG user state 아래의 권한 제한 디렉터리에 둔다.
 `repair`와 `uninstall`은 해당 payload의 hash와 mode를 변경 전에 검증한다.
+상태 generation은 예측 불가능한 ID의 임시 디렉터리에서 완성·검증한 뒤 원자적으로
+publish하며, 새 state JSON이 확정된 뒤 이전 generation을 정리한다.
 
 enterprise profile은 project `.claude/`와 함께 해당 설치가 변경한 Claude home의
 `team/`, `agents/` 파일만 추적한다. 기존 설정, 사용자 skill, 다른 파일은 관리
@@ -43,9 +47,11 @@ enterprise validation 전에 install-state를 확정한다. validation이 실패
 명령은 실패 상태로 끝나지만, 생성된 상태를 이용해 `doctor`로 확인하거나
 `uninstall`로 설치 전 상태를 복원할 수 있다.
 
-skill/hook 설치 단계가 finalize 전에 실패하면 begin snapshot으로 부분 변경을
-자동 rollback한다. 자동 rollback까지 실패하면 원본 snapshot이 든 권한 제한
-임시 디렉터리를 삭제하지 않고 경로를 출력한다.
+skill/hook 설치 단계가 finalize 전에 실패하거나 `HUP`/`INT`/`TERM`을 받으면 begin
+snapshot으로 부분 변경을 자동 rollback한다. rollback은 profile/source에서 선언한
+정확한 write-set만 다루며, 동시 편집처럼 예상 hash와 다른 변경은 삭제하지 않고
+중단한다. target별 install lock이 병렬 설치를 막는다. 자동 rollback까지 실패하면
+원본 snapshot이 든 권한 제한 임시 디렉터리를 삭제하지 않고 경로를 출력한다.
 
 ## 운영 명령
 
@@ -57,11 +63,12 @@ bash scripts/manage-install.sh uninstall --target <project> --dry-run --json
 bash scripts/manage-install.sh uninstall --target <project>
 ```
 
-- `doctor`: 관리 파일의 누락, 내용·mode drift를 읽기 전용으로 검사한다.
+- `doctor`: 관리 파일의 누락, 내용·mode·ownership drift를 읽기 전용으로 검사한다.
 - `repair`: drift가 있는 관리 파일만 설치 완료 snapshot으로 복구한다.
 - `uninstall`: drift가 없을 때 설치 전 파일을 복원하고 설치가 만든 파일만 제거한다.
 - drift 상태에서 uninstall은 사용자 변경 손실을 막기 위해 중단한다.
-- 다른 Claude home으로 실행하거나 state schema가 더 새로우면 자동 추측하지 않는다.
+- 다른 target으로 복사된 state, 다른 Claude home으로 실행한 state, 더 새 schema는
+  자동 추측하지 않는다.
 - 변조된 `state_id`와 관리 경로의 symlink·경로 탈출은 fail closed한다.
 - 같은 target을 다른 Claude home으로 재설치하려면 먼저 기존 home 기준으로
   uninstall해야 한다.

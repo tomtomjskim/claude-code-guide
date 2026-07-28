@@ -3,8 +3,8 @@
 <!-- CLAUDE-SETUP-GUIDE v1 -->
 
 **저장소**: https://github.com/tomtomjskim/claude-code-guide  
-**이 파일 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-tag-or-commit>/SETUP.md
-**원라이너 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-tag-or-commit>/scripts/quick-setup.sh
+**이 파일 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-full-commit>/SETUP.md
+**원라이너 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-full-commit>/scripts/quick-setup.sh
 
 ---
 
@@ -22,7 +22,7 @@
 
 터미널에서:
 ```bash
-CCG_REF="<reviewed-tag-or-commit>"
+CCG_REF="<reviewed-full-40-character-commit>"
 curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
   | bash -s -- --ref "$CCG_REF" --dry-run
 # 출력 검토 후 --dry-run을 제거해 적용
@@ -37,7 +37,7 @@ Claude Code 세션에서 아래를 그대로 붙여넣기:
 https://github.com/tomtomjskim/claude-code-guide
 
 실행 방법:
-CCG_REF="<reviewed-tag-or-commit>"
+CCG_REF="<reviewed-full-40-character-commit>"
 curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --dry-run
 
 SETUP.md wizard에 따라 프로젝트 분석 → profile 추천 → dry-run 검토 → 확인 후 실행.
@@ -50,7 +50,7 @@ Claude가 SETUP.md(또는 quick-setup.sh)를 WebFetch/실행하여 아래 Wizard
 검토된 checkout에서 한 번 실행:
 ```bash
 git clone https://github.com/tomtomjskim/claude-code-guide <local-guide-path>
-git -C <local-guide-path> checkout --detach <reviewed-tag-or-commit>
+git -C <local-guide-path> checkout --detach <reviewed-tag-or-full-commit>
 bash <local-guide-path>/scripts/install-skills.sh --skills setup-wizard ~/
 ```
 
@@ -136,17 +136,18 @@ User: y
 
 **원라이너 (원격):**
 ```bash
-CCG_REF="<reviewed-tag-or-commit>"
+CCG_REF="<reviewed-full-40-character-commit>"
 curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
   | bash -s -- --ref "$CCG_REF" --profile team --dry-run
 ```
 
-dry-run 출력과 source ref를 확인한 뒤에만 `--dry-run`을 제거한다.
+dry-run 출력과 source ref를 확인한 뒤에만 `--dry-run`을 제거한다. 원격 apply는
+full 40-character commit SHA만 허용하며 branch, tag, short SHA는 preview only다.
 
 **옵션:**
 - `--profile <solo|team|enterprise|review-only|auto>` — 프로파일 명시 (기본: auto)
 - `--target <path>` — 설치 대상 프로젝트 경로 (기본: `$PWD` 또는 `$CLAUDE_PROJECT_PATH`)
-- `--ref <tag-or-commit>` — 원격 source를 검토된 ref로 고정
+- `--ref <full-commit>` — 원격 apply source를 검토된 40자 commit SHA로 고정
 - `--dry-run` — 실제 변경 없이 실행 명령만 출력
 - `--force` — 기존 설치 덮어쓰기
 - `--skip-stack` — 스택별 CUSTOMIZE 안내 생략
@@ -185,10 +186,11 @@ Claude: [9개 CUSTOMIZE 블록의 PHP 예시를 TypeScript 예시로 치환]
 ls .claude/skills/ | wc -l
 cat .claude/settings.local.json
 
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 # enterprise만
-bash ~/.claude/team/scripts/validate-system.sh \
+bash "$CLAUDE_HOME/team/scripts/validate-system.sh" \
   --project <target> \
-  --claude-home ~/.claude
+  --claude-home "$CLAUDE_HOME"
 # 기대: Errors 0, Warnings 0, Checks 19 categories
 
 # quick-setup 설치 상태
@@ -248,7 +250,10 @@ bash scripts/install-hooks.sh <target>
 ```bash
 bash scripts/install-skills.sh --team <target>
 bash scripts/install-hooks.sh <target>
-bash scripts/validate-system.sh
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+bash "$CLAUDE_HOME/team/scripts/validate-system.sh" \
+  --project <target> \
+  --claude-home "$CLAUDE_HOME"
 ```
 
 - **추가**: `~/.claude/team/`에 agents.yaml, prompts/, workflows/, context/ 설치

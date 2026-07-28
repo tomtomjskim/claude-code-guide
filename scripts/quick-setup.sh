@@ -5,7 +5,7 @@
 # Claude Code 세션에서 자연어 호출 대상.
 #
 # 사용법:
-#   CCG_REF="<reviewed-tag-or-commit>"
+#   CCG_REF="<reviewed-full-40-character-commit>"
 #   curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
 #     | bash -s -- --ref "$CCG_REF" [--profile <name>] [--target <path>] [--dry-run] [--force]
 #
@@ -37,8 +37,12 @@ REPO_URL="https://github.com/tomtomjskim/claude-code-guide"
 TMPDIR=""
 PRESERVE_TMPDIR=0
 INSTALL_TRANSACTION_ACTIVE=0
+INSTALL_LOCK_HELD=0
+INSTALL_LOCK_DIR=""
+ROLLBACK_ATTEMPTED=0
 SOURCE_OVERRIDE="${CLAUDE_CODE_GUIDE_SOURCE:-}"
 SOURCE_REF="${CLAUDE_CODE_GUIDE_REF:-main}"
+SOURCE_REVISION=""
 
 if [ -z "$SOURCE_OVERRIDE" ] \
   && [ -n "${BASH_SOURCE[0]:-}" ] \
@@ -69,7 +73,7 @@ while [[ $# -gt 0 ]]; do
 claude-code-guide Quick Setup
 
 Usage:
-  CCG_REF="<reviewed-tag-or-commit>"
+  CCG_REF="<reviewed-full-40-character-commit>"
   curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
     | bash -s -- --ref "$CCG_REF" [--profile <name>] [--target <path>] [--dry-run] [--force] [--skip-stack]
 
@@ -86,7 +90,7 @@ Profiles:
 Options:
   --profile <name>     프로파일 선택 (solo|team|enterprise|review-only|auto)
   --target <path>      설치 대상 (default: $PWD)
-  --ref <value>        clone할 검토된 tag/branch/commit (default: main)
+  --ref <value>        원격 apply는 검토된 full 40-character commit 필수
   --dry-run            실행 명령만 출력, 실제 변경 없음
   --force              기존 설치 덮어쓰기
   --skip-stack         스택별 CUSTOMIZE 안내 생략
@@ -117,22 +121,30 @@ run() {
 }
 
 cleanup() {
+  if [ "$INSTALL_LOCK_HELD" = "1" ] && [ -n "$INSTALL_LOCK_DIR" ]; then
+    rm -f "$INSTALL_LOCK_DIR/pid"
+    if ! rmdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
+      log "⚠️  Install lock could not be removed: $INSTALL_LOCK_DIR"
+    fi
+    INSTALL_LOCK_HELD=0
+  fi
   if [ "$PRESERVE_TMPDIR" = "1" ]; then
     log "⚠️  Recovery snapshot preserved at: $TMPDIR"
   elif [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ]; then
     rm -rf "$TMPDIR"
   fi
 }
-trap cleanup EXIT
 
-rollback_failed_install() {
-  local original_status=$?
+rollback_active_install() {
   local rollback_status=0
-  trap - ERR
+  if [ "$ROLLBACK_ATTEMPTED" = "1" ]; then
+    return 0
+  fi
+  ROLLBACK_ATTEMPTED=1
   set +e
   if [ "$INSTALL_TRANSACTION_ACTIVE" = "1" ]; then
     log ""
-    log "↩️  Install step failed; restoring the begin snapshot..."
+    log "↩️  Install interrupted; restoring declared managed files..."
     python3 "$CCG/scripts/install_state.py" abort \
       --target "$TARGET" \
       --snapshot "$STATE_SNAPSHOT" \
@@ -145,9 +157,26 @@ rollback_failed_install() {
     else
       log "✅ Partial install rolled back."
     fi
+    INSTALL_TRANSACTION_ACTIVE=0
   fi
+  return "$rollback_status"
+}
+
+finish_on_exit() {
+  local original_status=$?
+  trap - EXIT ERR HUP INT TERM
+  if [ "$INSTALL_TRANSACTION_ACTIVE" = "1" ]; then
+    rollback_active_install || true
+    [ "$original_status" -eq 0 ] && original_status=1
+  fi
+  cleanup
   exit "$original_status"
 }
+
+trap finish_on_exit EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # -----------------------------
 # 타겟 경로 검증
@@ -155,6 +184,10 @@ rollback_failed_install() {
 if [ ! -d "$TARGET" ]; then
   echo "❌ Target directory not found: $TARGET" >&2
   echo "   Hint: --target /path/to/project 또는 해당 디렉토리에서 실행" >&2
+  exit 1
+fi
+if [ -L "$TARGET" ]; then
+  echo "❌ Target directory must not be a symlink: $TARGET" >&2
   exit 1
 fi
 TARGET="$(cd "$TARGET" && pwd)"
@@ -260,25 +293,34 @@ else
     echo "❌ Invalid source ref: $SOURCE_REF" >&2
     exit 1
   fi
-  if [ "$SOURCE_REF" = "main" ]; then
-    log "⚠️  moving main을 사용합니다. 재현 가능한 설치는 --ref <reviewed-tag-or-commit>을 지정하세요."
+  if [ "$DRY_RUN" = "0" ] && ! [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "❌ Remote apply requires a full 40-character commit SHA." >&2
+    echo "   Branches, tags, and short SHAs are preview only; resolve and review the commit first." >&2
+    exit 1
   fi
-  if [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+  if [ "$DRY_RUN" = "1" ] && ! [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    log "⚠️  Named or short ref preview only: $SOURCE_REF"
+  fi
+  if [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
     if [ "$DRY_RUN" = "1" ]; then
       echo "[DRY-RUN] git clone --filter=blob:none --no-checkout \"$REPO_URL\" \"$TMPDIR/ccg\""
       echo "[DRY-RUN] git -C \"$TMPDIR/ccg\" fetch --depth 1 origin \"$SOURCE_REF\""
       echo "[DRY-RUN] git -C \"$TMPDIR/ccg\" checkout --detach FETCH_HEAD"
+      echo "[DRY-RUN] verify checked-out HEAD equals $SOURCE_REF"
     else
       git clone --filter=blob:none --no-checkout "$REPO_URL" "$TMPDIR/ccg"
       git -C "$TMPDIR/ccg" fetch --depth 1 origin "$SOURCE_REF"
       git -C "$TMPDIR/ccg" checkout --detach FETCH_HEAD
+      SOURCE_REVISION="$(git -C "$TMPDIR/ccg" rev-parse --verify HEAD)"
+      REQUESTED_REVISION="$(printf '%s' "$SOURCE_REF" | tr '[:upper:]' '[:lower:]')"
+      RESOLVED_REVISION="$(printf '%s' "$SOURCE_REVISION" | tr '[:upper:]' '[:lower:]')"
+      if [ "$RESOLVED_REVISION" != "$REQUESTED_REVISION" ]; then
+        echo "❌ Checked-out commit does not match requested SHA." >&2
+        exit 1
+      fi
     fi
   else
-    if [ "$DRY_RUN" = "1" ]; then
-      echo "[DRY-RUN] git clone --depth 1 --branch $SOURCE_REF \"$REPO_URL\" \"$TMPDIR/ccg\""
-    else
-      git clone --depth 1 --branch "$SOURCE_REF" "$REPO_URL" "$TMPDIR/ccg" 2>&1 | tail -3
-    fi
+    echo "[DRY-RUN] git clone --depth 1 --branch $SOURCE_REF \"$REPO_URL\" \"$TMPDIR/ccg\""
   fi
 
   if [ "$DRY_RUN" = "0" ] && [ ! -d "$TMPDIR/ccg" ]; then
@@ -287,6 +329,17 @@ else
   fi
 
   CCG="$TMPDIR/ccg"
+fi
+
+if [ -z "$SOURCE_REVISION" ] && [ "$DRY_RUN" = "0" ]; then
+  if git -C "$CCG" rev-parse --verify HEAD >/dev/null 2>&1; then
+    SOURCE_REVISION="$(git -C "$CCG" rev-parse --verify HEAD)"
+    if [ -n "$(GIT_OPTIONAL_LOCKS=0 git -C "$CCG" status --porcelain --untracked-files=normal)" ]; then
+      SOURCE_REVISION="${SOURCE_REVISION}+dirty"
+    fi
+  else
+    SOURCE_REVISION="local-unversioned"
+  fi
 fi
 
 # -----------------------------
@@ -330,13 +383,27 @@ STATE_HOME_FLAGS=()
 [ "$INSTALL_TEAM" = "1" ] && STATE_HOME_FLAGS+=(--include-home)
 
 if [ "$DRY_RUN" = "0" ]; then
+  if [ -L "$TARGET/.claude" ]; then
+    echo "❌ Managed root is a symlink: $TARGET/.claude" >&2
+    exit 1
+  fi
+  mkdir -p "$TARGET/.claude"
+  INSTALL_LOCK_DIR="$TARGET/.claude/.claude-code-guide-install.lock"
+  if ! mkdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
+    echo "❌ Existing install lock blocks this operation: $INSTALL_LOCK_DIR" >&2
+    exit 1
+  fi
+  printf '%s\n' "$$" > "$INSTALL_LOCK_DIR/pid"
+  INSTALL_LOCK_HELD=1
+
   python3 "$CCG/scripts/install_state.py" begin \
     --target "$TARGET" \
     --output "$STATE_SNAPSHOT" \
+    --source "$CCG" \
+    --profile "$PROFILE" \
     --claude-home "$CLAUDE_HOME" \
     "${STATE_HOME_FLAGS[@]}"
   INSTALL_TRANSACTION_ACTIVE=1
-  trap rollback_failed_install ERR
 fi
 
 log ""
@@ -352,10 +419,10 @@ if [ "$DRY_RUN" = "0" ]; then
     --target "$TARGET" \
     --snapshot "$STATE_SNAPSHOT" \
     --profile "$PROFILE" \
+    --source-revision "$SOURCE_REVISION" \
     --claude-home "$CLAUDE_HOME" \
     "${STATE_HOME_FLAGS[@]}"
   INSTALL_TRANSACTION_ACTIVE=0
-  trap - ERR
 fi
 
 # -----------------------------

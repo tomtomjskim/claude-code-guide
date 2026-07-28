@@ -246,7 +246,11 @@ if [ "$SKIP_SETTINGS" = false ]; then
         done
     done
 
-    echo "$SETTINGS" | jq '.' > "$TARGET_SETTINGS"
+    SETTINGS_TMP=$(mktemp "${TARGET_SETTINGS}.tmp.XXXXXX")
+    trap 'rm -f "$SETTINGS_TMP"' EXIT
+    echo "$SETTINGS" | jq '.' > "$SETTINGS_TMP"
+    mv "$SETTINGS_TMP" "$TARGET_SETTINGS"
+    trap - EXIT
     echo ""
     echo "  settings.local.json 업데이트 완료"
 fi

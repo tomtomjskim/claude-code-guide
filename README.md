@@ -12,26 +12,30 @@
 
 ### 방법 A — 검토된 clone 사용 (권장)
 
-재현 가능한 설치는 먼저 검토한 tag 또는 commit으로 checkout합니다.
+재현 가능한 설치는 먼저 검토한 tag 또는 full commit으로 checkout합니다.
 
 ```bash
 git clone https://github.com/tomtomjskim/claude-code-guide.git
 cd claude-code-guide
-git checkout <reviewed-tag-or-commit>
+git checkout --detach <reviewed-tag-or-full-commit>
 bash scripts/quick-setup.sh --target <project> --dry-run
 bash scripts/quick-setup.sh --target <project>
 ```
 
-원라이너가 필요하면 raw script와 내부 clone에 같은 ref를 지정합니다.
+원라이너가 필요하면 raw script와 내부 clone에 같은 **검토된 full 40-character
+commit SHA**를 지정합니다. Branch, tag, short SHA는 dry-run 미리보기에서만
+허용됩니다.
 
 ```bash
-CCG_REF=<reviewed-tag-or-commit>
+CCG_REF=<reviewed-full-40-character-commit>
 curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
   | bash -s -- --ref "$CCG_REF" --dry-run
+# 출력 검토 후 같은 CCG_REF로 --dry-run 제거
 ```
 
-`main`을 직접 사용하면 moving target 경고가 출력됩니다. 외부 script는 지침이 아니라
-검토 대상 코드로 취급하고, 실제 설치 전에 `--dry-run` 결과를 확인하세요.
+`main`, branch, tag, short SHA를 실제 원격 설치에 사용하면 네트워크 접근 전에
+중단됩니다. 외부 script는 지침이 아니라 검토 대상 코드로 취급하고, 실제 설치 전에
+`--dry-run` 결과를 확인하세요.
 
 ### 방법 B — 전역 `/setup-wizard` 스킬 (최초 1회 설치 후 영구)
 
@@ -39,7 +43,7 @@ curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG
 
 ```bash
 git clone https://github.com/tomtomjskim/claude-code-guide <local-guide-path>
-git -C <local-guide-path> checkout --detach <reviewed-tag-or-commit>
+git -C <local-guide-path> checkout --detach <reviewed-tag-or-full-commit>
 bash <local-guide-path>/scripts/install-skills.sh --skills setup-wizard ~/
 ```
 
