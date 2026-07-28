@@ -1289,6 +1289,7 @@ def apply_entries_transactionally(
     )
     os.chmod(backup_root, 0o700)
     backups: dict[str, dict | None] = {}
+    preserve_backup = False
     try:
         backups = snapshot_runtime_destinations(
             entries,
@@ -1316,14 +1317,17 @@ def apply_entries_transactionally(
                     claude_home,
                 )
             except InstallStateError as rollback_error:
+                preserve_backup = True
                 raise InstallStateError(
-                    f"runtime operation failed ({error}); {rollback_error}"
+                    f"runtime operation failed ({error}); {rollback_error}; "
+                    f"backup preserved at {backup_root}"
                 ) from error
             raise InstallStateError(
                 f"runtime operation failed and was rolled back: {error}"
             ) from error
     finally:
-        shutil.rmtree(backup_root, ignore_errors=True)
+        if not preserve_backup:
+            shutil.rmtree(backup_root, ignore_errors=True)
 
 
 def command_repair(args: argparse.Namespace) -> int:
