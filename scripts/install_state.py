@@ -4,22 +4,24 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
 import re
 import secrets
 import shutil
+import signal
 import stat
 import subprocess
 import sys
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 
 SCHEMA_VERSION = 1
-GUIDE_VERSION = "4.5"
+GUIDE_VERSION = "4.5.1"
 STATE_RELATIVE_PATH = Path(".claude/claude-code-guide-install-state.json")
 STATE_KEYS = {
     "schema_version",
@@ -52,6 +54,12 @@ SNAPSHOT_ENTRY_KEYS = {"scope", "path", "sha256", "mode", "uid", "gid"}
 PATH_ID_PATTERN = re.compile(r"^[0-9a-f]{24}$")
 STATE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+TRANSACTION_STATUSES = frozenset(
+    {"initializing", "prepared", "commit-ready", "committed", "aborted"}
+)
+RUNTIME_TRANSACTION_STATUSES = frozenset(
+    {"initializing", "prepared", "commit-ready", "committed"}
+)
 
 PROFILE_SKILLS = {
     "solo": ("dispatch", "stage", "check-code", "reflect", "flow"),
@@ -73,6 +81,76 @@ VALID_PROFILES = frozenset({"solo", "team", "enterprise", "review-only"})
 
 class InstallStateError(RuntimeError):
     """Raised when install state cannot be handled safely."""
+
+
+def fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError as error:
+        raise InstallStateError(f"directory fsync failed: {path}") from error
+
+
+def fsync_file(path: Path) -> None:
+    try:
+        with path.open("rb") as handle:
+            os.fsync(handle.fileno())
+    except OSError as error:
+        raise InstallStateError(f"file fsync failed: {path}") from error
+
+
+def ensure_directory_durable(path: Path, mode: int = 0o700) -> Path:
+    path = path.absolute()
+    missing = []
+    current = path
+    while not current.exists():
+        if current.is_symlink():
+            raise InstallStateError(
+                f"directory path must not contain a symlink: {current}"
+            )
+        missing.append(current)
+        if current.parent == current:
+            break
+        current = current.parent
+    if current.is_symlink() or not current.is_dir():
+        raise InstallStateError(f"directory path is unsafe: {current}")
+    for directory in reversed(missing):
+        try:
+            directory.mkdir(mode=mode)
+        except FileExistsError:
+            if directory.is_symlink() or not directory.is_dir():
+                raise InstallStateError(
+                    f"directory path became unsafe: {directory}"
+                )
+        os.chmod(directory, mode)
+        fsync_directory(directory.parent)
+        fsync_directory(directory)
+    if path.is_symlink() or not path.is_dir():
+        raise InstallStateError(f"directory path is unsafe: {path}")
+    fsync_directory(path)
+    if path.parent != path:
+        fsync_directory(path.parent)
+    return path
+
+
+def prepare_internal_stage(path: Path) -> Path:
+    ensure_directory_durable(path.parent)
+    if path.is_symlink():
+        raise InstallStateError(f"internal stage must not be a symlink: {path}")
+    if path.exists():
+        if not path.is_file():
+            raise InstallStateError(f"internal stage is unsafe: {path}")
+        remove_path_durably(path)
+    return path
+
+
+def fault_point(name: str) -> None:
+    if os.environ.get("CLAUDE_CODE_GUIDE_FAULT_POINT") == name:
+        os.kill(os.getpid(), signal.SIGKILL)
 
 
 def sha256_file(path: Path) -> str:
@@ -178,18 +256,22 @@ def scope_root(scope: str, target: Path, claude_home: Path) -> Path:
 def write_json_atomic(path: Path, payload: dict, mode: int = 0o600) -> None:
     if path.parent.is_symlink():
         raise InstallStateError(f"JSON parent must not be a symlink: {path.parent}")
-    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temp_path = path.with_name(f".{path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
+    ensure_directory_durable(path.parent)
+    temp_path = prepare_internal_stage(
+        path.with_name(f".{path.name}.ccg-json-stage")
+    )
     try:
-        temp_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        with temp_path.open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         os.chmod(temp_path, mode)
+        fsync_file(temp_path)
         os.replace(temp_path, path)
+        fsync_directory(path.parent)
     finally:
         if temp_path.exists():
-            temp_path.unlink()
+            remove_path_durably(temp_path)
 
 
 def run_git(target: Path, *arguments: str) -> subprocess.CompletedProcess:
@@ -248,7 +330,7 @@ def ensure_state_is_git_local(target: Path) -> None:
         raise InstallStateError(
             f"Git exclude file must not be a symlink: {exclude_path}"
         )
-    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    ensure_directory_durable(exclude_path.parent)
     try:
         import fcntl
 
@@ -579,9 +661,9 @@ def apply_metadata(path: Path, mode: int, uid: int, gid: int) -> None:
 
 
 def copy_record_file(record: dict, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    temp_path = destination.with_name(
-        f".{destination.name}.restore-{os.getpid()}-{secrets.token_hex(4)}"
+    ensure_directory_durable(destination.parent)
+    temp_path = prepare_internal_stage(
+        destination.with_name(f".{destination.name}.ccg-copy-stage")
     )
     try:
         shutil.copyfile(record["source"], temp_path, follow_symlinks=False)
@@ -591,10 +673,12 @@ def copy_record_file(record: dict, destination: Path) -> None:
             record["uid"],
             record["gid"],
         )
+        fsync_file(temp_path)
         os.replace(temp_path, destination)
+        fsync_directory(destination.parent)
     finally:
         if temp_path.exists():
-            temp_path.unlink()
+            remove_path_durably(temp_path)
 
 
 def snapshot_file_path(snapshot: Path, scope: str, relative: str) -> Path:
@@ -617,11 +701,353 @@ def resolved_state_home(create: bool) -> Path:
     if state_home.is_symlink():
         raise InstallStateError(f"managed state home must not be a symlink: {state_home}")
     if create:
-        state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        ensure_directory_durable(state_home)
     if not state_home.exists() or not state_home.is_dir():
         raise InstallStateError(f"managed state home is missing or unsafe: {state_home}")
     os.chmod(state_home, 0o700)
     return state_home.resolve()
+
+
+def transaction_parent_for(target: Path, create: bool) -> Path:
+    state_home = resolved_state_home(create=create)
+    transactions = state_home / "transactions"
+    target_root = transactions / path_identity(target)
+    for directory in (transactions, target_root):
+        if directory.is_symlink():
+            raise InstallStateError(
+                f"transaction directory must not be a symlink: {directory}"
+            )
+        if create:
+            ensure_directory_durable(directory)
+            os.chmod(directory, 0o700)
+    if not target_root.exists() or not target_root.is_dir():
+        raise InstallStateError(
+            f"transaction directory is missing or unsafe: {target_root}"
+        )
+    return target_root.resolve()
+
+
+def new_transaction_path(target: Path) -> Path:
+    parent = transaction_parent_for(target, create=True)
+    return parent / secrets.token_hex(16)
+
+
+def is_persistent_transaction(snapshot: Path, target: Path) -> bool:
+    try:
+        snapshot.resolve(strict=False).relative_to(
+            transaction_parent_for(target, create=True)
+        )
+    except ValueError:
+        return False
+    return True
+
+
+def transaction_file(snapshot: Path) -> Path:
+    return snapshot / "transaction.json"
+
+
+def runtime_transaction_file(snapshot: Path) -> Path:
+    return snapshot / "runtime.json"
+
+
+def runtime_before_path(snapshot: Path, scope: str, relative: str) -> Path:
+    return safe_destination(snapshot / "before" / scope, relative)
+
+
+def transaction_key(snapshot: Path) -> str:
+    return hashlib.sha256(
+        str(snapshot.resolve(strict=False)).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def internal_path(
+    snapshot: Path,
+    destination: Path,
+    purpose: str,
+) -> Path:
+    return destination.with_name(
+        f".{destination.name}.ccg-{purpose}-{transaction_key(snapshot)}"
+    )
+
+
+def runtime_capture_path(snapshot: Path, destination: Path) -> Path:
+    return destination.with_name(
+        f".{destination.name}.ccg-quarantine-{transaction_key(snapshot)}"
+    )
+
+
+def recovery_capture_path(snapshot: Path, destination: Path) -> Path:
+    return internal_path(snapshot, destination, "recovery")
+
+
+def publish_stage_path(snapshot: Path, destination: Path) -> Path:
+    return internal_path(snapshot, destination, "stage")
+
+
+def runtime_stage_path(snapshot: Path, destination: Path) -> Path:
+    return internal_path(snapshot, destination, "runtime-stage")
+
+
+def read_runtime_transaction(snapshot: Path) -> dict:
+    path = runtime_transaction_file(snapshot)
+    if not path.exists() or path.is_symlink() or not path.is_file():
+        raise InstallStateError(
+            f"runtime transaction journal missing or unsafe: {path}"
+        )
+    payload = read_json(path)
+    expected = {
+        "schema_version",
+        "kind",
+        "status",
+        "target_id",
+        "claude_home_id",
+        "state_id",
+        "entries",
+    }
+    if set(payload) != expected:
+        raise InstallStateError(f"invalid runtime transaction shape: {path}")
+    if (
+        payload["schema_version"] != SCHEMA_VERSION
+        or payload["kind"] not in {"repair", "uninstall"}
+        or payload["status"] not in RUNTIME_TRANSACTION_STATUSES
+        or not isinstance(payload["entries"], list)
+        or not isinstance(payload["state_id"], str)
+        or not STATE_ID_PATTERN.fullmatch(payload["state_id"])
+    ):
+        raise InstallStateError(f"invalid runtime transaction values: {path}")
+    for key in ("target_id", "claude_home_id"):
+        if (
+            not isinstance(payload[key], str)
+            or not PATH_ID_PATTERN.fullmatch(payload[key])
+        ):
+            raise InstallStateError(f"invalid runtime transaction {key}: {path}")
+    required_entry_keys = {
+        "scope",
+        "path",
+        "before_exists",
+        "before_sha256",
+        "before_mode",
+        "before_uid",
+        "before_gid",
+        "after_prefix",
+    }
+    seen = set()
+    for entry in payload["entries"]:
+        if not isinstance(entry, dict) or set(entry) != required_entry_keys:
+            raise InstallStateError(f"invalid runtime transaction entry: {path}")
+        validate_scoped_path(entry["scope"], entry["path"])
+        key = f"{entry['scope']}:{entry['path']}"
+        if key in seen:
+            raise InstallStateError(f"duplicate runtime transaction entry: {key}")
+        seen.add(key)
+        validate_optional_file_fields(
+            {
+                "before_exists": entry["before_exists"],
+                "before_sha256": entry["before_sha256"],
+                "before_mode": entry["before_mode"],
+                "before_uid": entry["before_uid"],
+                "before_gid": entry["before_gid"],
+            },
+            "before",
+        )
+        if entry["after_prefix"] not in {"installed", "previous"}:
+            raise InstallStateError(
+                f"invalid runtime transaction after prefix: {key}"
+            )
+    return payload
+
+
+def write_runtime_transaction(snapshot: Path, payload: dict) -> None:
+    write_json_atomic(runtime_transaction_file(snapshot), payload)
+
+
+def update_runtime_transaction(snapshot: Path, status: str) -> dict:
+    if status not in RUNTIME_TRANSACTION_STATUSES:
+        raise InstallStateError(f"invalid runtime transaction status: {status}")
+    payload = read_runtime_transaction(snapshot)
+    payload["status"] = status
+    write_runtime_transaction(snapshot, payload)
+    return payload
+
+
+def read_transaction(snapshot: Path) -> dict:
+    path = transaction_file(snapshot)
+    if not path.exists() or path.is_symlink() or not path.is_file():
+        raise InstallStateError(f"transaction journal missing or unsafe: {path}")
+    payload = read_json(path)
+    expected = {
+        "schema_version",
+        "kind",
+        "status",
+        "target_id",
+        "claude_home_id",
+        "include_home",
+        "pending_state_id",
+        "old_state_id",
+        "published",
+    }
+    if set(payload) != expected:
+        raise InstallStateError(f"invalid transaction journal shape: {path}")
+    if (
+        payload["schema_version"] != SCHEMA_VERSION
+        or payload["kind"] != "install"
+        or payload["status"] not in TRANSACTION_STATUSES
+        or not isinstance(payload["include_home"], bool)
+        or not isinstance(payload["published"], list)
+        or any(not isinstance(item, str) for item in payload["published"])
+        or len(set(payload["published"])) != len(payload["published"])
+    ):
+        raise InstallStateError(f"invalid transaction journal values: {path}")
+    for key in ("target_id", "claude_home_id"):
+        if (
+            not isinstance(payload[key], str)
+            or not PATH_ID_PATTERN.fullmatch(payload[key])
+        ):
+            raise InstallStateError(f"invalid transaction {key}: {path}")
+    for key in ("pending_state_id", "old_state_id"):
+        value = payload[key]
+        if value is not None and (
+            not isinstance(value, str) or not STATE_ID_PATTERN.fullmatch(value)
+        ):
+            raise InstallStateError(f"invalid transaction {key}: {path}")
+    return payload
+
+
+def write_transaction(snapshot: Path, payload: dict) -> None:
+    write_json_atomic(transaction_file(snapshot), payload)
+
+
+def update_transaction(snapshot: Path, status: str, **updates) -> dict:
+    if status not in TRANSACTION_STATUSES:
+        raise InstallStateError(f"invalid transaction status: {status}")
+    payload = read_transaction(snapshot)
+    payload.update(updates)
+    payload["status"] = status
+    write_transaction(snapshot, payload)
+    return payload
+
+
+def capture_path_for(snapshot: Path, destination: Path) -> Path:
+    return destination.with_name(
+        f".{destination.name}.ccg-base-{transaction_key(snapshot)}"
+    )
+
+
+def remove_path_durably(path: Path) -> None:
+    if not path.exists():
+        return
+    path.unlink()
+    fsync_directory(path.parent)
+
+
+def initialize_transaction_directory(
+    output: Path,
+    journal_name: str,
+    journal: dict,
+) -> None:
+    ensure_directory_durable(output.parent)
+    stage = output.with_name(f".{output.name}.ccg-init")
+    if output.exists() or output.is_symlink():
+        raise InstallStateError(f"transaction output already exists: {output}")
+    if stage.exists() or stage.is_symlink():
+        raise InstallStateError(
+            f"incomplete transaction staging requires review: {stage}"
+        )
+    ensure_directory_durable(stage)
+    try:
+        write_json_atomic(stage / journal_name, journal)
+        os.rename(stage, output)
+        fsync_directory(output.parent)
+    except Exception:
+        if stage.exists() and stage.is_dir() and not stage.is_symlink():
+            shutil.rmtree(stage)
+            fsync_directory(stage.parent)
+        raise
+
+
+def cleanup_directory_durably(path: Path, prefix: str) -> None:
+    if not path.exists():
+        return
+    if path.is_symlink() or not path.is_dir():
+        raise InstallStateError(f"cleanup path is unsafe: {path}")
+    parent = path.parent
+    tombstone = parent / (
+        f".{prefix}-{path.name}-{secrets.token_hex(8)}"
+    )
+    os.rename(path, tombstone)
+    fsync_directory(parent)
+    shutil.rmtree(tombstone)
+    fsync_directory(parent)
+
+
+def cleanup_transaction_directory(snapshot: Path, target: Path) -> None:
+    if not is_persistent_transaction(snapshot, target):
+        return
+    cleanup_directory_durably(snapshot, "cleanup")
+
+
+def cleanup_state_generation(state_root: Path, target: Path) -> None:
+    if not state_root.exists():
+        return
+    state_home = state_root.parent
+    tombstone = state_home / (
+        f".cleanup-state-{path_identity(target)}-"
+        f"{state_root.name}-{secrets.token_hex(8)}"
+    )
+    os.rename(state_root, tombstone)
+    fsync_directory(state_home)
+    shutil.rmtree(tombstone)
+    fsync_directory(state_home)
+
+
+def cleanup_stale_tombstones(target: Path) -> None:
+    transaction_parent = transaction_parent_for(target, create=True)
+    for stage in transaction_parent.glob(".*.ccg-init"):
+        if stage.is_symlink() or not stage.is_dir():
+            raise InstallStateError(
+                f"unsafe transaction staging directory: {stage}"
+            )
+        cleanup_directory_durably(stage, "cleanup-init")
+    for tombstone in transaction_parent.glob(".cleanup-*"):
+        if tombstone.is_symlink() or not tombstone.is_dir():
+            raise InstallStateError(
+                f"unsafe transaction cleanup tombstone: {tombstone}"
+            )
+        shutil.rmtree(tombstone)
+        fsync_directory(transaction_parent)
+    state_home = resolved_state_home(create=True)
+    for tombstone in state_home.glob(
+        f".cleanup-state-{path_identity(target)}-*"
+    ):
+        if tombstone.is_symlink() or not tombstone.is_dir():
+            raise InstallStateError(
+                f"unsafe state cleanup tombstone: {tombstone}"
+            )
+        shutil.rmtree(tombstone)
+        fsync_directory(state_home)
+
+
+@contextlib.contextmanager
+def target_lock(target: Path):
+    state_home = resolved_state_home(create=True)
+    lock_root = state_home / "locks"
+    if lock_root.is_symlink():
+        raise InstallStateError(f"lock directory must not be a symlink: {lock_root}")
+    ensure_directory_durable(lock_root)
+    os.chmod(lock_root, 0o700)
+    lock_path = lock_root / f"{path_identity(target)}.lock"
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise InstallStateError(
+                f"another install-state operation holds the target lock: {target}"
+            ) from error
+        yield
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 
 def state_root_for(state_id: str, must_exist: bool) -> Path:
@@ -902,11 +1328,25 @@ def command_begin(args: argparse.Namespace) -> int:
     for record in records.values():
         validate_restorable_ownership(record)
 
-    output = Path(args.output)
+    output = Path(args.output) if args.output else new_transaction_path(target)
     if output.exists():
         raise InstallStateError(f"snapshot output already exists: {output}")
-    output.mkdir(parents=True, mode=0o700)
-    os.chmod(output, 0o700)
+    transaction = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": "install",
+        "status": "initializing",
+        "target_id": path_identity(target),
+        "claude_home_id": path_identity(claude_home),
+        "include_home": bool(args.include_home),
+        "pending_state_id": None,
+        "old_state_id": existing_state["state_id"] if existing_state else None,
+        "published": [],
+    }
+    initialize_transaction_directory(
+        output,
+        transaction_file(output).name,
+        transaction,
+    )
     try:
         serialized_records = []
         for key in sorted(records):
@@ -927,10 +1367,13 @@ def command_begin(args: argparse.Namespace) -> int:
             "files": serialized_records,
         }
         write_json_atomic(output / "snapshot.json", snapshot)
+        update_transaction(output, "prepared")
     except Exception:
-        shutil.rmtree(output, ignore_errors=True)
+        if output.exists():
+            cleanup_directory_durably(output, "aborted-begin")
         raise
     print(f"snapshot: {len(serialized_records)} files")
+    print(f"transaction: {output}")
     return 0
 
 
@@ -942,107 +1385,317 @@ def restore_capture_exclusive(capture: Path, destination: Path) -> None:
             "generated-file base could not be restored without overwriting "
             f"concurrent content; capture preserved at {capture}"
         ) from error
-    capture.unlink()
+    fsync_directory(destination.parent)
+    remove_path_durably(capture)
+
+
+def optional_path_record(entry: dict, path: Path) -> dict | None:
+    if not path.exists():
+        if path.is_symlink():
+            raise InstallStateError(f"captured path is a symlink: {path}")
+        return None
+    return path_record(entry, path)
+
+
+def record_matches_any(
+    record: dict | None,
+    candidates: list[dict | None],
+) -> bool:
+    return any(records_equal(record, candidate) for candidate in candidates)
+
+
+def copy_record_file_exclusive(
+    record: dict,
+    destination: Path,
+    stage: Path,
+) -> None:
+    ensure_directory_durable(destination.parent)
+    prepare_internal_stage(stage)
+    try:
+        shutil.copyfile(record["source"], stage, follow_symlinks=False)
+        apply_metadata(
+            stage,
+            record["mode"],
+            record["uid"],
+            record["gid"],
+        )
+        fsync_file(stage)
+        os.link(stage, destination, follow_symlinks=False)
+        fsync_directory(destination.parent)
+    except FileExistsError as error:
+        raise InstallStateError(
+            f"destination changed during recovery: {destination}"
+        ) from error
+    finally:
+        if stage.exists():
+            remove_path_durably(stage)
+
+
+def converge_path_exclusive(
+    entry: dict,
+    destination: Path,
+    allowed: list[dict | None],
+    desired: dict | None,
+    mutation_capture: Path,
+    stage: Path,
+) -> bool:
+    """Converge one path without overwriting an unverified concurrent edit."""
+    ensure_directory_durable(destination.parent)
+    if mutation_capture.exists():
+        captured = path_record(entry, mutation_capture)
+        if not record_matches_any(captured, allowed):
+            if not destination.exists():
+                restore_capture_exclusive(mutation_capture, destination)
+            raise InstallStateError(
+                "recovery preserved unexpected concurrent drift: "
+                f"{entry['scope']}:{entry['path']}"
+            )
+        current = optional_path_record(entry, destination)
+        if records_equal(current, desired):
+            remove_path_durably(mutation_capture)
+            if stage.exists():
+                remove_path_durably(stage)
+            return False
+        if current is not None:
+            raise InstallStateError(
+                "recovery preserved concurrent destination and capture: "
+                f"{entry['scope']}:{entry['path']}"
+            )
+        changed = True
+    else:
+        current = optional_path_record(entry, destination)
+        if records_equal(current, desired):
+            if stage.exists():
+                remove_path_durably(stage)
+            return False
+        if not record_matches_any(current, allowed):
+            raise InstallStateError(
+                "recovery preserved unexpected concurrent drift: "
+                f"{entry['scope']}:{entry['path']}"
+            )
+        changed = True
+        if current is not None:
+            os.replace(destination, mutation_capture)
+            fsync_directory(destination.parent)
+            captured = path_record(entry, mutation_capture)
+            if not records_equal(captured, current):
+                if not destination.exists():
+                    restore_capture_exclusive(mutation_capture, destination)
+                raise InstallStateError(
+                    "recovery preserved edit captured after validation: "
+                    f"{entry['scope']}:{entry['path']}"
+                )
+
+    if desired is not None:
+        copy_record_file_exclusive(desired, destination, stage)
+    elif destination.exists():
+        raise InstallStateError(
+            "destination appeared during recovery: "
+            f"{entry['scope']}:{entry['path']}"
+        )
+    if mutation_capture.exists():
+        remove_path_durably(mutation_capture)
+    final = optional_path_record(entry, destination)
+    if not records_equal(final, desired):
+        raise InstallStateError(
+            "recovery preserved a destination edited during finalization: "
+            f"{entry['scope']}:{entry['path']}"
+        )
+    return changed
 
 
 def command_publish(args: argparse.Namespace) -> int:
     target = validate_target(Path(args.target))
+    claude_home = Path(
+        getattr(
+            args,
+            "claude_home",
+            os.environ.get(
+                "CLAUDE_CONFIG_DIR",
+                str(Path.home() / ".claude"),
+            ),
+        )
+    ).expanduser().resolve(strict=False)
     snapshot = Path(args.snapshot)
+    transaction = read_transaction(snapshot)
+    if transaction["status"] != "prepared":
+        raise InstallStateError(
+            f"transaction is not publishable: {transaction['status']}"
+        )
     snapshot_meta, manifest, before = deserialize_snapshot(snapshot)
     if snapshot_meta["target_id"] != path_identity(target):
         raise InstallStateError("snapshot target does not match requested target")
+    if snapshot_meta["claude_home_id"] != path_identity(claude_home):
+        raise InstallStateError("snapshot Claude home does not match requested home")
     validate_snapshot_payload(snapshot, before)
     key = f"{args.scope}:{args.path}"
     declared = manifest_by_key(manifest)
-    if key not in declared or declared[key]["expected_sha256"] is not None:
-        raise InstallStateError(
-            f"path is not a generated managed file: {key}"
-        )
-    current = scan_manifest(target, Path("."), [declared[key]]).get(key)
+    if key not in declared:
+        raise InstallStateError(f"path is not a declared managed file: {key}")
+    current = scan_manifest(target, claude_home, [declared[key]]).get(key)
     if not records_equal(before.get(key), current):
-        raise InstallStateError(
-            f"generated file base changed since begin: {key}"
-        )
+        raise InstallStateError(f"managed file base changed since begin: {key}")
     source = Path(args.source)
     if source.is_symlink() or not source.is_file():
-        raise InstallStateError(f"generated source is missing or unsafe: {source}")
-    expected_mode = file_metadata(source)[0]
-    authorized = load_authorized_entries(snapshot, manifest)
-    authorized[key] = {
-        "scope": args.scope,
-        "path": args.path,
-        "expected_sha256": sha256_file(source),
-        "expected_mode": expected_mode,
-    }
-    write_json_atomic(
-        snapshot / AUTHORIZED_RELATIVE_PATH,
-        {
-            "schema_version": SCHEMA_VERSION,
-            "entries": [authorized[item] for item in sorted(authorized)],
-        },
+        raise InstallStateError(f"managed source is missing or unsafe: {source}")
+    source_hash = sha256_file(source)
+    source_mode = file_metadata(source)[0]
+    generated = declared[key]["expected_sha256"] is None
+    expected_mode = (
+        source_mode if generated else declared[key]["expected_mode"]
     )
+    if generated:
+        authorized = load_authorized_entries(snapshot, manifest)
+        authorized[key] = {
+            "scope": args.scope,
+            "path": args.path,
+            "expected_sha256": source_hash,
+            "expected_mode": expected_mode,
+        }
+        write_json_atomic(
+            snapshot / AUTHORIZED_RELATIVE_PATH,
+            {
+                "schema_version": SCHEMA_VERSION,
+                "entries": [authorized[item] for item in sorted(authorized)],
+            },
+        )
+    elif source_hash != declared[key]["expected_sha256"]:
+        raise InstallStateError(f"managed source does not match manifest: {key}")
+
+    current = scan_manifest(target, claude_home, [declared[key]]).get(key)
+    if not records_equal(before.get(key), current):
+        raise InstallStateError(
+            f"managed file base changed after journal authorization: {key}"
+        )
     destination = safe_destination(
-        scope_root(args.scope, target, Path(".")),
+        scope_root(args.scope, target, claude_home),
         args.path,
     )
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    ensure_directory_durable(destination.parent)
     destination = safe_destination(
-        scope_root(args.scope, target, Path(".")),
+        scope_root(args.scope, target, claude_home),
         args.path,
     )
+    capture = (
+        capture_path_for(snapshot, destination)
+        if before.get(key) is not None
+        else None
+    )
+    stage = prepare_internal_stage(publish_stage_path(snapshot, destination))
+    if capture is not None and capture.exists():
+        raise InstallStateError(f"transaction capture already exists: {capture}")
+    shutil.copyfile(source, stage, follow_symlinks=False)
+    os.chmod(stage, expected_mode, follow_symlinks=False)
+    fsync_file(stage)
     capture = None
     try:
         if before.get(key) is not None:
-            capture = destination.with_name(
-                f".{destination.name}.ccg-base-{secrets.token_hex(8)}"
-            )
+            capture = capture_path_for(snapshot, destination)
             os.replace(destination, capture)
+            fsync_directory(destination.parent)
+            fault_point("publish_after_capture")
             if not records_equal(before[key], path_record(declared[key], capture)):
                 restore_capture_exclusive(capture, destination)
                 capture = None
                 raise InstallStateError(
-                    f"generated file base changed during publish: {key}"
+                    f"managed file base changed during publish: {key}"
                 )
         elif destination.exists():
-            raise InstallStateError(
-                f"generated file appeared during publish: {key}"
-            )
+            raise InstallStateError(f"managed file appeared during publish: {key}")
         try:
-            os.link(source, destination, follow_symlinks=False)
+            os.link(stage, destination, follow_symlinks=False)
+            fsync_directory(destination.parent)
+            fault_point("publish_after_link")
         except FileExistsError as error:
             raise InstallStateError(
-                f"generated destination changed during publish: {key}"
+                f"managed destination changed during publish: {key}"
             ) from error
+    except (InstallStateError, OSError) as error:
+        base_capture = capture_path_for(snapshot, destination)
+        base_valid = False
+        if base_capture.exists():
+            try:
+                captured = path_record(declared[key], base_capture)
+            except (InstallStateError, OSError) as capture_error:
+                raise InstallStateError(
+                    f"publish failed ({error}); base capture is unsafe: "
+                    f"{base_capture}"
+                ) from capture_error
+            if before.get(key) is None or not records_equal(
+                before[key],
+                captured,
+            ):
+                if not destination.exists():
+                    restore_capture_exclusive(base_capture, destination)
+                raise InstallStateError(
+                    f"publish failed ({error}); an edit captured after "
+                    f"validation was preserved: {key}"
+                ) from error
+            base_valid = True
         try:
-            source.unlink()
+            current = optional_path_record(declared[key], destination)
+        except InstallStateError as current_error:
+            raise InstallStateError(
+                f"publish failed ({error}); destination was preserved: {key}"
+            ) from current_error
+        allowed = [before.get(key)]
+        if current is None:
+            if before.get(key) is not None and not base_valid:
+                raise InstallStateError(
+                    f"publish failed ({error}); destination disappeared: {key}"
+                ) from error
+            if before.get(key) is not None:
+                allowed.append(None)
+        elif not records_equal(current, before.get(key)):
+            if (
+                current["sha256"] != source_hash
+                or current["mode"] != expected_mode
+            ):
+                raise InstallStateError(
+                    f"publish failed ({error}); concurrent destination was "
+                    f"preserved: {key}"
+                ) from error
+            allowed.append(current)
+        desired = None
+        if before.get(key) is not None:
+            desired = dict(before[key])
+            desired["source"] = snapshot_file_path(
+                snapshot,
+                args.scope,
+                args.path,
+            )
+        try:
+            converge_path_exclusive(
+                declared[key],
+                destination,
+                allowed,
+                desired,
+                recovery_capture_path(snapshot, destination),
+                internal_path(snapshot, destination, "rollback-stage"),
+            )
+        except (InstallStateError, OSError) as recovery_error:
+            raise InstallStateError(
+                f"publish failed ({error}); recovery preserved transaction: "
+                f"{recovery_error}"
+            ) from error
+        if base_capture.exists():
+            remove_path_durably(base_capture)
+        raise
+    finally:
+        if stage.exists():
+            remove_path_durably(stage)
+    if generated:
+        try:
+            remove_path_durably(source)
         except OSError as error:
             print(
                 f"WARNING: generated source temp retained: {source}: {error}",
                 file=sys.stderr,
             )
-    except (InstallStateError, OSError) as error:
-        if capture is not None and capture.exists() and not destination.exists():
-            try:
-                restore_capture_exclusive(capture, destination)
-                capture = None
-            except InstallStateError as restore_error:
-                raise InstallStateError(
-                    f"generated publish failed ({error}); {restore_error}"
-                ) from error
-        if capture is not None and capture.exists():
-            raise InstallStateError(
-                f"generated publish failed ({error}); base capture preserved "
-                f"at {capture}"
-            ) from error
-        raise
-    if capture is not None and capture.exists():
-        try:
-            capture.unlink()
-        except OSError as error:
-            print(
-                f"WARNING: generated-file base capture retained: {capture}: {error}",
-                file=sys.stderr,
-            )
+    transaction = read_transaction(snapshot)
+    if key not in transaction["published"]:
+        transaction["published"].append(key)
+        write_transaction(snapshot, transaction)
     print(f"published: {key}")
     return 0
 
@@ -1076,67 +1729,197 @@ def remove_empty_parents(path: Path, stop: Path) -> None:
         current = current.parent
 
 
-def command_abort(args: argparse.Namespace) -> int:
-    target = validate_target(Path(args.target))
-    claude_home = Path(args.claude_home).expanduser().resolve(strict=False)
-    snapshot = Path(args.snapshot)
+def rollback_snapshot(
+    target: Path,
+    claude_home: Path,
+    snapshot: Path,
+    include_home: bool,
+) -> int:
     snapshot_meta, manifest, before = deserialize_snapshot(snapshot)
     validate_snapshot_identity(
         snapshot_meta,
         target,
         claude_home,
-        args.include_home,
+        include_home,
     )
     validate_snapshot_payload(snapshot, before)
     authorized = load_authorized_entries(snapshot, manifest)
-    current = scan_manifest(target, claude_home, manifest)
     declared = manifest_by_key(manifest)
-
     conflicts = []
-    for key, manifest_entry in declared.items():
-        before_record = before.get(key)
-        current_record = current.get(key)
-        if records_equal(before_record, current_record):
-            continue
-        if current_record is None or not current_matches_trusted(
-            current_record,
-            manifest_entry,
-            authorized.get(key),
-        ):
-            conflicts.append(key)
-    conflict_keys = set(conflicts)
-
     restored = 0
     for key in sorted(declared, reverse=True):
-        if key in conflict_keys:
-            continue
+        manifest_entry = declared[key]
         before_record = before.get(key)
-        current_record = current.get(key)
-        if records_equal(before_record, current_record):
-            continue
         scope, relative = key.split(":", 1)
         root = scope_root(scope, target, claude_home)
         destination = safe_destination(root, relative)
-        if before_record is None:
-            if destination.exists():
-                destination.unlink()
-                remove_empty_parents(destination, root)
-        else:
-            snapshot_record = dict(before_record)
-            snapshot_record["source"] = snapshot_file_path(
+        publish_stage = publish_stage_path(snapshot, destination)
+        try:
+            prepare_internal_stage(publish_stage)
+        except InstallStateError:
+            conflicts.append(key)
+            continue
+        base_capture = capture_path_for(snapshot, destination)
+        base_capture_valid = False
+        if base_capture.exists():
+            if before_record is None:
+                conflicts.append(key)
+                continue
+            try:
+                captured = path_record(manifest_entry, base_capture)
+            except (InstallStateError, OSError):
+                conflicts.append(key)
+                continue
+            if not records_equal(before_record, captured):
+                if not destination.exists():
+                    try:
+                        restore_capture_exclusive(base_capture, destination)
+                    except InstallStateError:
+                        pass
+                conflicts.append(key)
+                continue
+            base_capture_valid = True
+
+        mutation_capture = recovery_capture_path(snapshot, destination)
+        try:
+            current_record = optional_path_record(
+                manifest_entry,
+                destination,
+            )
+        except InstallStateError:
+            conflicts.append(key)
+            continue
+        allowed = [before_record]
+        if current_record is None:
+            if (
+                before_record is not None
+                and not base_capture_valid
+                and not mutation_capture.exists()
+            ):
+                conflicts.append(key)
+                continue
+            if before_record is not None:
+                allowed.append(None)
+        elif not records_equal(before_record, current_record):
+            if not current_matches_trusted(
+                current_record,
+                manifest_entry,
+                authorized.get(key),
+            ):
+                conflicts.append(key)
+                continue
+            allowed.append(current_record)
+
+        if mutation_capture.exists():
+            try:
+                mutation_record = path_record(
+                    manifest_entry,
+                    mutation_capture,
+                )
+            except (InstallStateError, OSError):
+                conflicts.append(key)
+                continue
+            if (
+                not records_equal(mutation_record, before_record)
+                and not current_matches_trusted(
+                    mutation_record,
+                    manifest_entry,
+                    authorized.get(key),
+                )
+            ):
+                if not destination.exists():
+                    try:
+                        restore_capture_exclusive(
+                            mutation_capture,
+                            destination,
+                        )
+                    except InstallStateError:
+                        pass
+                conflicts.append(key)
+                continue
+            allowed.append(mutation_record)
+
+        desired = None
+        if before_record is not None:
+            desired = dict(before_record)
+            desired["source"] = snapshot_file_path(
                 snapshot,
                 scope,
                 relative,
             )
-            copy_record_file(snapshot_record, destination)
-        restored += 1
+        try:
+            changed = converge_path_exclusive(
+                manifest_entry,
+                destination,
+                allowed,
+                desired,
+                mutation_capture,
+                internal_path(snapshot, destination, "rollback-stage"),
+            )
+        except (InstallStateError, OSError):
+            conflicts.append(key)
+            continue
+        if base_capture.exists():
+            remove_path_durably(base_capture)
+        if publish_stage.exists():
+            remove_path_durably(publish_stage)
+        if changed:
+            if before_record is None:
+                remove_empty_parents(destination, root)
+            restored += 1
+
     if conflicts:
         raise InstallStateError(
             f"rollback restored {restored} safe files but preserved unexpected "
             "drift on declared paths: " + ", ".join(conflicts)
         )
+    update_transaction(snapshot, "aborted")
+    return restored
+
+
+def command_abort(args: argparse.Namespace) -> int:
+    target = validate_target(Path(args.target))
+    claude_home = Path(args.claude_home).expanduser().resolve(strict=False)
+    snapshot = Path(args.snapshot)
+    transaction = read_transaction(snapshot)
+    if transaction["status"] in {"commit-ready", "committed"}:
+        complete_install_commit(
+            snapshot,
+            target,
+            claude_home,
+            transaction,
+        )
+        cleanup_transaction_directory(snapshot, target)
+        print("commit recovered: 1 transaction")
+        return 0
+    restored = rollback_snapshot(
+        target,
+        claude_home,
+        snapshot,
+        args.include_home,
+    )
     print(f"rolled back: {restored} declared files")
+    cleanup_transaction_directory(snapshot, target)
     return 0
+
+
+def cleanup_install_captures(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+    manifest: list[dict],
+) -> None:
+    for entry in manifest:
+        destination = safe_destination(
+            scope_root(entry["scope"], target, claude_home),
+            entry["path"],
+        )
+        for internal in (
+            capture_path_for(snapshot, destination),
+            publish_stage_path(snapshot, destination),
+        ):
+            if internal.exists():
+                remove_path_durably(internal)
 
 
 def changed_record_keys(before: dict, after: dict) -> set[str]:
@@ -1180,6 +1963,11 @@ def command_finalize(args: argparse.Namespace) -> int:
     target = validate_target(Path(args.target))
     claude_home = Path(args.claude_home).expanduser().resolve(strict=False)
     snapshot = Path(args.snapshot)
+    transaction = read_transaction(snapshot)
+    if transaction["status"] != "prepared":
+        raise InstallStateError(
+            f"transaction is not finalizable: {transaction['status']}"
+        )
     snapshot_meta, manifest, before = deserialize_snapshot(snapshot)
     validate_snapshot_identity(
         snapshot_meta,
@@ -1196,6 +1984,22 @@ def command_finalize(args: argparse.Namespace) -> int:
     validate_snapshot_payload(snapshot, before)
     after = scan_manifest(target, claude_home, manifest)
     authorized = load_authorized_entries(snapshot, manifest)
+    declared = manifest_by_key(manifest)
+    for key, manifest_entry in declared.items():
+        if (
+            manifest_entry["expected_sha256"] is None
+            or key not in transaction["published"]
+        ):
+            continue
+        current = after.get(key)
+        if (
+            current is None
+            or current["sha256"] != manifest_entry["expected_sha256"]
+            or current["mode"] != manifest_entry["expected_mode"]
+        ):
+            raise InstallStateError(
+                f"managed file changed before finalize: {key}"
+            )
     for key, authorized_entry in authorized.items():
         current = after.get(key)
         if (
@@ -1207,6 +2011,12 @@ def command_finalize(args: argparse.Namespace) -> int:
                 f"authorized generated file changed before finalize: {key}"
             )
     changed_keys = changed_record_keys(before, after)
+    unjournaled = changed_keys - set(transaction["published"])
+    if unjournaled:
+        raise InstallStateError(
+            "finalize found changes without a completed publish journal; "
+            "run recover instead: " + ", ".join(sorted(unjournaled))
+        )
 
     ensure_state_is_git_local(target)
     existing_state = load_existing_state(target)
@@ -1227,12 +2037,17 @@ def command_finalize(args: argparse.Namespace) -> int:
             existing_entries[f"{entry['scope']}:{entry['path']}"] = entry
 
     state_home = resolved_state_home(create=True)
-    pending = Path(
-        tempfile.mkdtemp(prefix=".pending-", dir=state_home)
-    )
-    os.chmod(pending, 0o700)
     state_id = secrets.token_hex(16)
+    pending = state_home / f".pending-{state_id}"
+    ensure_directory_durable(pending)
+    os.chmod(pending, 0o700)
     state_root = state_home / state_id
+    update_transaction(
+        snapshot,
+        "prepared",
+        pending_state_id=state_id,
+        old_state_id=existing_state["state_id"] if existing_state else None,
+    )
     try:
         entries = []
         for key in sorted(set(existing_entries) | changed_keys):
@@ -1329,24 +2144,221 @@ def command_finalize(args: argparse.Namespace) -> int:
             validate_payload_file(entry, pending, "previous")
             validate_payload_file(entry, pending, "installed")
         os.rename(pending, state_root)
-        try:
-            write_json_atomic(target / STATE_RELATIVE_PATH, state)
-        except Exception:
-            shutil.rmtree(state_root, ignore_errors=True)
-            raise
+        fsync_directory(state_home)
+        fault_point("finalize_after_state_generation")
+        write_json_atomic(snapshot / "next-state.json", state)
+        update_transaction(snapshot, "commit-ready")
+        fault_point("finalize_after_commit_ready")
+        write_json_atomic(target / STATE_RELATIVE_PATH, state)
+        fault_point("finalize_after_state_publish")
+        update_transaction(snapshot, "committed")
     finally:
         if pending.exists():
-            shutil.rmtree(pending, ignore_errors=True)
+            cleanup_state_generation(pending, target)
 
+    cleanup_install_captures(snapshot, target, claude_home, manifest)
     if old_state_root and old_state_root != state_root:
         try:
-            shutil.rmtree(old_state_root)
+            cleanup_state_generation(old_state_root, target)
         except OSError as error:
             print(
                 f"WARNING: stale state generation retained: {old_state_root}: {error}",
                 file=sys.stderr,
             )
+    cleanup_transaction_directory(snapshot, target)
     print(f"managed: {len(changed_keys)} changed files")
+    return 0
+
+
+def cleanup_pending_generation(transaction: dict, target: Path) -> None:
+    state_id = transaction["pending_state_id"]
+    if state_id is None:
+        return
+    state_home = resolved_state_home(create=True)
+    for path in (state_home / state_id, state_home / f".pending-{state_id}"):
+        if path.exists():
+            if path.is_symlink() or not path.is_dir():
+                raise InstallStateError(
+                    f"pending state generation is unsafe: {path}"
+                )
+            cleanup_state_generation(path, target)
+
+
+def complete_install_commit(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+    transaction: dict,
+) -> None:
+    state_path = snapshot / "next-state.json"
+    if not state_path.exists() or state_path.is_symlink():
+        raise InstallStateError(
+            f"commit-ready transaction is missing next state: {state_path}"
+        )
+    state = validate_state(read_json(state_path))
+    if (
+        state["target_id"] != path_identity(target)
+        or state["claude_home_id"] != path_identity(claude_home)
+        or state["state_id"] != transaction["pending_state_id"]
+    ):
+        raise InstallStateError("commit-ready transaction identity mismatch")
+    state_root = state_root_for(state["state_id"], must_exist=True)
+    for entry in state["entries"]:
+        validate_payload_file(entry, state_root, "previous")
+        validate_payload_file(entry, state_root, "installed")
+        destination = safe_destination(
+            scope_root(entry["scope"], target, claude_home),
+            entry["path"],
+        )
+        if entry["installed_exists"]:
+            if (
+                not destination.exists()
+                or destination.is_symlink()
+                or not destination.is_file()
+                or not record_matches_entry(
+                    path_record(entry, destination),
+                    entry,
+                    "installed",
+                )
+            ):
+                raise InstallStateError(
+                    "managed file changed during commit recovery: "
+                    f"{entry['scope']}:{entry['path']}"
+                )
+        elif destination.exists():
+            raise InstallStateError(
+                "managed file appeared during commit recovery: "
+                f"{entry['scope']}:{entry['path']}"
+            )
+    write_json_atomic(target / STATE_RELATIVE_PATH, state)
+    update_transaction(snapshot, "committed")
+    _, manifest, _ = deserialize_snapshot(snapshot)
+    cleanup_install_captures(snapshot, target, claude_home, manifest)
+    old_state_id = transaction["old_state_id"]
+    if old_state_id and old_state_id != state["state_id"]:
+        old_state_root = state_root_for(old_state_id, must_exist=False)
+        if old_state_root.exists():
+            cleanup_state_generation(old_state_root, target)
+
+
+def recover_install_transaction(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+) -> None:
+    transaction = read_transaction(snapshot)
+    if (
+        transaction["target_id"] != path_identity(target)
+        or transaction["claude_home_id"] != path_identity(claude_home)
+    ):
+        raise InstallStateError(
+            f"transaction identity does not match recovery request: {snapshot}"
+        )
+    status = transaction["status"]
+    if status == "initializing":
+        cleanup_pending_generation(transaction, target)
+        cleanup_transaction_directory(snapshot, target)
+        return
+    if status in {"commit-ready", "committed"}:
+        complete_install_commit(
+            snapshot,
+            target,
+            claude_home,
+            transaction,
+        )
+        cleanup_transaction_directory(snapshot, target)
+        return
+    if status in {"prepared", "aborted"}:
+        if status == "prepared":
+            rollback_snapshot(
+                target,
+                claude_home,
+                snapshot,
+                transaction["include_home"],
+            )
+        cleanup_pending_generation(transaction, target)
+        cleanup_transaction_directory(snapshot, target)
+        return
+    raise InstallStateError(f"unsupported transaction status: {status}")
+
+
+def recover_runtime_transaction(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+) -> None:
+    journal = read_runtime_transaction(snapshot)
+    if (
+        journal["target_id"] != path_identity(target)
+        or journal["claude_home_id"] != path_identity(claude_home)
+    ):
+        raise InstallStateError(
+            f"runtime transaction identity mismatch: {snapshot}"
+        )
+    if journal["status"] == "initializing":
+        cleanup_transaction_directory(snapshot, target)
+        return
+    state = runtime_state(snapshot)
+    state_root = state_root_for(state["state_id"], must_exist=False)
+    side = "before" if journal["status"] == "prepared" else "after"
+    restore_runtime_side(
+        snapshot,
+        target,
+        claude_home,
+        journal,
+        state,
+        state_root,
+        side,
+    )
+    state_file = target / STATE_RELATIVE_PATH
+    if journal["kind"] == "uninstall":
+        if side == "before":
+            write_json_atomic(state_file, state)
+        else:
+            remove_path_durably(state_file)
+            if state_root.exists():
+                cleanup_state_generation(state_root, target)
+    if side == "after" and journal["status"] != "committed":
+        update_runtime_transaction(snapshot, "committed")
+    cleanup_transaction_directory(snapshot, target)
+
+
+def recover_incomplete_transactions(
+    target: Path,
+    claude_home: Path,
+) -> int:
+    cleanup_stale_tombstones(target)
+    parent = transaction_parent_for(target, create=True)
+    recovered = 0
+    for snapshot in sorted(parent.iterdir()):
+        if snapshot.is_symlink() or not snapshot.is_dir():
+            raise InstallStateError(
+                f"unsafe transaction entry blocks recovery: {snapshot}"
+            )
+        if transaction_file(snapshot).is_file():
+            recover_install_transaction(snapshot, target, claude_home)
+        elif runtime_transaction_file(snapshot).is_file():
+            recover_runtime_transaction(snapshot, target, claude_home)
+        else:
+            raise InstallStateError(
+                f"transaction journal missing; manual review required: {snapshot}"
+            )
+        recovered += 1
+    return recovered
+
+
+def command_recover(args: argparse.Namespace) -> int:
+    target = validate_target(Path(args.target))
+    claude_home = Path(args.claude_home).expanduser().resolve(strict=False)
+    recovered = recover_incomplete_transactions(target, claude_home)
+    render_result(
+        {
+            "schema_version": SCHEMA_VERSION,
+            "status": "recovered",
+            "recovered": recovered,
+        },
+        args.json,
+    )
     return 0
 
 
@@ -1439,67 +2451,6 @@ def command_doctor(args: argparse.Namespace) -> int:
     return 1 if report["status"] == "drifted" else 0
 
 
-def apply_entries_transactionally(
-    entries: list[dict],
-    prefix: str,
-    target: Path,
-    claude_home: Path,
-    state_root: Path,
-    expected_records: dict[str, dict | None],
-    after_apply=None,
-) -> None:
-    applied: list[tuple[dict, Path, Path | None]] = []
-    try:
-        for entry in entries:
-            key = f"{entry['scope']}:{entry['path']}"
-            destination, quarantine = quarantine_expected_entry(
-                entry,
-                expected_records[key],
-                target,
-                claude_home,
-                "repair",
-            )
-            applied.append((entry, destination, quarantine))
-            if entry[f"{prefix}_exists"]:
-                copy_payload_exclusive(
-                    entry,
-                    prefix,
-                    destination,
-                    state_root,
-                )
-        if after_apply:
-            after_apply()
-    except (InstallStateError, OSError) as error:
-        failures = []
-        for entry, destination, quarantine in reversed(applied):
-            try:
-                rollback_repaired_entry(
-                    entry,
-                    prefix,
-                    destination,
-                    quarantine,
-                )
-            except (InstallStateError, OSError) as rollback_error:
-                failures.append(str(rollback_error))
-        if failures:
-            raise InstallStateError(
-                f"runtime operation failed ({error}); rollback incomplete: "
-                + "; ".join(failures)
-            ) from error
-        raise InstallStateError(
-            f"runtime operation failed and was rolled back: {error}"
-        ) from error
-    for _, _, quarantine in applied:
-        if quarantine is not None and quarantine.exists():
-            try:
-                quarantine.unlink()
-            except OSError as error:
-                print(
-                    f"WARNING: repair quarantine retained: {quarantine}: {error}",
-                    file=sys.stderr,
-                )
-
-
 def path_record(entry: dict, path: Path) -> dict:
     if path.is_symlink() or not path.is_file():
         raise InstallStateError(f"captured path is not a regular file: {path}")
@@ -1539,132 +2490,12 @@ def expected_entry_record(entry: dict, prefix: str) -> dict | None:
     }
 
 
-def quarantine_expected_entry(
-    entry: dict,
-    expected: dict | None,
-    target: Path,
-    claude_home: Path,
-    operation: str,
-) -> tuple[Path, Path | None]:
-    root = scope_root(entry["scope"], target, claude_home)
-    destination = safe_destination(root, entry["path"])
-    if expected is None:
-        if destination.exists():
-            raise InstallStateError(
-                f"managed file changed before {operation}: {destination}"
-            )
-        return destination, None
-    if (
-        not destination.exists()
-        or destination.is_symlink()
-        or not destination.is_file()
-    ):
-        raise InstallStateError(
-            f"managed file changed before {operation}: {destination}"
-        )
-    quarantine = destination.with_name(
-        f".{destination.name}.ccg-quarantine-{secrets.token_hex(8)}"
-    )
-    os.replace(destination, quarantine)
-    try:
-        captured = path_record(entry, quarantine)
-        if records_equal(captured, expected):
-            return destination, quarantine
-        error = InstallStateError(
-            f"managed file changed during {operation}: {destination}"
-        )
-    except (InstallStateError, OSError) as capture_error:
-        error = capture_error
-
-    if not destination.exists():
-        try:
-            restore_capture_exclusive(quarantine, destination)
-        except (InstallStateError, OSError) as restore_error:
-            raise InstallStateError(
-                f"{operation} capture failed ({error}); {restore_error}; "
-                f"captured file preserved at {quarantine}"
-            ) from error
-        raise InstallStateError(
-            f"{operation} capture failed and was restored: {error}"
-        ) from error
-    raise InstallStateError(
-        f"{operation} capture failed ({error}); concurrent destination "
-        f"preserved and captured file retained at {quarantine}"
-    ) from error
-
-
-def rollback_repaired_entry(
-    entry: dict,
-    prefix: str,
-    destination: Path,
-    quarantine: Path | None,
-) -> None:
-    discard = None
-    if destination.exists():
-        if destination.is_symlink() or not destination.is_file():
-            suffix = (
-                f"; original capture preserved at {quarantine}"
-                if quarantine is not None
-                else ""
-            )
-            raise InstallStateError(
-                f"repair rollback found concurrent drift: {destination}{suffix}"
-            )
-        discard = destination.with_name(
-            f".{destination.name}.ccg-discard-{secrets.token_hex(8)}"
-        )
-        os.replace(destination, discard)
-        try:
-            written = path_record(entry, discard)
-            if not record_matches_entry(written, entry, prefix):
-                raise InstallStateError(
-                    f"repair rollback found concurrent drift: {destination}"
-                )
-        except (InstallStateError, OSError) as error:
-            try:
-                restore_capture_exclusive(discard, destination)
-                discard = None
-            except (InstallStateError, OSError) as restore_error:
-                raise InstallStateError(
-                    f"repair rollback capture failed ({error}); "
-                    f"{restore_error}; captured file preserved at {discard}"
-                ) from error
-            suffix = (
-                f"; original capture preserved at {quarantine}"
-                if quarantine is not None
-                else ""
-            )
-            raise InstallStateError(f"{error}{suffix}") from error
-    elif entry[f"{prefix}_exists"] and quarantine is None:
-        return
-
-    if quarantine is not None:
-        try:
-            restore_capture_exclusive(quarantine, destination)
-            quarantine = None
-        except (InstallStateError, OSError) as error:
-            if discard is not None and discard.exists() and not destination.exists():
-                try:
-                    restore_capture_exclusive(discard, destination)
-                    discard = None
-                except (InstallStateError, OSError) as restore_error:
-                    raise InstallStateError(
-                        f"repair rollback failed ({error}); {restore_error}; "
-                        f"captures preserved at {quarantine} and {discard}"
-                    ) from error
-            raise InstallStateError(
-                f"repair rollback failed; original capture preserved at "
-                f"{quarantine}: {error}"
-            ) from error
-    if discard is not None and discard.exists():
-        discard.unlink()
-
-
 def copy_payload_exclusive(
     entry: dict,
     prefix: str,
     destination: Path,
     state_root: Path,
+    stage: Path,
 ) -> None:
     source = state_payload_path(
         state_root,
@@ -1673,152 +2504,335 @@ def copy_payload_exclusive(
         entry["path"],
     )
     record = payload_record(entry, prefix, source)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    temp_path = destination.with_name(
-        f".{destination.name}.install-{os.getpid()}-{secrets.token_hex(4)}"
-    )
-    try:
-        shutil.copyfile(source, temp_path, follow_symlinks=False)
-        apply_metadata(
-            temp_path,
-            record["mode"],
-            record["uid"],
-            record["gid"],
-        )
-        os.link(temp_path, destination, follow_symlinks=False)
-    except FileExistsError as error:
-        raise InstallStateError(
-            f"destination changed during operation: {destination}"
-        ) from error
-    finally:
-        if temp_path.exists():
-            temp_path.unlink()
+    copy_record_file_exclusive(record, destination, stage)
 
 
-def quarantine_installed_entry(
-    entry: dict,
+def runtime_entry_before_record(entry: dict) -> dict | None:
+    if not entry["before_exists"]:
+        return None
+    return {
+        "scope": entry["scope"],
+        "path": entry["path"],
+        "sha256": entry["before_sha256"],
+        "mode": entry["before_mode"],
+        "uid": entry["before_uid"],
+        "gid": entry["before_gid"],
+    }
+
+
+def begin_runtime_transaction(
+    kind: str,
     target: Path,
     claude_home: Path,
-) -> tuple[Path, Path | None]:
-    return quarantine_expected_entry(
-        entry,
-        expected_entry_record(entry, "installed"),
-        target,
-        claude_home,
-        "uninstall",
-    )
-
-
-def rollback_quarantined_entry(
-    entry: dict,
-    destination: Path,
-    quarantine: Path | None,
-) -> None:
-    if entry["previous_exists"]:
-        if not destination.exists() or not destination.is_file():
-            raise InstallStateError(
-                f"uninstall rollback destination changed: {destination}"
-            )
-        discard = destination.with_name(
-            f".{destination.name}.ccg-discard-{secrets.token_hex(8)}"
-        )
-        os.replace(destination, discard)
-        try:
-            written = path_record(entry, discard)
-            if not record_matches_entry(written, entry, "previous"):
-                raise InstallStateError(
-                    f"uninstall rollback found concurrent drift: {destination}"
-                )
-        except (InstallStateError, OSError) as error:
-            if not destination.exists():
-                try:
-                    restore_capture_exclusive(discard, destination)
-                    discard = None
-                except (InstallStateError, OSError) as restore_error:
-                    raise InstallStateError(
-                        f"uninstall rollback capture failed ({error}); "
-                        f"{restore_error}; captures preserved at "
-                        f"{quarantine} and {discard}"
-                    ) from error
-            suffix = (
-                f"; installed capture preserved at {quarantine}"
-                if quarantine is not None
-                else ""
-            )
-            raise InstallStateError(f"{error}{suffix}") from error
-        if quarantine is None:
-            discard.unlink()
-            return
-        try:
-            restore_capture_exclusive(quarantine, destination)
-        except (InstallStateError, OSError) as error:
-            raise InstallStateError(
-                f"uninstall rollback failed; captures preserved at "
-                f"{quarantine} and {discard}: {error}"
-            ) from error
-        discard.unlink()
-        return
-    if destination.exists():
-        raise InstallStateError(
-            f"uninstall rollback found concurrent drift: {destination}; "
-            f"installed capture preserved at {quarantine}"
-        )
-    if quarantine is not None:
-        restore_capture_exclusive(quarantine, destination)
-
-
-def uninstall_entries_transactionally(
+    state: dict,
     entries: list[dict],
-    target: Path,
-    claude_home: Path,
-    state_root: Path,
-    state_file: Path,
-) -> None:
-    applied: list[tuple[dict, Path, Path | None]] = []
+    before_records: dict[str, dict | None],
+) -> Path:
+    snapshot = new_transaction_path(target)
+    serialized_entries = []
+    for entry in entries:
+        key = f"{entry['scope']}:{entry['path']}"
+        before = before_records[key]
+        serialized_entries.append(
+            {
+                "scope": entry["scope"],
+                "path": entry["path"],
+                "before_exists": before is not None,
+                "before_sha256": before["sha256"] if before else None,
+                "before_mode": before["mode"] if before else None,
+                "before_uid": before["uid"] if before else None,
+                "before_gid": before["gid"] if before else None,
+                "after_prefix": (
+                    "installed" if kind == "repair" else "previous"
+                ),
+            }
+        )
+    journal = {
+        "schema_version": SCHEMA_VERSION,
+        "kind": kind,
+        "status": "initializing",
+        "target_id": path_identity(target),
+        "claude_home_id": path_identity(claude_home),
+        "state_id": state["state_id"],
+        "entries": serialized_entries,
+    }
+    initialize_transaction_directory(
+        snapshot,
+        runtime_transaction_file(snapshot).name,
+        journal,
+    )
+    write_json_atomic(snapshot / "state.json", state)
     try:
         for entry in entries:
-            destination, quarantine = quarantine_installed_entry(
-                entry,
-                target,
-                claude_home,
+            key = f"{entry['scope']}:{entry['path']}"
+            expected = before_records[key]
+            destination = safe_destination(
+                scope_root(entry["scope"], target, claude_home),
+                entry["path"],
             )
-            applied.append((entry, destination, quarantine))
-            if entry["previous_exists"]:
+            current = (
+                path_record(entry, destination)
+                if destination.exists()
+                and not destination.is_symlink()
+                and destination.is_file()
+                else None
+            )
+            if not records_equal(expected, current):
+                raise InstallStateError(
+                    f"managed file changed before {kind}: {destination}"
+                )
+            if expected is not None:
+                record = dict(expected)
+                record["source"] = destination
+                copy_record_file(
+                    record,
+                    runtime_before_path(
+                        snapshot,
+                        entry["scope"],
+                        entry["path"],
+                    ),
+                )
+        update_runtime_transaction(snapshot, "prepared")
+    except Exception:
+        if snapshot.exists():
+            cleanup_directory_durably(snapshot, "aborted-runtime")
+        raise
+    return snapshot
+
+
+def runtime_state(snapshot: Path) -> dict:
+    state_path = snapshot / "state.json"
+    if not state_path.exists() or state_path.is_symlink():
+        raise InstallStateError(
+            f"runtime transaction state is missing or unsafe: {state_path}"
+        )
+    return validate_state(read_json(state_path))
+
+
+def runtime_state_and_root(snapshot: Path) -> tuple[dict, Path]:
+    state = runtime_state(snapshot)
+    return state, state_root_for(state["state_id"], must_exist=True)
+
+
+def runtime_state_entries(state: dict) -> dict[str, dict]:
+    return {
+        f"{entry['scope']}:{entry['path']}": entry
+        for entry in state["entries"]
+    }
+
+
+def restore_runtime_side(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+    journal: dict,
+    state: dict,
+    state_root: Path,
+    side: str,
+) -> None:
+    state_entries = runtime_state_entries(state)
+    for runtime_entry in journal["entries"]:
+        key = f"{runtime_entry['scope']}:{runtime_entry['path']}"
+        state_entry = state_entries[key]
+        before = runtime_entry_before_record(runtime_entry)
+        after = expected_entry_record(
+            state_entry,
+            runtime_entry["after_prefix"],
+        )
+        destination = safe_destination(
+            scope_root(runtime_entry["scope"], target, claude_home),
+            runtime_entry["path"],
+        )
+        operation_capture = runtime_capture_path(snapshot, destination)
+        operation_capture_valid = False
+        if operation_capture.exists():
+            try:
+                captured = path_record(state_entry, operation_capture)
+            except (InstallStateError, OSError) as error:
+                if not destination.exists():
+                    try:
+                        restore_capture_exclusive(
+                            operation_capture,
+                            destination,
+                        )
+                    except InstallStateError:
+                        pass
+                raise InstallStateError(
+                    f"runtime capture could not be verified: {key}"
+                ) from error
+            if not records_equal(captured, before):
+                if not destination.exists():
+                    restore_capture_exclusive(
+                        operation_capture,
+                        destination,
+                    )
+                raise InstallStateError(
+                    "runtime recovery preserved an edit captured after "
+                    f"validation: {key}"
+                )
+            operation_capture_valid = True
+
+        desired = (
+            before
+            if side == "before"
+            else after
+        )
+        desired_with_source = None
+        if desired is not None:
+            desired_with_source = dict(desired)
+            if side == "before":
+                desired_with_source["source"] = runtime_before_path(
+                    snapshot,
+                    runtime_entry["scope"],
+                    runtime_entry["path"],
+                )
+            else:
+                desired_with_source["source"] = state_payload_path(
+                    state_root,
+                    runtime_entry["after_prefix"],
+                    runtime_entry["scope"],
+                    runtime_entry["path"],
+                )
+        allowed = [before, after]
+        if operation_capture_valid and not record_matches_any(None, allowed):
+            allowed.append(None)
+        converge_path_exclusive(
+            state_entry,
+            destination,
+            allowed,
+            desired_with_source,
+            recovery_capture_path(snapshot, destination),
+            runtime_stage_path(snapshot, destination),
+        )
+        if operation_capture.exists():
+            remove_path_durably(operation_capture)
+
+
+def execute_runtime_transaction(
+    snapshot: Path,
+    target: Path,
+    claude_home: Path,
+    state: dict,
+    state_root: Path,
+) -> None:
+    journal = read_runtime_transaction(snapshot)
+    state_entries = runtime_state_entries(state)
+    try:
+        for runtime_entry in journal["entries"]:
+            key = f"{runtime_entry['scope']}:{runtime_entry['path']}"
+            state_entry = state_entries[key]
+            expected = runtime_entry_before_record(runtime_entry)
+            destination = safe_destination(
+                scope_root(runtime_entry["scope"], target, claude_home),
+                runtime_entry["path"],
+            )
+            capture = runtime_capture_path(snapshot, destination)
+            if capture.exists():
+                raise InstallStateError(
+                    f"runtime transaction capture already exists: {capture}"
+                )
+            if expected is not None:
+                if (
+                    not destination.exists()
+                    or destination.is_symlink()
+                    or not destination.is_file()
+                ):
+                    raise InstallStateError(
+                        f"managed file changed before {journal['kind']}: "
+                        f"{destination}"
+                    )
+                os.replace(destination, capture)
+                fsync_directory(destination.parent)
+                try:
+                    captured = path_record(state_entry, capture)
+                except (InstallStateError, OSError) as error:
+                    if not destination.exists():
+                        restore_capture_exclusive(capture, destination)
+                    raise InstallStateError(
+                        f"managed file capture failed during "
+                        f"{journal['kind']}: {destination}"
+                    ) from error
+                if not records_equal(captured, expected):
+                    if not destination.exists():
+                        restore_capture_exclusive(capture, destination)
+                    raise InstallStateError(
+                        f"managed file changed during {journal['kind']}: "
+                        f"{destination}"
+                    )
+                fault_point(f"{journal['kind']}_after_capture")
+            elif destination.exists():
+                raise InstallStateError(
+                    f"managed file appeared during {journal['kind']}: "
+                    f"{destination}"
+                )
+            prefix = runtime_entry["after_prefix"]
+            if state_entry[f"{prefix}_exists"]:
                 copy_payload_exclusive(
-                    entry,
-                    "previous",
+                    state_entry,
+                    prefix,
                     destination,
                     state_root,
+                    runtime_stage_path(snapshot, destination),
                 )
-        state_file.unlink()
+            fault_point(f"{journal['kind']}_after_publish")
+
+        update_runtime_transaction(snapshot, "commit-ready")
+        if journal["kind"] == "uninstall":
+            remove_path_durably(target / STATE_RELATIVE_PATH)
+            fault_point("uninstall_after_state_unlink")
+        update_runtime_transaction(snapshot, "committed")
     except (InstallStateError, OSError) as error:
-        failures = []
-        for entry, destination, quarantine in reversed(applied):
-            try:
-                rollback_quarantined_entry(
-                    entry,
-                    destination,
-                    quarantine,
-                )
-            except (InstallStateError, OSError) as rollback_error:
-                failures.append(str(rollback_error))
-        if failures:
+        journal = read_runtime_transaction(snapshot)
+        side = (
+            "before"
+            if journal["status"] == "prepared"
+            else "after"
+        )
+        try:
+            restore_runtime_side(
+                snapshot,
+                target,
+                claude_home,
+                journal,
+                state,
+                state_root,
+                side,
+            )
+            state_file = target / STATE_RELATIVE_PATH
+            if journal["kind"] == "uninstall":
+                if side == "before":
+                    write_json_atomic(state_file, state)
+                else:
+                    remove_path_durably(state_file)
+                    if state_root.exists():
+                        cleanup_state_generation(state_root, target)
+            if side == "after" and journal["status"] != "committed":
+                update_runtime_transaction(snapshot, "committed")
+            cleanup_transaction_directory(snapshot, target)
+        except (InstallStateError, OSError) as recovery_error:
             raise InstallStateError(
-                f"uninstall failed ({error}); rollback incomplete: "
-                + "; ".join(failures)
+                f"runtime operation failed ({error}); recovery failed: "
+                f"{recovery_error}; transaction preserved at {snapshot}"
             ) from error
+        if side == "after":
+            return
         raise InstallStateError(
-            f"uninstall failed and was rolled back: {error}"
+            f"runtime operation failed and was rolled back: {error}"
         ) from error
-    for _, _, quarantine in applied:
-        if quarantine is not None and quarantine.exists():
-            try:
-                quarantine.unlink()
-            except OSError as error:
-                print(
-                    f"WARNING: uninstall quarantine retained: {quarantine}: {error}",
-                    file=sys.stderr,
-                )
+
+    restore_runtime_side(
+        snapshot,
+        target,
+        claude_home,
+        read_runtime_transaction(snapshot),
+        state,
+        state_root,
+        "after",
+    )
+    if journal["kind"] == "uninstall":
+        cleanup_state_generation(state_root, target)
+        fault_point("uninstall_after_state_generation_cleanup")
+    cleanup_transaction_directory(snapshot, target)
 
 
 def command_repair(args: argparse.Namespace) -> int:
@@ -1843,13 +2857,20 @@ def command_repair(args: argparse.Namespace) -> int:
                 scope_root(entry["scope"], target, claude_home),
                 entry["path"],
             )
-        apply_entries_transactionally(
-            entries,
-            "installed",
+        snapshot = begin_runtime_transaction(
+            "repair",
             target,
             claude_home,
-            state_root,
+            state,
+            entries,
             observed,
+        )
+        execute_runtime_transaction(
+            snapshot,
+            target,
+            claude_home,
+            state,
+            state_root,
         )
     result = {
         "schema_version": SCHEMA_VERSION,
@@ -1877,20 +2898,29 @@ def command_uninstall(args: argparse.Namespace) -> int:
                 scope_root(entry["scope"], target, claude_home),
                 entry["path"],
             )
-        uninstall_entries_transactionally(
-            list(reversed(state["entries"])),
+        entries = list(reversed(state["entries"]))
+        before_records = {
+            f"{entry['scope']}:{entry['path']}": expected_entry_record(
+                entry,
+                "installed",
+            )
+            for entry in entries
+        }
+        snapshot = begin_runtime_transaction(
+            "uninstall",
             target,
             claude_home,
-            state_root,
-            target / STATE_RELATIVE_PATH,
+            state,
+            entries,
+            before_records,
         )
-        try:
-            shutil.rmtree(state_root)
-        except OSError as error:
-            print(
-                f"WARNING: stale state generation retained: {state_root}: {error}",
-                file=sys.stderr,
-            )
+        execute_runtime_transaction(
+            snapshot,
+            target,
+            claude_home,
+            state,
+            state_root,
+        )
     result = {
         "schema_version": SCHEMA_VERSION,
         "status": "planned" if args.dry_run else "uninstalled",
@@ -1924,13 +2954,31 @@ def add_common_runtime_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--json", action="store_true")
 
 
+def command_transaction_path(args: argparse.Namespace) -> int:
+    target = validate_target(Path(args.target))
+    print(new_transaction_path(target))
+    return 0
+
+
+def command_lock_path(args: argparse.Namespace) -> int:
+    target = validate_target(Path(args.target))
+    state_home = resolved_state_home(create=True)
+    lock_root = state_home / "locks"
+    if lock_root.is_symlink():
+        raise InstallStateError(f"lock directory must not be a symlink: {lock_root}")
+    ensure_directory_durable(lock_root)
+    os.chmod(lock_root, 0o700)
+    print(lock_root / f"{path_identity(target)}.lock")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     begin = subparsers.add_parser("begin")
     add_transaction_identity_arguments(begin)
-    begin.add_argument("--output", required=True)
+    begin.add_argument("--output")
     begin.add_argument(
         "--source",
         default=str(Path(__file__).resolve().parents[1]),
@@ -1944,7 +2992,18 @@ def build_parser() -> argparse.ArgumentParser:
     publish = subparsers.add_parser("publish")
     publish.add_argument("--target", required=True)
     publish.add_argument("--snapshot", required=True)
-    publish.add_argument("--scope", choices=("project",), required=True)
+    publish.add_argument(
+        "--claude-home",
+        default=os.environ.get(
+            "CLAUDE_CONFIG_DIR",
+            str(Path.home() / ".claude"),
+        ),
+    )
+    publish.add_argument(
+        "--scope",
+        choices=("project", "claude-home"),
+        required=True,
+    )
     publish.add_argument("--path", required=True)
     publish.add_argument("--source", required=True)
     publish.set_defaults(handler=command_publish)
@@ -1961,6 +3020,10 @@ def build_parser() -> argparse.ArgumentParser:
     abort.add_argument("--snapshot", required=True)
     abort.set_defaults(handler=command_abort)
 
+    recover = subparsers.add_parser("recover")
+    add_common_runtime_arguments(recover)
+    recover.set_defaults(handler=command_recover)
+
     doctor = subparsers.add_parser("doctor")
     add_common_runtime_arguments(doctor)
     doctor.set_defaults(handler=command_doctor)
@@ -1974,6 +3037,14 @@ def build_parser() -> argparse.ArgumentParser:
     add_common_runtime_arguments(uninstall)
     uninstall.add_argument("--dry-run", action="store_true")
     uninstall.set_defaults(handler=command_uninstall)
+
+    transaction_path = subparsers.add_parser("transaction-path")
+    transaction_path.add_argument("--target", required=True)
+    transaction_path.set_defaults(handler=command_transaction_path)
+
+    lock_path = subparsers.add_parser("lock-path")
+    lock_path.add_argument("--target", required=True)
+    lock_path.set_defaults(handler=command_lock_path)
     return parser
 
 
@@ -1981,7 +3052,27 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
-        return args.handler(args)
+        helper_commands = {"transaction-path", "lock-path"}
+        def run_handler() -> int:
+            should_recover = args.command == "begin" or (
+                args.command in {"repair", "uninstall"}
+                and not args.dry_run
+            )
+            if should_recover:
+                target = validate_target(Path(args.target))
+                claude_home = Path(args.claude_home).expanduser().resolve(
+                    strict=False
+                )
+                recover_incomplete_transactions(target, claude_home)
+            return args.handler(args)
+
+        if (
+            args.command in helper_commands
+            or os.environ.get("CLAUDE_CODE_GUIDE_LOCK_HELD") == "1"
+        ):
+            return run_handler()
+        with target_lock(validate_target(Path(args.target))):
+            return run_handler()
     except InstallStateError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2

@@ -75,7 +75,9 @@ LEVEL3_PATTERNS=(
 # stderr만으로는 Claude Code가 모델 컨텍스트로 surface 하지 않을 수 있음
 # 파일 로그로 영속 기록하여 사후 추적 + 분석 가능
 # 비활성화: LEVEL3_LOG="" (빈 문자열)
-LEVEL3_LOG="${LEVEL3_LOG:-${TMPDIR:-/tmp}/claude-hook-level3.log}"
+if [ "${LEVEL3_LOG+x}" != "x" ]; then
+  LEVEL3_LOG="__PRIVATE_HOOK_STATE__"
+fi
 
 # rm -rf 허용 디렉토리 (빌드 아티팩트 등)
 SAFE_RM_DIRS=(
@@ -178,9 +180,36 @@ for pattern in "${LEVEL3_PATTERNS[@]}"; do
     msg="WARNING: 주의 필요한 명령 — $pattern (cmd: ${COMMAND:0:120})"
     echo "$msg" >&2
     # 영속 로그 (stderr가 모델 컨텍스트로 surface 안 될 가능성 대비)
+    if [ "$LEVEL3_LOG" = "__PRIVATE_HOOK_STATE__" ]; then
+      runtime_root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+      hook_state_dir="${CLAUDE_HOOK_STATE_DIR:-$runtime_root/claude-code-guide-hooks-$(id -u)}"
+      if [ -L "$hook_state_dir" ]; then
+        echo "[safety-careful] unsafe hook state symlink; Level 3 log skipped: $hook_state_dir" >&2
+        LEVEL3_LOG=""
+      else
+        umask 077
+        mkdir -p -m 700 "$hook_state_dir" 2>/dev/null || LEVEL3_LOG=""
+        current_uid=$(id -u)
+        owner=$(stat -c '%u' "$hook_state_dir" 2>/dev/null \
+          || stat -f '%u' "$hook_state_dir" 2>/dev/null \
+          || echo "")
+        if [ "$owner" != "$current_uid" ] || [ ! -d "$hook_state_dir" ] || [ -L "$hook_state_dir" ]; then
+          echo "[safety-careful] unsafe hook state ownership; Level 3 log skipped: $hook_state_dir" >&2
+          LEVEL3_LOG=""
+        elif ! chmod 700 "$hook_state_dir" 2>/dev/null; then
+          LEVEL3_LOG=""
+        else
+          LEVEL3_LOG="$hook_state_dir/level3.log"
+        fi
+      fi
+    fi
     if [ -n "$LEVEL3_LOG" ]; then
       mkdir -p "$(dirname "$LEVEL3_LOG")" 2>/dev/null
-      echo "[$(date '+%Y-%m-%d %H:%M:%S')] $msg" >> "$LEVEL3_LOG" 2>/dev/null || true
+      if [ ! -L "$LEVEL3_LOG" ]; then
+        umask 077
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] $msg" >> "$LEVEL3_LOG" 2>/dev/null || true
+        chmod 600 "$LEVEL3_LOG" 2>/dev/null || true
+      fi
     fi
     exit 0
   fi

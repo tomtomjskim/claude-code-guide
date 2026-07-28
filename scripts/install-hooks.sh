@@ -171,8 +171,18 @@ for hook_name in "${SELECTED_HOOKS[@]}"; do
         continue
     fi
 
-    cp "$SRC_FILE" "$DST_FILE"
-    chmod +x "$DST_FILE"
+    if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
+        python3 "$SCRIPT_DIR/install_state.py" publish \
+          --target "$TARGET" \
+          --claude-home "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" \
+          --snapshot "$CLAUDE_CODE_GUIDE_TRANSACTION" \
+          --scope project \
+          --path "hooks/${hook_name}.sh" \
+          --source "$SRC_FILE"
+    else
+        cp "$SRC_FILE" "$DST_FILE"
+        chmod +x "$DST_FILE"
+    fi
     echo "  OK    $hook_name"
     INSTALLED=$((INSTALLED + 1))
 done
@@ -252,6 +262,7 @@ if [ "$SKIP_SETTINGS" = false ]; then
     if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
         python3 "$SCRIPT_DIR/install_state.py" publish \
           --target "$TARGET" \
+          --claude-home "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" \
           --snapshot "$CLAUDE_CODE_GUIDE_TRANSACTION" \
           --scope project \
           --path settings.local.json \

@@ -50,21 +50,30 @@ enterprise validation 전에 install-state를 확정한다. validation이 실패
 명령은 실패 상태로 끝나지만, 생성된 상태를 이용해 `doctor`로 확인하거나
 `uninstall`로 설치 전 상태를 복원할 수 있다.
 
-skill/hook 설치 단계가 finalize 전에 실패하거나 `HUP`/`INT`/`TERM`을 받으면 begin
-snapshot으로 부분 변경을 자동 rollback한다. rollback은 profile/source에서 선언한
-정확한 write-set만 다루며, 동시 편집처럼 예상 hash와 다른 변경은 삭제하지 않고
-보존하면서 나머지 안전한 경로는 복원한다. target별 install lock이 병렬 설치를
-막는다. 자동 rollback까지 실패하면
-원본 snapshot이 든 권한 제한 임시 디렉터리를 삭제하지 않고 경로를 출력한다.
-동적으로 생성하는 `settings.local.json`은 destination을 바꾸기 전에 생성 결과 hash를
-transaction journal에 기록하고, begin snapshot과 일치하는 base를 같은 디렉터리로
-원자 격리한 뒤 destination이 비어 있을 때만 publish한다. finalize에서도 journal의
-hash와 mode를 다시 확인해 publish 이후 동시 편집을 설치 결과로 채택하지 않는다.
+begin snapshot과 WAL은 임시 `/tmp`가 아니라 XDG user state의
+`transactions/<target-id>/<transaction-id>/`에 둔다. skill, hook,
+`settings.local.json`의 모든 managed file은 destination을 바꾸기 전에 durable
+before-image와 after metadata를 기록한다. transaction journal은 sibling staging
+directory에서 완성한 뒤 registry에 원자 publish하고, 새 directory 계층의 각
+component와 parent entry를 순서대로 `fsync`한다.
+target별 stable `flock`은 병렬 설치를 막고 프로세스 사망 시 커널이 자동 해제한다.
+
+`HUP`/`INT`/`TERM`은 즉시 rollback하고, trap을 실행할 수 없는 `SIGKILL`·process
+crash·reboot는 다음 `quick-setup` 또는 명시적 `recover`에서 복구한다. durable
+commit 전 transaction은 before-image로 rollback하고, commit-ready 이후 transaction은
+새 state를 roll-forward한다. `repair`와 `uninstall`의 capture도 commit 전에는
+삭제하지 않는다. destination이 기록된 before/after 어느 쪽과도 일치하지 않으면
+동시 사용자 편집으로 간주해 보존하고 fail-closed한다.
+
+지원 범위는 `fcntl`, `flock`, same-filesystem rename/link와 file·directory `fsync`를
+제공하는 local POSIX filesystem이다. 네트워크 filesystem, Windows native,
+저장장치/파일시스템 자체 손상은 이 보장의 범위 밖이다.
 
 ## 운영 명령
 
 ```bash
 bash scripts/manage-install.sh doctor --target <project> --json
+bash scripts/manage-install.sh recover --target <project> --json
 bash scripts/manage-install.sh repair --target <project> --dry-run --json
 bash scripts/manage-install.sh repair --target <project>
 bash scripts/manage-install.sh uninstall --target <project> --dry-run --json
@@ -72,6 +81,7 @@ bash scripts/manage-install.sh uninstall --target <project>
 ```
 
 - `doctor`: 관리 파일의 누락, 내용·mode·ownership drift를 읽기 전용으로 검사한다.
+- `recover`: 미완료 WAL을 commit 경계에 따라 rollback 또는 roll-forward한다.
 - `repair`: 처음 관찰한 drift 파일을 원자 격리해 같은 내용인지 다시 확인한 뒤에만
   설치 완료 snapshot으로 복구한다.
 - `uninstall`: drift가 없을 때 설치 전 파일을 복원하고 설치가 만든 파일만 제거한다.
@@ -85,6 +95,27 @@ bash scripts/manage-install.sh uninstall --target <project>
   uninstall해야 한다.
 - 기존 install-state와 source revision이 달라지면 검토 후 `--force`를 명시해야
   하며, source revision과 profile을 동시에 바꾸려면 먼저 uninstall한다.
+
+여기서 `doctor`와 `--dry-run`의 읽기 전용 범위는 managed target 파일과 install-state다.
+동시 lifecycle 작업을 배제하기 위한 XDG state home의 target별 lock directory/file은
+생성되거나 mode가 보정될 수 있다.
+
+## Hook runtime state
+
+Agent counter, 감사 로그, Level 3 로그는 사용자 전용 `0700` runtime 디렉터리를
+공유하되 counter는 hash된 session ID별 `0600` 파일로 분리한다. 누락된 session ID는
+counter를 만들지 않으며, 7일 TTL과 `flock`을 사용한다. 테스트는 별도
+`CLAUDE_HOOK_STATE_DIR`을 사용해 실제 세션 상태를 수정하지 않는다.
+
+legacy `/tmp/claude-hooks/agent-count-unknown`은 자동 초기화하거나 삭제하지 않는다.
+그 작업은 아직 구버전 Hook을 실행 중인 다른 세션의 호출 제한을 되돌릴 수 있다.
+모든 Hook을 v4.5.1로 갱신하고 구버전 세션이 종료된 뒤에만 별도 정리한다.
+
+pre-v4.5.1 중단 설치는 새 WAL 복구 대상이 아니다. v4.5의 before-image는 임의
+`/tmp` 디렉터리에 있었고 project-local directory lock을 사용했다. legacy lock의
+PID가 실제 설치 프로세스인지 확인하고 target과 남은 snapshot을 수동 검토하기
+전에는 `<project>/.claude/.claude-code-guide-install.lock`을 삭제하거나 `--force`
+재설치를 실행하지 않는다.
 
 ## 검증
 

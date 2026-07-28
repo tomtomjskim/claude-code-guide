@@ -111,7 +111,7 @@ dry-run 검토 후 적용하면 check-code, check-spec, qa-test 3 스킬만 추�
 - SETUP wizard: 저장소의 검토된 tag/commit에 있는 SETUP.md
 - 자연어 트리거: "claude-code-guide 설치", "PDARR 워크플로우 적용", "/setup-wizard"
 - 전역 설치 명령: 검토된 checkout에서 bash scripts/install-skills.sh --skills setup-wizard ~/
-- 릴리즈: v4.5 (docs/v4.5-changelog.md 참조)
+- 릴리즈: v4.5.1 (docs/v4.5.1-changelog.md 참조)
 ```
 
 이후 어느 세션에서든 "claude-code-guide 설치해줘" 한 문장으로 전체 흐름 자동 진행.

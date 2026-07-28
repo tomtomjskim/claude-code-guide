@@ -29,6 +29,51 @@ if [ "${CLAUDE_HOOK_TEST:-0}" = "1" ] \
   exit 0
 fi
 
+HOOK_STATE_DIR=""
+prepare_hook_state_dir() {
+  if [ -n "$HOOK_STATE_DIR" ]; then
+    return 0
+  fi
+  local runtime_root owner current_uid
+  runtime_root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+  HOOK_STATE_DIR="${CLAUDE_HOOK_STATE_DIR:-$runtime_root/claude-code-guide-hooks-$(id -u)}"
+  if [ -L "$HOOK_STATE_DIR" ]; then
+    echo "[guard-agent] unsafe hook state symlink; persistent checks skipped: $HOOK_STATE_DIR" >&2
+    HOOK_STATE_DIR=""
+    return 1
+  fi
+  umask 077
+  if ! mkdir -p -m 700 "$HOOK_STATE_DIR" 2>/dev/null; then
+    echo "[guard-agent] hook state directory unavailable; persistent checks skipped: $HOOK_STATE_DIR" >&2
+    HOOK_STATE_DIR=""
+    return 1
+  fi
+  current_uid=$(id -u)
+  owner=$(stat -c '%u' "$HOOK_STATE_DIR" 2>/dev/null \
+    || stat -f '%u' "$HOOK_STATE_DIR" 2>/dev/null \
+    || echo "")
+  if [ "$owner" != "$current_uid" ] || [ ! -d "$HOOK_STATE_DIR" ] || [ -L "$HOOK_STATE_DIR" ]; then
+    echo "[guard-agent] unsafe hook state ownership; persistent checks skipped: $HOOK_STATE_DIR" >&2
+    HOOK_STATE_DIR=""
+    return 1
+  fi
+  chmod 700 "$HOOK_STATE_DIR" 2>/dev/null || {
+    echo "[guard-agent] hook state permissions unavailable; persistent checks skipped: $HOOK_STATE_DIR" >&2
+    HOOK_STATE_DIR=""
+    return 1
+  }
+}
+
+hash_session_id() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s' "$1" | sha256sum | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    printf '%s' "$1" | shasum -a 256 | awk '{print $1}'
+  else
+    printf '%s' "$1" | cksum | awk '{print $1 "-" $2}'
+  fi
+}
+
 # fail-open: hook 자체 오류 시 허용 (명시적 || exit 0 패턴 — P0-H3)
 # (기존 trap 'exit 0' ERR 제거: set -e 없이는 대부분의 에러에서 발동 안 됨)
 
@@ -105,11 +150,12 @@ else
   GREP_MODE="-E"
   # 1회 안내 (P2-M1) — ERE fallback 사용 중임을 알림 (영문 word boundary 정확도 영향)
   # 같은 세션 동안 반복 출력 방지
-  GREP_NOTICE_FILE="${TMPDIR:-/tmp}/.guard-grep-notice"
-  if [ ! -f "$GREP_NOTICE_FILE" ]; then
+  GREP_NOTICE_FILE=""
+  prepare_hook_state_dir && GREP_NOTICE_FILE="$HOOK_STATE_DIR/grep-fallback-notice"
+  if [ -z "$GREP_NOTICE_FILE" ] || [ ! -f "$GREP_NOTICE_FILE" ]; then
     echo "[guard-agent] note: grep -P (PCRE) 미지원 — ERE fallback 사용 중." >&2
     echo "  영문 word boundary (\\b) 정확도 손실 가능. 정확한 PCRE 원하면: brew install grep" >&2
-    touch "$GREP_NOTICE_FILE" 2>/dev/null
+    [ -n "$GREP_NOTICE_FILE" ] && touch "$GREP_NOTICE_FILE" 2>/dev/null
   fi
 fi
 
@@ -151,7 +197,7 @@ fi
 DESCRIPTION=$(echo "$INPUT" | jq -r '.tool_input.description // ""' 2>/dev/null || echo "")
 PROMPT=$(echo "$INPUT" | jq -r '.tool_input.prompt // ""' 2>/dev/null || echo "")
 SUBAGENT_TYPE=$(echo "$INPUT" | jq -r '.tool_input.subagent_type // ""' 2>/dev/null || echo "")
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id | select(type == "string") // ""' 2>/dev/null || echo "")
 
 # ── Rule 1: subagent_type 블랙리스트 ──
 if [ -n "$BLOCKED_TYPES" ]; then
@@ -261,13 +307,46 @@ fi
 
 # ── Rule 6: 세션당 호출 횟수 제한 ──
 if [ "$MAX_AGENT_CALLS" -gt 0 ]; then
-  COUNT_DIR="/tmp/claude-hooks"
-  mkdir -p "$COUNT_DIR"
-  COUNT_FILE="$COUNT_DIR/agent-count-${SESSION_ID}"
-
+  if [ -z "$SESSION_ID" ] || [ "$SESSION_ID" = "unknown" ]; then
+    echo "[guard-agent] session_id missing; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  fi
+  if ! prepare_hook_state_dir; then
+    exit 0
+  fi
+  find "$HOOK_STATE_DIR" -maxdepth 1 -type f -name 'agent-count-*' \
+    -mtime +7 -delete 2>/dev/null || true
+  SESSION_KEY=$(hash_session_id "$SESSION_ID")
+  COUNT_FILE="$HOOK_STATE_DIR/agent-count-${SESSION_KEY}"
+  if [ -L "$COUNT_FILE" ]; then
+    echo "[guard-agent] unsafe counter symlink; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  fi
+  umask 077
+  : >> "$COUNT_FILE" 2>/dev/null || {
+    echo "[guard-agent] counter unavailable; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  }
+  chmod 600 "$COUNT_FILE" 2>/dev/null || {
+    echo "[guard-agent] counter permissions unavailable; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  }
+  exec 9<> "$COUNT_FILE"
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "[guard-agent] flock unavailable; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  fi
+  flock -x 9 || {
+    echo "[guard-agent] counter lock unavailable; Agent call counter skipped (fail-open)." >&2
+    exit 0
+  }
   COUNT=$(cat "$COUNT_FILE" 2>/dev/null || echo 0)
+  case "$COUNT" in
+    ''|*[!0-9]*) COUNT=0 ;;
+  esac
   COUNT=$((COUNT + 1))
-  echo "$COUNT" > "$COUNT_FILE"
+  printf '%s\n' "$COUNT" > "$COUNT_FILE"
+  flock -u 9
 
   if [ "$COUNT" -gt "$MAX_AGENT_CALLS" ]; then
     echo "[BLOCKED] 세션당 Agent 호출 ${MAX_AGENT_CALLS}회 초과 (현재: ${COUNT}회). 메인에서 직접 작업하세요." >&2

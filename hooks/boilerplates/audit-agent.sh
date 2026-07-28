@@ -17,6 +17,33 @@ fi
 # fail-open: hook 자체 오류 시 허용 (PostToolUse는 차단 불가)
 # (기존 trap 'exit 0' ERR 제거 — set -e 없이 무효, 명시적 || exit 0 사용)
 
+prepare_hook_state_dir() {
+  local runtime_root owner current_uid
+  runtime_root="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+  HOOK_STATE_DIR="${CLAUDE_HOOK_STATE_DIR:-$runtime_root/claude-code-guide-hooks-$(id -u)}"
+  if [ -L "$HOOK_STATE_DIR" ]; then
+    echo "[audit-agent] unsafe hook state symlink; audit log skipped: $HOOK_STATE_DIR" >&2
+    return 1
+  fi
+  umask 077
+  if ! mkdir -p -m 700 "$HOOK_STATE_DIR" 2>/dev/null; then
+    echo "[audit-agent] hook state directory unavailable; audit log skipped: $HOOK_STATE_DIR" >&2
+    return 1
+  fi
+  current_uid=$(id -u)
+  owner=$(stat -c '%u' "$HOOK_STATE_DIR" 2>/dev/null \
+    || stat -f '%u' "$HOOK_STATE_DIR" 2>/dev/null \
+    || echo "")
+  if [ "$owner" != "$current_uid" ] || [ ! -d "$HOOK_STATE_DIR" ] || [ -L "$HOOK_STATE_DIR" ]; then
+    echo "[audit-agent] unsafe hook state ownership; audit log skipped: $HOOK_STATE_DIR" >&2
+    return 1
+  fi
+  chmod 700 "$HOOK_STATE_DIR" 2>/dev/null || {
+    echo "[audit-agent] hook state permissions unavailable; audit log skipped: $HOOK_STATE_DIR" >&2
+    return 1
+  }
+}
+
 INPUT=$(cat 2>/dev/null || echo '{}')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name' 2>/dev/null || echo "")
 
@@ -28,9 +55,13 @@ fi
 # │         🔧 커스터마이징 영역              │
 # ╰──────────────────────────────────────────╯
 
-# 로그 파일 경로
-LOG_DIR="/tmp/claude-hooks"
-LOG_FILE="$LOG_DIR/agent-audit.log"
+# 로그 파일 경로. AGENT_AUDIT_LOG="" 이면 비활성화.
+if [ "${AGENT_AUDIT_LOG+x}" = "x" ]; then
+  LOG_FILE="$AGENT_AUDIT_LOG"
+else
+  prepare_hook_state_dir || exit 0
+  LOG_FILE="$HOOK_STATE_DIR/agent-audit.log"
+fi
 
 # prompt 미리보기 최대 길이 (바이트)
 PROMPT_PREVIEW_LENGTH=120
@@ -39,7 +70,13 @@ PROMPT_PREVIEW_LENGTH=120
 # │      커스터마이징 영역 끝                  │
 # ╰──────────────────────────────────────────╯
 
-mkdir -p "$LOG_DIR"
+[ -z "$LOG_FILE" ] && exit 0
+if [ -L "$LOG_FILE" ]; then
+  echo "[audit-agent] unsafe audit log symlink; audit log skipped: $LOG_FILE" >&2
+  exit 0
+fi
+umask 077
+mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || exit 0
 
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
@@ -59,6 +96,7 @@ if [ -z "$PROMPT_PREVIEW" ] && [ -n "$DESCRIPTION" ]; then
     | head -c "$PROMPT_PREVIEW_LENGTH" | tr '\n\r' '  ' | sed 's/"/\\"/g')
 fi
 
-echo "[$TIMESTAMP] session=$SESSION_ID type=$SUBAGENT_TYPE desc=\"$DESCRIPTION\" prompt=\"$PROMPT_PREVIEW...\"" >> "$LOG_FILE"
+echo "[$TIMESTAMP] session=$SESSION_ID type=$SUBAGENT_TYPE desc=\"$DESCRIPTION\" prompt=\"$PROMPT_PREVIEW...\"" >> "$LOG_FILE" 2>/dev/null || true
+chmod 600 "$LOG_FILE" 2>/dev/null || true
 
 exit 0

@@ -17,6 +17,9 @@ set -u
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 HOOKS_DIR="$REPO_ROOT/hooks/boilerplates"
+HOOK_TEST_STATE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ccg-hook-tests.XXXXXX")
+export CLAUDE_HOOK_STATE_DIR="$HOOK_TEST_STATE_DIR"
+trap 'rm -rf -- "$HOOK_TEST_STATE_DIR"' EXIT HUP INT TERM
 
 PASS=0
 FAIL=0
@@ -270,7 +273,7 @@ run_test "기본 빈 FROZEN 목록 — 모든 파일 허용" \
   '{"tool_name":"Edit","tool_input":{"file_path":"/some/random/path.txt"}}'
 
 # Tier 1 와일드카드 (.env)
-FROZEN_FILE_TEST="${TMPDIR:-/tmp}/safety-freeze-test.sh"
+FROZEN_FILE_TEST="$HOOK_TEST_STATE_DIR/safety-freeze-test.sh"
 cat > "$FROZEN_FILE_TEST" <<'EOF'
 #!/usr/bin/env bash
 # 테스트용 hook (custom FROZEN list 주입)
@@ -373,21 +376,13 @@ else
 fi
 
 # Rule 6: MAX_AGENT_CALLS 초과 차단
-# 카운터 파일 미리 N+1 으로 설정 → 다음 호출에서 차단
-COUNTER_DIR="/tmp/claude-hooks-test-rule6"
 SESSION="test-session-rule6"
-mkdir -p "$COUNTER_DIR"
-echo "100" > "$COUNTER_DIR/agent-count-${SESSION}"
-# 임시로 hook의 COUNT_DIR override가 어렵기 때문에 실제 hook의 카운터 파일 위치 사용
-# 대신 MAX_AGENT_CALLS=1로 export하고 한번에 즉시 초과
-mkdir -p /tmp/claude-hooks
-echo "5" > "/tmp/claude-hooks/agent-count-${SESSION}"  # 누적 5회
-export MAX_AGENT_CALLS=3
+export MAX_AGENT_CALLS=1
 rule6_input="{\"tool_name\":\"Agent\",\"session_id\":\"${SESSION}\",\"tool_input\":{\"subagent_type\":\"general-purpose\",\"description\":\"test\",\"prompt\":\"$WARN_PROMPT\"}}"
+echo "$rule6_input" | bash "$HOOK" >/dev/null 2>&1
 rule6_stderr=$(echo "$rule6_input" | bash "$HOOK" 2>&1)
 rule6_exit=$?
 unset MAX_AGENT_CALLS
-rm -f "/tmp/claude-hooks/agent-count-${SESSION}"
 if [ "$rule6_exit" = "2" ] && echo "$rule6_stderr" | grep -q "Agent 호출.*초과"; then
   echo "  ✓ Rule 6: MAX_AGENT_CALLS 초과 차단 (carry-over count)"
   PASS=$((PASS + 1))
@@ -404,7 +399,7 @@ echo ""
 echo "=== audit-agent.sh ==="
 
 HOOK="$HOOKS_DIR/audit-agent.sh"
-AUDIT_LOG="/tmp/claude-hooks/agent-audit.log"
+AUDIT_LOG="$HOOK_TEST_STATE_DIR/agent-audit.log"
 
 # 정상 로그 기록
 > "$AUDIT_LOG" 2>/dev/null
@@ -457,7 +452,7 @@ echo ""
 echo "=== safety-careful.sh — P1-H7 LEVEL3_LOG ==="
 
 HOOK="$HOOKS_DIR/safety-careful.sh"
-TEST_LOG="${TMPDIR:-/tmp}/claude-hook-level3-test.log"
+TEST_LOG="$HOOK_TEST_STATE_DIR/claude-hook-level3-test.log"
 rm -f "$TEST_LOG" 2>/dev/null
 
 # Level 3 명령 실행 → log 파일에 기록

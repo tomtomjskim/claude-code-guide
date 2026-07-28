@@ -13,6 +13,33 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_SRC="$REPO_DIR/skills"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
+publish_managed_file() {
+    local scope="$1"
+    local relative="$2"
+    local source="$3"
+    python3 "$SCRIPT_DIR/install_state.py" publish \
+        --target "$TARGET" \
+        --claude-home "$CLAUDE_HOME" \
+        --snapshot "$CLAUDE_CODE_GUIDE_TRANSACTION" \
+        --scope "$scope" \
+        --path "$relative" \
+        --source "$source"
+}
+
+publish_managed_tree() {
+    local scope="$1"
+    local source_root="$2"
+    local destination_prefix="$3"
+    local source relative
+    while IFS= read -r -d '' source; do
+        relative="${source#"$source_root"/}"
+        publish_managed_file \
+            "$scope" \
+            "$destination_prefix/$relative" \
+            "$source"
+    done < <(find "$source_root" -type f -print0 | sort -z)
+}
+
 # --- Parse arguments ---
 FORCE=false
 TARGET=""
@@ -161,8 +188,15 @@ for skill_dir in "${SKILL_DIRS[@]}"; do
         OVERWRITTEN=$((OVERWRITTEN + 1))
     fi
 
-    mkdir -p "$target_dir"
-    cp -R "$skill_dir". "$target_dir"/
+    if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
+        publish_managed_tree \
+            project \
+            "${skill_dir%/}" \
+            "skills/$skill_name"
+    else
+        mkdir -p "$target_dir"
+        cp -R "$skill_dir". "$target_dir"/
+    fi
     echo "  OK    $skill_name"
     INSTALLED=$((INSTALLED + 1))
 done
@@ -179,13 +213,37 @@ if [ "$INSTALL_TEAM" = true ]; then
     mkdir -p "$AGENTS_DST"
 
     # Copy team components
-    [ -f "$REPO_DIR/agents.yaml" ] && cp "$REPO_DIR/agents.yaml" "$TEAM_DIR/" && echo "  OK    agents.yaml"
-    [ -d "$REPO_DIR/prompts" ] && cp -r "$REPO_DIR/prompts/"*.md "$TEAM_DIR/prompts/" 2>/dev/null && echo "  OK    prompts/ ($(ls -1 "$REPO_DIR/prompts/"*.md | wc -l) files)"
-    [ -d "$REPO_DIR/workflows" ] && cp -r "$REPO_DIR/workflows/"*.yaml "$TEAM_DIR/workflows/" 2>/dev/null && echo "  OK    workflows/ ($(ls -1 "$REPO_DIR/workflows/"*.yaml | wc -l) files)"
-    [ -d "$REPO_DIR/context" ] && cp -r "$REPO_DIR/context/"* "$TEAM_DIR/context/" 2>/dev/null && echo "  OK    context/"
-    [ -d "$REPO_DIR/hooks" ] && cp -r "$REPO_DIR/hooks/"* "$TEAM_DIR/hooks/" 2>/dev/null && echo "  OK    hooks/"
-    [ -d "$REPO_DIR/agents" ] && cp -r "$REPO_DIR/agents/"*.md "$AGENTS_DST/" 2>/dev/null && echo "  OK    agents/ ($(ls -1 "$REPO_DIR/agents/"*.md | wc -l) files)"
-    [ -d "$REPO_DIR/scripts" ] && cp "$REPO_DIR/scripts/"*.sh "$TEAM_DIR/scripts/" 2>/dev/null && echo "  OK    scripts/"
+    if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
+        [ -f "$REPO_DIR/agents.yaml" ] \
+            && publish_managed_file claude-home team/agents.yaml "$REPO_DIR/agents.yaml" \
+            && echo "  OK    agents.yaml"
+        for source in "$REPO_DIR/prompts/"*.md; do
+            [ -f "$source" ] && publish_managed_file claude-home "team/prompts/$(basename "$source")" "$source"
+        done
+        echo "  OK    prompts/"
+        for source in "$REPO_DIR/workflows/"*.yaml; do
+            [ -f "$source" ] && publish_managed_file claude-home "team/workflows/$(basename "$source")" "$source"
+        done
+        echo "  OK    workflows/"
+        [ -d "$REPO_DIR/context" ] && publish_managed_tree claude-home "$REPO_DIR/context" team/context && echo "  OK    context/"
+        [ -d "$REPO_DIR/hooks" ] && publish_managed_tree claude-home "$REPO_DIR/hooks" team/hooks && echo "  OK    hooks/"
+        for source in "$REPO_DIR/agents/"*.md; do
+            [ -f "$source" ] && publish_managed_file claude-home "agents/$(basename "$source")" "$source"
+        done
+        echo "  OK    agents/"
+        for source in "$REPO_DIR/scripts/"*.sh; do
+            [ -f "$source" ] && publish_managed_file claude-home "team/scripts/$(basename "$source")" "$source"
+        done
+        echo "  OK    scripts/"
+    else
+        [ -f "$REPO_DIR/agents.yaml" ] && cp "$REPO_DIR/agents.yaml" "$TEAM_DIR/" && echo "  OK    agents.yaml"
+        [ -d "$REPO_DIR/prompts" ] && cp -r "$REPO_DIR/prompts/"*.md "$TEAM_DIR/prompts/" 2>/dev/null && echo "  OK    prompts/ ($(ls -1 "$REPO_DIR/prompts/"*.md | wc -l) files)"
+        [ -d "$REPO_DIR/workflows" ] && cp -r "$REPO_DIR/workflows/"*.yaml "$TEAM_DIR/workflows/" 2>/dev/null && echo "  OK    workflows/ ($(ls -1 "$REPO_DIR/workflows/"*.yaml | wc -l) files)"
+        [ -d "$REPO_DIR/context" ] && cp -r "$REPO_DIR/context/"* "$TEAM_DIR/context/" 2>/dev/null && echo "  OK    context/"
+        [ -d "$REPO_DIR/hooks" ] && cp -r "$REPO_DIR/hooks/"* "$TEAM_DIR/hooks/" 2>/dev/null && echo "  OK    hooks/"
+        [ -d "$REPO_DIR/agents" ] && cp -r "$REPO_DIR/agents/"*.md "$AGENTS_DST/" 2>/dev/null && echo "  OK    agents/ ($(ls -1 "$REPO_DIR/agents/"*.md | wc -l) files)"
+        [ -d "$REPO_DIR/scripts" ] && cp "$REPO_DIR/scripts/"*.sh "$TEAM_DIR/scripts/" 2>/dev/null && echo "  OK    scripts/"
+    fi
 
     # Set executable permissions
     chmod +x "$TEAM_DIR/hooks/scripts/"*.sh 2>/dev/null

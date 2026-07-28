@@ -39,6 +39,7 @@ PRESERVE_TMPDIR=0
 INSTALL_TRANSACTION_ACTIVE=0
 INSTALL_LOCK_HELD=0
 INSTALL_LOCK_DIR=""
+INSTALL_LOCK_FILE=""
 ROLLBACK_ATTEMPTED=0
 SOURCE_OVERRIDE="${CLAUDE_CODE_GUIDE_SOURCE:-}"
 SOURCE_REF="${CLAUDE_CODE_GUIDE_REF:-main}"
@@ -121,15 +122,13 @@ run() {
 }
 
 cleanup() {
-  if [ "$INSTALL_LOCK_HELD" = "1" ] && [ -n "$INSTALL_LOCK_DIR" ]; then
-    rm -f "$INSTALL_LOCK_DIR/pid"
-    if ! rmdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
-      log "⚠️  Install lock could not be removed: $INSTALL_LOCK_DIR"
-    fi
+  if [ "$INSTALL_LOCK_HELD" = "1" ]; then
+    flock -u 8 2>/dev/null || true
+    exec 8>&-
     INSTALL_LOCK_HELD=0
   fi
   if [ "$PRESERVE_TMPDIR" = "1" ]; then
-    log "⚠️  Recovery snapshot preserved at: $TMPDIR"
+    log "⚠️  Recovery transaction preserved at: $STATE_SNAPSHOT"
   elif [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ]; then
     rm -rf "$TMPDIR"
   fi
@@ -377,7 +376,7 @@ esac
 [ "$FORCE" = "1" ] && SKILLS_FLAGS+=(--force)
 [ "$FORCE" = "1" ] && HOOKS_FLAGS+=(--force)
 
-STATE_SNAPSHOT="$TMPDIR/install-state-before"
+STATE_SNAPSHOT=""
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 STATE_HOME_FLAGS=()
 [ "$INSTALL_TEAM" = "1" ] && STATE_HOME_FLAGS+=(--include-home)
@@ -391,12 +390,27 @@ if [ "$DRY_RUN" = "0" ]; then
   fi
   mkdir -p "$TARGET/.claude"
   INSTALL_LOCK_DIR="$TARGET/.claude/.claude-code-guide-install.lock"
-  if ! mkdir "$INSTALL_LOCK_DIR" 2>/dev/null; then
-    echo "❌ Existing install lock blocks this operation: $INSTALL_LOCK_DIR" >&2
+  if [ -d "$INSTALL_LOCK_DIR" ]; then
+    echo "❌ Legacy install lock blocks this operation: $INSTALL_LOCK_DIR" >&2
     exit 1
   fi
-  printf '%s\n' "$$" > "$INSTALL_LOCK_DIR/pid"
+  if ! command -v flock >/dev/null 2>&1; then
+    echo "❌ Durable install locking requires the 'flock' command." >&2
+    exit 1
+  fi
+  INSTALL_LOCK_FILE="$(
+    python3 "$CCG/scripts/install_state.py" lock-path --target "$TARGET"
+  )"
+  exec 8> "$INSTALL_LOCK_FILE"
+  if ! flock -n 8; then
+    echo "❌ Existing install lock blocks this operation: $INSTALL_LOCK_FILE" >&2
+    exit 1
+  fi
   INSTALL_LOCK_HELD=1
+  export CLAUDE_CODE_GUIDE_LOCK_HELD=1
+  STATE_SNAPSHOT="$(
+    python3 "$CCG/scripts/install_state.py" transaction-path --target "$TARGET"
+  )"
 
   python3 "$CCG/scripts/install_state.py" begin \
     --target "$TARGET" \
@@ -409,17 +423,16 @@ if [ "$DRY_RUN" = "0" ]; then
   INSTALL_TRANSACTION_ACTIVE=1
 fi
 
+if [ "$DRY_RUN" = "0" ]; then
+  export CLAUDE_CODE_GUIDE_TRANSACTION="$STATE_SNAPSHOT"
+fi
 log ""
 log "⚙️  Installing skills ($PROFILE profile)..."
 run bash "$CCG/scripts/install-skills.sh" "${SKILLS_FLAGS[@]}" "$TARGET"
 
 log ""
 log "🔒 Installing hooks..."
-if [ "$DRY_RUN" = "0" ]; then
-  export CLAUDE_CODE_GUIDE_TRANSACTION="$STATE_SNAPSHOT"
-fi
 run bash "$CCG/scripts/install-hooks.sh" "${HOOKS_FLAGS[@]}" "$TARGET"
-unset CLAUDE_CODE_GUIDE_TRANSACTION
 
 if [ "$DRY_RUN" = "0" ]; then
   python3 "$CCG/scripts/install_state.py" finalize \
@@ -431,6 +444,7 @@ if [ "$DRY_RUN" = "0" ]; then
     "${STATE_HOME_FLAGS[@]}"
   INSTALL_TRANSACTION_ACTIVE=0
 fi
+unset CLAUDE_CODE_GUIDE_TRANSACTION
 
 # -----------------------------
 # enterprise: 팀 시스템 검증

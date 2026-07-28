@@ -9,6 +9,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   bash scripts/manage-install.sh doctor --target <path> [--json]
+  bash scripts/manage-install.sh recover --target <path> [--json]
   bash scripts/manage-install.sh repair --target <path> [--dry-run] [--json]
   bash scripts/manage-install.sh uninstall --target <path> [--dry-run] [--json]
 
@@ -23,7 +24,7 @@ if [ "$#" -eq 0 ] || [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
 fi
 
 case "$1" in
-  doctor|repair|uninstall) ;;
+  doctor|recover|repair|uninstall) ;;
   *)
     echo "ERROR: unsupported command '$1'" >&2
     usage >&2

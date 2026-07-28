@@ -92,7 +92,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **설치**: 검토된 tag/commit을 checkout한 뒤 `bash scripts/quick-setup.sh --dry-run`
 - **자연어 트리거**: "claude-code-guide 설치", "PDARR 워크플로우 적용"
 - **대화형 가이드**: https://github.com/tomtomjskim/claude-code-guide/blob/main/SETUP.md
-- **릴리즈 노트**: https://github.com/tomtomjskim/claude-code-guide/blob/main/docs/v4-changelog.md
+- **릴리즈 노트**: https://github.com/tomtomjskim/claude-code-guide/blob/main/docs/v4.5.1-changelog.md
 ```
 
 이후 어느 세션에서든 "claude-code-guide 설치해줘" 한마디로 Claude가 위 URL 활용하여 설치 진행.
@@ -103,6 +103,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
+- [`docs/v4.5.1-changelog.md`](docs/v4.5.1-changelog.md) — **v4.5.1 릴리즈 노트** (Hook session 격리, durable crash recovery)
 - [`docs/v4.3-changelog.md`](docs/v4.3-changelog.md) — **v4.3 릴리즈 노트** (PDARR + Goal-runtime 정렬: `/breakdown`, `/prd --vibe`)
 - [`docs/v4.5-changelog.md`](docs/v4.5-changelog.md) — **v4.5 릴리즈 노트** (검토된 ref, install-state, doctor/repair/uninstall)
 - [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — v4.2 릴리즈 노트 (DESIGN.md 운영 모델)

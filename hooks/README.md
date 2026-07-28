@@ -121,6 +121,7 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 | `MIN_PROMPT_LENGTH` | `200` | 이 길이 미만의 prompt는 단순 작업으로 간주 (P1-H6: `0`으로 비활성, env override 가능) |
 | `MIN_FILE_COUNT` | `2` | 이 개수 이하 파일 + 짧은 prompt → 차단 (env override 가능) |
 | `MIN_EFFICIENT_FILES` | `4` | 이 개수 미만 파일 → 토큰 효율 경고 |
+| `CLAUDE_HOOK_STATE_DIR` | private user runtime dir | 카운터·감사·경고 로그 상태 경로 override |
 | `ANALYSIS_STRONG_PATTERN` | 내장 (P1-H5) | 강한 탐색 의도 — 단독 매칭 시 차단 |
 | `ANALYSIS_WEAK_PATTERN` | 내장 (P1-H5) | 약한 동사 — `SCOPE_HINT`와 같이 매칭 시에만 차단 |
 | `SCOPE_HINT_PATTERN` | 내장 (P1-H5) | 광범위 scope 키워드 (전체/모든/all 등) |
@@ -133,6 +134,9 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
   - `"explore the codebase"` → STRONG 단독 → 차단
 - **P1-H6 MIN_PROMPT_LENGTH heuristic 명시**: 보안 경계 아님을 코드 주석/README에 명시. `MIN_PROMPT_LENGTH=0`으로 Rule 3 전체 비활성. env var로 override 가능 (CUSTOMIZE 블록에 `${MIN_PROMPT_LENGTH:-200}` 형식)
 - **P1-H8 grep_compat 정확도 개선**: PCRE → ERE 변환 시 `(?:...)`, `(?=...)`, `(?!...)` 처리 추가. 한글 word boundary 정확도 손실은 코드 주석으로 명시. 정확한 PCRE 원하면 `brew install grep` 권장.
+- **v4.5.1 session 격리**: `session_id` 누락 시 카운터를 만들지 않고 fail-open한다.
+  유효한 ID는 hash 파일명, `0600`, `flock`으로 세션별 원자 증가하며 7일 TTL을
+  적용한다. `flock`이 없으면 제한 자체를 fail-open한다.
 
 **오탐 시 우회 방법 (우선순위 순):**
 1. prompt에 부정어 추가: `"...분석하지 말고 X만 수정해"`, `"코드 탐색 없이"`
@@ -147,7 +151,7 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 | `TRUSTED_PATHS` | `()` | 무조건 허용할 스크립트 경로 목록 |
 | `LEVEL4_PATTERNS` | 내장 패턴 | 절대 차단할 파괴적 명령 정규식 |
 | `LEVEL3_PATTERNS` | 내장 패턴 | 경고 명령 정규식 (허용 + WARNING) |
-| `LEVEL3_LOG` | `${TMPDIR:-/tmp}/claude-hook-level3.log` | Level 3 WARNING 영속 로그 파일 (P1-H7) |
+| `LEVEL3_LOG` | `<private-hook-state>/level3.log` | Level 3 WARNING 로그 (`""`이면 비활성) |
 
 **Bundle H-P0 수정 사항:**
 - `rm -rf /` 패턴에 `/([[:space:]]|$|\*)` 앵커 추가 — `/tmp/foo` 등 정상 경로 오탐 제거
@@ -156,7 +160,7 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 - Dev mode bypass 지원 (위 섹션)
 
 **Bundle H-P1 수정 사항:**
-- **P1-H7 Level 3 영속 로그**: stderr만으로는 Claude Code가 모델 컨텍스트로 surface 안 할 가능성 → `LEVEL3_LOG` 파일에 timestamp + 명령 기록. `LEVEL3_LOG=""`로 비활성. 로그 분석 예: `tail -20 /tmp/claude-hook-level3.log`
+- **P1-H7 Level 3 영속 로그**: stderr만으로는 Claude Code가 모델 컨텍스트로 surface 안 할 가능성 → private hook state의 `level3.log`에 timestamp + 명령 기록. `LEVEL3_LOG=""`로 비활성.
 
 **Safe rm -rf 정책:**
 - 현재 정책: `rm -rf <x>`의 피연산자가 모두 `SAFE_RM_DIRS`에 있어야 허용
@@ -174,8 +178,13 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `LOG_DIR` | `/tmp/claude-hooks` | 감사 로그 저장 디렉토리 |
+| `AGENT_AUDIT_LOG` | `<private-hook-state>/agent-audit.log` | 감사 로그 경로 (`""`이면 비활성) |
 | `PROMPT_PREVIEW_LENGTH` | `120` | 로그에 기록할 prompt 미리보기 길이 |
+
+private hook state 기본 경로는
+`${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/claude-code-guide-hooks-<uid>`이며
+소유 사용자만 접근 가능한 `0700`으로 만든다. 테스트 러너는 이 경로를 사용하지
+않고 실행별 임시 `CLAUDE_HOOK_STATE_DIR`을 주입한다.
 
 ---
 

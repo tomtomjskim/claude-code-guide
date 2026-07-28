@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 QUICK_SETUP = REPO_ROOT / "scripts" / "quick-setup.sh"
 MANAGE_INSTALL = REPO_ROOT / "scripts" / "manage-install.sh"
 VALIDATE_SYSTEM = REPO_ROOT / "scripts" / "validate-system.sh"
+INSTALL_STATE = REPO_ROOT / "scripts" / "install_state.py"
 
 
 class QuickSetupLifecycleTest(unittest.TestCase):
@@ -540,6 +541,105 @@ class QuickSetupLifecycleTest(unittest.TestCase):
                 / ".claude"
                 / ".claude-code-guide-install.lock"
             ).exists()
+        )
+
+    def test_sigkill_snapshot_is_persistent_and_recoverable(self):
+        slow_source = self.root / "sigkill-install-guide"
+        shutil.copytree(
+            REPO_ROOT,
+            slow_source,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+        )
+        marker = self.root / "hooks-started-for-sigkill"
+        (slow_source / "scripts" / "install-hooks.sh").write_text(
+            "\n".join(
+                [
+                    "#!/bin/bash",
+                    f"touch {marker}",
+                    "sleep 30",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        existing = (
+            self.target / ".claude" / "skills" / "dispatch" / "SKILL.md"
+        )
+        existing.parent.mkdir(parents=True)
+        existing.write_text("original before crash\n", encoding="utf-8")
+        env = {
+            **self.env,
+            "CLAUDE_CODE_GUIDE_SOURCE": str(slow_source),
+        }
+        process = subprocess.Popen(
+            [
+                "bash",
+                str(QUICK_SETUP),
+                "--profile",
+                "solo",
+                "--target",
+                str(self.target),
+                "--skip-stack",
+                "--force",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 10
+        while not marker.exists() and process.poll() is None:
+            if time.monotonic() >= deadline:
+                process.kill()
+                self.fail("hook installer did not reach the SIGKILL checkpoint")
+            time.sleep(0.05)
+
+        os.killpg(process.pid, signal.SIGKILL)
+        process.communicate(timeout=10)
+        self.assertNotEqual(
+            existing.read_text(encoding="utf-8"),
+            "original before crash\n",
+        )
+        transactions = list(
+            (self.state_home / "transactions").glob("*/*/transaction.json")
+        )
+        self.assertEqual(len(transactions), 1)
+
+        self.run_command(
+            "python3",
+            INSTALL_STATE,
+            "recover",
+            "--target",
+            self.target,
+            "--claude-home",
+            self.claude_home,
+        )
+        self.assertEqual(
+            existing.read_text(encoding="utf-8"),
+            "original before crash\n",
+        )
+        self.assertEqual(
+            list((self.state_home / "transactions").glob("*/*/transaction.json")),
+            [],
+        )
+
+        self.run_command(
+            "bash",
+            QUICK_SETUP,
+            "--profile",
+            "solo",
+            "--target",
+            self.target,
+            "--skip-stack",
+            "--force",
+        )
+        self.assertTrue(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).is_file()
         )
 
     def test_term_after_settings_write_restores_existing_settings(self):
