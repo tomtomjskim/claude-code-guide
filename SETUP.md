@@ -321,5 +321,5 @@ bash scripts/install-hooks.sh --preset minimal <target>
 
 ## 버전
 
-이 `SETUP.md`는 claude-code-guide v4.5.1 이후 기준.
+이 `SETUP.md`는 claude-code-guide v4.8 이후 기준.
 사용할 ref는 release note와 `git tag -l` 또는 명시 commit을 함께 검토해 선택한다.

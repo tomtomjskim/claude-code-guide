@@ -21,7 +21,7 @@ from pathlib import Path, PurePosixPath
 
 
 SCHEMA_VERSION = 1
-GUIDE_VERSION = "4.5.1"
+GUIDE_VERSION = "4.8"
 STATE_RELATIVE_PATH = Path(".claude/claude-code-guide-install-state.json")
 STATE_KEYS = {
     "schema_version",

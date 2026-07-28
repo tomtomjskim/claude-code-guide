@@ -109,9 +109,9 @@ counter를 만들지 않으며, 7일 TTL과 `flock`을 사용한다. 테스트�
 
 legacy `/tmp/claude-hooks/agent-count-unknown`은 자동 초기화하거나 삭제하지 않는다.
 그 작업은 아직 구버전 Hook을 실행 중인 다른 세션의 호출 제한을 되돌릴 수 있다.
-모든 Hook을 v4.5.1로 갱신하고 구버전 세션이 종료된 뒤에만 별도 정리한다.
+모든 Hook을 v4.8로 갱신하고 구버전 세션이 종료된 뒤에만 별도 정리한다.
 
-pre-v4.5.1 중단 설치는 새 WAL 복구 대상이 아니다. v4.5의 before-image는 임의
+pre-v4.8 중단 설치는 새 WAL 복구 대상이 아니다. 기존 before-image는 임의
 `/tmp` 디렉터리에 있었고 project-local directory lock을 사용했다. legacy lock의
 PID가 실제 설치 프로세스인지 확인하고 target과 남은 snapshot을 수동 검토하기
 전에는 `<project>/.claude/.claude-code-guide-install.lock`을 삭제하거나 `--force`

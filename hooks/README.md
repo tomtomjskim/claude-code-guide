@@ -134,7 +134,7 @@ chmod +x <project>/.claude/hooks/guard-agent.sh
   - `"explore the codebase"` → STRONG 단독 → 차단
 - **P1-H6 MIN_PROMPT_LENGTH heuristic 명시**: 보안 경계 아님을 코드 주석/README에 명시. `MIN_PROMPT_LENGTH=0`으로 Rule 3 전체 비활성. env var로 override 가능 (CUSTOMIZE 블록에 `${MIN_PROMPT_LENGTH:-200}` 형식)
 - **P1-H8 grep_compat 정확도 개선**: PCRE → ERE 변환 시 `(?:...)`, `(?=...)`, `(?!...)` 처리 추가. 한글 word boundary 정확도 손실은 코드 주석으로 명시. 정확한 PCRE 원하면 `brew install grep` 권장.
-- **v4.5.1 session 격리**: `session_id` 누락 시 카운터를 만들지 않고 fail-open한다.
+- **v4.8 session 격리**: `session_id` 누락 시 카운터를 만들지 않고 fail-open한다.
   유효한 ID는 hash 파일명, `0600`, `flock`으로 세션별 원자 증가하며 7일 TTL을
   적용한다. `flock`이 없으면 제한 자체를 fail-open한다.
 

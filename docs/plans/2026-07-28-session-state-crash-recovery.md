@@ -51,14 +51,14 @@
 ### Task 3: Release documentation
 
 **Files:**
-- Create: `docs/v4.5.1-changelog.md`
+- Create: `docs/v4.8-changelog.md`
 - Modify: `README.md`
 - Modify: `docs/README.md`
-- Modify: `docs/36-ecc-selective-adoption.md`
+- Modify: `docs/39-ecc-selective-adoption.md`
 - Modify: `scripts/install_state.py`
 
 **Steps:**
-1. `GUIDE_VERSION`을 `4.5.1`로 갱신한다.
+1. `GUIDE_VERSION`을 `4.8`로 갱신한다.
 2. migration, supported filesystem, legacy `/tmp` counter 비자동 삭제 이유를 기록한다.
 3. crash recovery와 hook state 격리 검증 명령을 기록한다.
 4. repository validator와 전체 회귀 테스트를 실행한다.
