@@ -42,9 +42,10 @@ repository root 기준 경로를 `.git/info/exclude`에 로컬 ignore로 추가�
 checkout으로 전파되지 않게 한다.
 
 enterprise profile은 project `.claude/`와 함께 해당 설치가 변경한 Claude home의
-`team/`, `agents/` 파일만 추적한다. 기존 설정, 사용자 skill, 다른 파일은 관리
-대상에 포함하지 않는다. `CLAUDE_CONFIG_DIR`를 지정하면 설치, 검증, 상태 추적이
-모두 같은 경로를 사용한다.
+`team/` validator package만 추적한다. v4.7의 `~/.agents/adapters/claude`와 active
+Claude agent symlink는 이 target transaction의 소유 범위가 아니므로 기존 상태를
+변경하지 않는다. 기존 설정, 사용자 skill, 다른 파일도 관리 대상에 포함하지 않는다.
+`CLAUDE_CONFIG_DIR`를 지정하면 설치, 검증, 상태 추적이 모두 같은 경로를 사용한다.
 
 enterprise validation 전에 install-state를 확정한다. validation이 실패하면
 명령은 실패 상태로 끝나지만, 생성된 상태를 이용해 `doctor`로 확인하거나

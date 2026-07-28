@@ -526,7 +526,7 @@ def build_manifest(
             add_manifest_entry(
                 entries,
                 "claude-home",
-                f"agents/{source_file.name}",
+                f"team/agents/{source_file.name}",
                 source_file,
             )
         for source_file in sorted((source / "scripts").glob("*.sh")):

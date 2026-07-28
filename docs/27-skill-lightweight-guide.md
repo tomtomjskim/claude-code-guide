@@ -108,6 +108,31 @@ references/: 참조 파일 전체 합산 ≤ 500줄
 - raw 작업 메모를 공개 문서 뷰어에 복사하지 않는다.
 - terse communication mode를 안전/승인 메시지보다 우선하지 않는다.
 
+### 2.5 Side-effect 경량화 기준
+
+스킬 경량화는 토큰 수만 줄이는 작업이 아닙니다. 스킬이 호출될 때마다
+문서, 리포트, 스크린샷, test harness, issue/comment, git stage/push를
+자동으로 만들면 작은 작업도 운영 비용과 stale backlog를 남깁니다.
+
+기본 원칙:
+
+- 사용자가 요청했거나 승인된 계획의 정확한 경로가 있을 때만 durable artifact를 만든다.
+- known target이 있으면 broad scan보다 targeted read를 먼저 수행한다.
+- known target을 이유 없이 broad scan으로 확장하지 않는다.
+- 단순 로컬 수정은 직접 수정하고, 임시 스크립트나 별도 하네스를 만들지 않는다.
+- secret, raw sensitive log, real env value는 출력하거나 문서에 저장하지 않는다.
+- git stage/push, 외부 서비스 write, production data write, process lifecycle 변경은 스킬 기본 동작에 넣지 않는다.
+- 단순 명령이 quoting이나 syntax 문제로 실패하면 같은 무거운 도구 경로를 반복하지 않고 가장 단순한 동등 경로로 바꾼다.
+- 임시 검증 증거는 새 문서보다 최종 응답, PR description, 기존 task 문서에 먼저 남긴다.
+
+권장 구조:
+
+| Layer | 담을 것 | 담지 말 것 |
+|---|---|---|
+| Generic skill core | shortest safe path, artifact gate, secret/write approval gate | 특정 repo DB, deploy, wiki path |
+| Project overlay | repo별 hard stop, 테스트 명령, 문서 위치, 승인 기준 | 모든 프로젝트에 적용할 일반론 |
+| Runtime adapter | trigger, 경로 참조, 도구 fallback | 정책 본문 전체 복사 |
+
 ---
 
 ## 3. 경량화 전략
@@ -294,6 +319,14 @@ find .claude/skills -name "SKILL.md" -exec wc -c {} \; | sort -rn
 - [ ] 중복 워크플로우 다이어그램 → `_shared/`로 추출
 - [ ] 프리셋별 상세 절차 → 기본 모드만 본체, 나머지 references/
 - [ ] 설명적 문장 → 테이블/리스트로 압축
+
+### Phase 3.5: 부작용 축소 (artifact/write 기본값 제거)
+
+- [ ] 스킬이 새 문서, 리포트, 스크린샷, script, test harness를 자동 생성하지 않는가?
+- [ ] 필요한 산출물은 사용자 요청 또는 승인된 정확한 경로가 있는가?
+- [ ] stage, commit, push, issue/comment, 외부 서비스 write가 dry-run/확인 없이 실행되지 않는가?
+- [ ] repo별 DB/배포/문서 정책은 generic skill이 아니라 project overlay에 있는가?
+- [ ] 임시 검증 결과는 새 파일보다 최종 응답이나 기존 작업 문서에 남기도록 되어 있는가?
 
 ### Phase 4: 설정 (토큰 절감 설정 적용)
 

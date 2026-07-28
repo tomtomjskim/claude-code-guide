@@ -52,22 +52,21 @@ else
     CLAUDE_HOME="$(cd "$(dirname "$CLAUDE_HOME")" && pwd)/$(basename "$CLAUDE_HOME")"
 fi
 
-PROMPTS_DIR="$CLAUDE_HOME/team/prompts"
-AGENTS_DIR="$CLAUDE_HOME/agents"
-WORKFLOWS_DIR="$CLAUDE_HOME/team/workflows"
-HOOKS_DIR="$CLAUDE_HOME/team/hooks"
-AGENTS_YAML="$CLAUDE_HOME/team/agents.yaml"
+TEAM_DIR="${CLAUDE_TEAM_DIR:-$CLAUDE_HOME/team}"
+PROMPTS_DIR="${CLAUDE_PROMPTS_DIR:-$TEAM_DIR/prompts}"
+AGENTS_DIR="${CLAUDE_AGENTS_DIR:-$TEAM_DIR/agents}"
+WORKFLOWS_DIR="${CLAUDE_WORKFLOWS_DIR:-$TEAM_DIR/workflows}"
+HOOKS_DIR="${CLAUDE_HOOKS_DIR:-$TEAM_DIR/hooks}"
+AGENTS_YAML="${CLAUDE_AGENTS_YAML:-$TEAM_DIR/agents.yaml}"
 
 if [ -n "$PROJECT_ROOT" ]; then
     SKILLS_DIR="$PROJECT_ROOT/.claude/skills"
-    if [ -f "$PROJECT_ROOT/.claude/settings.local.json" ]; then
-        SETTINGS_JSON="$PROJECT_ROOT/.claude/settings.local.json"
-    else
-        SETTINGS_JSON="$PROJECT_ROOT/.claude/settings.json"
-    fi
+    SETTINGS_JSON="$PROJECT_ROOT/.claude/settings.json"
+    SETTINGS_LOCAL_JSON="$PROJECT_ROOT/.claude/settings.local.json"
 else
-    SKILLS_DIR="$CLAUDE_HOME/skills"
-    SETTINGS_JSON="$CLAUDE_HOME/settings.json"
+    SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$CLAUDE_HOME/skills}"
+    SETTINGS_JSON="${CLAUDE_SETTINGS_JSON:-$CLAUDE_HOME/settings.json}"
+    SETTINGS_LOCAL_JSON="${CLAUDE_SETTINGS_LOCAL_JSON:-$CLAUDE_HOME/settings.local.json}"
 fi
 
 # v4.0 P1-1: 버전 canonical 중앙화 (strategy.md Decision 1)
@@ -78,8 +77,8 @@ EXPECTED_VERSION="3.2"
 ERRORS=0
 WARNINGS=0
 
-HOOKS_SCRIPTS_DIR="$CLAUDE_HOME/team/hooks/scripts"
-SESSION_SCHEMA="$CLAUDE_HOME/team/context/session-state-schema.yaml"
+HOOKS_SCRIPTS_DIR="${CLAUDE_HOOKS_SCRIPTS_DIR:-$TEAM_DIR/hooks/scripts}"
+SESSION_SCHEMA="${CLAUDE_SESSION_SCHEMA:-$TEAM_DIR/context/session-state-schema.yaml}"
 
 # v4.0 P0-4: agents.yaml을 SSOT로 삼는 동적 에이전트 이름 파싱
 # bash grep 기반 — yq 외부 의존 회피 (strategy.md Decision 3)
@@ -278,7 +277,7 @@ fi
 # 6. Check handoff-protocol.md exists
 echo ""
 echo "--- 6. Handoff Protocol ---"
-CONTEXT_DIR="$CLAUDE_HOME/team/context"
+CONTEXT_DIR="${CLAUDE_CONTEXT_DIR:-$TEAM_DIR/context}"
 if [ -f "$CONTEXT_DIR/handoff-protocol.md" ]; then
     echo "  handoff-protocol.md: exists ✓"
 else
@@ -431,15 +430,21 @@ done
 # 14. v3.2: settings.json Hooks Registration
 echo ""
 echo "--- 14. settings.json Hooks (v3.2) ---"
-if [ -f "$SETTINGS_JSON" ]; then
+if [ -f "$SETTINGS_JSON" ] || [ -f "$SETTINGS_LOCAL_JSON" ]; then
     HOOK_COUNT=$(python3 -c "
 import json
-with open('$SETTINGS_JSON') as f:
-    d = json.load(f)
-hooks = d.get('hooks', {})
-pre = len(hooks.get('PreToolUse', []))
-post = len(hooks.get('PostToolUse', []))
-print(f'{pre + post}')
+settings_files = ['$SETTINGS_JSON', '$SETTINGS_LOCAL_JSON']
+count = 0
+for path in settings_files:
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except FileNotFoundError:
+        continue
+    hooks = d.get('hooks', {})
+    count += len(hooks.get('PreToolUse', []))
+    count += len(hooks.get('PostToolUse', []))
+print(count)
 " 2>/dev/null || echo "0")
     if [ "$HOOK_COUNT" -ge 3 ]; then
         echo "  Registered hooks: $HOOK_COUNT ✓"
@@ -448,7 +453,7 @@ print(f'{pre + post}')
         WARNINGS=$((WARNINGS + 1))
     fi
 else
-    echo "ERROR: settings.json not found"
+    echo "ERROR: settings.json/settings.local.json not found"
     ERRORS=$((ERRORS + 1))
 fi
 

@@ -166,6 +166,40 @@ sequenceDiagram
 
 ---
 
+## 4. Hermes Agent Desktop / Office Web UI
+
+### 소개
+
+Hermes Agent Desktop은 Hermes gateway, SSH/Tailscale remote runtime, Office
+Web UI를 하나의 desktop shell에서 다루는 작업 표면입니다. Office/Claw3D는
+브라우저로 직접 접근할 수도 있고 Electron webview 안에서 임베드될 수도
+있으므로, 두 경로의 실패 원인을 분리해서 봐야 합니다.
+
+### 운영 포인트
+
+| 항목 | 기준 |
+|------|------|
+| Gateway | remote Hermes gateway는 `/health`로 확인 |
+| Remote 연결 | Tailscale + SSH tunnel을 우선 사용 |
+| Office URL | app webview는 root redirect 대신 `/office` 직접 로드 |
+| Adapter | SSH mode에서는 `HERMES_API_URL`을 local tunnel URL로 주입 |
+| Secret | API key 원문은 문서화하지 않고 config/env로만 전달 |
+| Debug | CDP 포트는 임시 검증용으로만 열고 종료 후 닫기 |
+
+### 브라우저 정상 / 앱 blank 구분
+
+| 현상 | 우선 의심 |
+|------|----------|
+| `http://localhost:3000/office`는 정상 | Office server 자체는 살아 있음 |
+| Electron app만 blank | webview lifecycle, hidden tab size, load event 문제 |
+| `Loading Claw3D...` 지속 | webview event listener 또는 readiness race |
+| `chrome-error://chromewebdata` | webview가 dev server 준비 전에 먼저 붙음 |
+
+상세 기준은 [Agent Tools And Hermes Web UI](36-agent-tools-and-hermes-web-ui.md)를
+따릅니다.
+
+---
+
 ## 통합 설정 예시
 
 ### MCP 설정 (전체)
@@ -225,6 +259,7 @@ services:
 - Serena MCP
 - Claude Code 네이티브 멀티 에이전트
 - Agent Orchestra Monitor
+- Hermes Agent Desktop / Office Web UI
 
 ---
 
@@ -232,4 +267,5 @@ services:
 
 - [Serena MCP 문서](https://github.com/serena-ai/serena-mcp)
 - [Agent Orchestra Monitor 문서](https://github.com/tomtomjskim/agent-orchestra-monitor)
+- [Agent Tools And Hermes Web UI](36-agent-tools-and-hermes-web-ui.md)
 - [Claude Code 공식 문서](https://docs.anthropic.com/claude-code)

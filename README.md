@@ -104,8 +104,15 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
 - [`docs/v4.8-changelog.md`](docs/v4.8-changelog.md) — **v4.8 릴리즈 노트** (Hook session 격리, durable crash recovery)
+- [`docs/v4.7-changelog.md`](docs/v4.7-changelog.md) — **v4.7 릴리즈 노트** (Shared Agent Rules)
+- [`docs/38-shared-agent-rules.md`](docs/38-shared-agent-rules.md) — Claude/Codex 공통 agent rule 디렉터리 운영 기준
+- [`docs/v4.6-changelog.md`](docs/v4.6-changelog.md) — **v4.6 릴리즈 노트** (Codex App instruction/hook hardening parity)
+- [`docs/37-codex-app-instructions-hardening.md`](docs/37-codex-app-instructions-hardening.md) — Codex App 지침·custom agent·trusted scope·hook pilot 운영 메모
+- [`docs/v4.5-changelog.md`](docs/v4.5-changelog.md) — **v4.5 릴리즈 노트** (Agent Operating Kernel adapter)
+- [`templates/CLAUDE.routing-card.md`](templates/CLAUDE.routing-card.md) — agent/model/effort 라우팅 카드
+- [`templates/CLAUDE.kernel-evaluation.md`](templates/CLAUDE.kernel-evaluation.md) — 커널 시험 적용 비교 평가 템플릿
+- [`docs/v4.4-changelog.md`](docs/v4.4-changelog.md) — **v4.4 릴리즈 노트** (external agent skill adoption)
 - [`docs/v4.3-changelog.md`](docs/v4.3-changelog.md) — **v4.3 릴리즈 노트** (PDARR + Goal-runtime 정렬: `/breakdown`, `/prd --vibe`)
-- [`docs/v4.5-changelog.md`](docs/v4.5-changelog.md) — **v4.5 릴리즈 노트** (검토된 ref, install-state, doctor/repair/uninstall)
 - [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — v4.2 릴리즈 노트 (DESIGN.md 운영 모델)
 - [`docs/v4.1-changelog.md`](docs/v4.1-changelog.md) — **v4.1 릴리즈 노트** (셋업 인프라 + Hook 안정화)
 - [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트 (SSOT 부채 청산)
@@ -146,6 +153,11 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v3.3 신규**: 듀얼 모드 디자인 전략 — SYSTEMATIC/CREATIVE 모드 자동 판별, design-gate.sh 자동 검사, `/design-creative` 스킬
 - **v3.3 신규**: 디자인 시스템 확장 규칙 — 토큰 추가/변경 절차, 폰트 수정 규칙, 체크리스트
 - **v4.2 신규**: `DESIGN.md` 운영 모델 — Google design.md 스펙 기반 토큰 문서, 주입 워크플로우, 보일러플레이트, 버전 관리
+- **v4.4 신규**: External agent skill adoption — diagnose, zoom-out, tracer bullet, project context 운영 패턴
+- **v4.5 신규**: Agent Operating Kernel adapter — 고위험 작업용 scope/decision/verification 운영 계약
+- **v4.5 신규**: Agent/Model Routing Card — 작업 유형별 agent/model/effort 선택 기준
+- **v4.6 신규**: Codex App instruction/hook hardening parity — `AGENTS.md`, `.codex/agents/*.toml`, trusted scope, hook pilot 운영 기준
+- **v4.7 신규**: Shared Agent Rules — `~/.agents/common-agents` 원천, Claude/Codex adapter, 프로젝트 agent 우선순위
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
@@ -179,8 +191,8 @@ claude-code-guide/
 │   ├── event-driven-review.yaml
 │   └── scripts/          # v3.2 레퍼런스 구현
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh + preflight-collect.sh
-├── docs/                 # 34편 가이드 문서 (v4.2: DESIGN.md 운영 모델 포함)
-├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿
+├── docs/                 # 38편 가이드 문서 (v4.7: Shared Agent Rules 포함)
+├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿, kernel adapter
 ├── QUICKSTART.md
 └── README.md
 ```
@@ -229,12 +241,19 @@ bash scripts/install-skills.sh --team /path/to/your-project
 # 또는 팀 시스템만 수동 설치
 mkdir -p ~/.claude/team
 cp agents.yaml ~/.claude/team/
+mkdir -p ~/.claude/team/agents
+cp agents/*.md ~/.claude/team/agents/
 cp -r prompts/ ~/.claude/team/prompts/
 cp -r workflows/ ~/.claude/team/workflows/
 cp -r context/ ~/.claude/team/context/
 cp -r hooks/ ~/.claude/team/hooks/
 cp -r scripts/ ~/.claude/team/scripts/
-cp -r agents/ ~/.claude/agents/
+mkdir -p ~/.agents/adapters/claude ~/.claude/agents
+cp agents/*.md ~/.agents/adapters/claude/
+for f in ~/.agents/adapters/claude/*.md; do
+  target="$HOME/.claude/agents/$(basename "$f")"
+  [ -e "$target" ] || ln -s "$f" "$target"
+done
 chmod +x ~/.claude/team/hooks/scripts/*.sh
 chmod +x ~/.claude/team/scripts/*.sh
 ```
@@ -345,6 +364,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 31 | [듀얼 모드 디자인 전략](docs/31-design-strategy.md) | SYSTEMATIC/CREATIVE 모드 판별, 프로젝트별 커스텀 게이트 가이드 |
 | 32 | [디자인 시스템 확장 규칙](docs/32-design-system-extension.md) | 토큰 추가/변경 절차, 폰트 수정 규칙 |
 | 33 | [서브에이전트 효율성](docs/33-subagent-efficiency.md) | 12가지 전략, A/B 벤치마크, Tiered Dispatch, Result Pipe |
+| 36 | [Agent Tools And Hermes Web UI](docs/36-agent-tools-and-hermes-web-ui.md) | Hermes Agent gateway, Office Web UI, Electron webview 진단 기준 |
 
 ---
 
@@ -556,6 +576,9 @@ qa-e2e는 depth 축 미적용 — --tc TC-N으로 범위 제어
 ### 프로젝트 템플릿
 - [프로젝트 구조](templates/project-structure/) - 표준 디렉토리 구조
 - [CLAUDE.md](templates/CLAUDE.md) - 프로젝트 설정 파일
+- [Agent Operating Kernel adapter](templates/CLAUDE.kernel.md) - 고위험 작업용 운영 계약
+- [Agent Operating Kernel evaluation](templates/CLAUDE.kernel-evaluation.md) - 시험 적용 후 비교 평가
+- [Agent/Model Routing Card](templates/CLAUDE.routing-card.md) - 성능/효율 라우팅 기준
 - [체크리스트](templates/checklists/) - 워크플로우 체크리스트
 
 ### 에이전트 템플릿 (v3.0)
