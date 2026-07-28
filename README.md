@@ -103,7 +103,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`BOOTSTRAP.md`](BOOTSTRAP.md) — 복사-붙여넣기 프롬프트 템플릿 모음 (7가지)
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
-- [`docs/v4.8-changelog.md`](docs/v4.8-changelog.md) — **v4.8 릴리즈 노트** (Hook session 격리, durable crash recovery)
+- [`docs/v4.8-changelog.md`](docs/v4.8-changelog.md) — **v4.8 릴리즈 노트** (Hook session 격리, durable crash recovery, installer 경계 강화)
 - [`docs/v4.7-changelog.md`](docs/v4.7-changelog.md) — **v4.7 릴리즈 노트** (Shared Agent Rules)
 - [`docs/38-shared-agent-rules.md`](docs/38-shared-agent-rules.md) — Claude/Codex 공통 agent rule 디렉터리 운영 기준
 - [`docs/v4.6-changelog.md`](docs/v4.6-changelog.md) — **v4.6 릴리즈 노트** (Codex App instruction/hook hardening parity)
@@ -158,6 +158,8 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - **v4.5 신규**: Agent/Model Routing Card — 작업 유형별 agent/model/effort 선택 기준
 - **v4.6 신규**: Codex App instruction/hook hardening parity — `AGENTS.md`, `.codex/agents/*.toml`, trusted scope, hook pilot 운영 기준
 - **v4.7 신규**: Shared Agent Rules — `~/.agents/common-agents` 원천, Claude/Codex adapter, 프로젝트 agent 우선순위
+- **v4.8 신규**: session별 private Hook state, crash-safe install WAL,
+  standalone installer symlink/traversal 차단, legacy active-agent ownership 이관
 - **v3.3 신규**: Hook 보일러플레이트 시스템 — 4종 커스터마이징 가능 템플릿 + `install-hooks.sh` 인스톨러
 - **v3.3 신규**: 서브에이전트 효율성 가이드 — 12가지 전략, A/B 벤치마크(55% 토큰 절감), Tiered Dispatch, Result Pipe, Bash 프리플라이트
 - **v3.3 신규**: `preflight-collect.sh` 사전 수집 스크립트 — 서브에이전트 탐색 턴 제거용
@@ -191,7 +193,7 @@ claude-code-guide/
 │   ├── event-driven-review.yaml
 │   └── scripts/          # v3.2 레퍼런스 구현
 ├── scripts/              # validate-system.sh + install-skills.sh + selfcheck-token-waste.sh + preflight-collect.sh
-├── docs/                 # 38편 가이드 문서 (v4.7: Shared Agent Rules 포함)
+├── docs/                 # 39편 가이드 문서 (v4.8: ECC 수명주기 포함)
 ├── templates/            # 프로젝트 구조, 체크리스트, CLAUDE.md 템플릿, kernel adapter
 ├── QUICKSTART.md
 └── README.md
@@ -238,25 +240,13 @@ bash scripts/install-hooks.sh --preset minimal /path/to/your-project
 # 스킬 + 팀 시스템 한 번에 설치
 bash scripts/install-skills.sh --team /path/to/your-project
 
-# 또는 팀 시스템만 수동 설치
-mkdir -p ~/.claude/team
-cp agents.yaml ~/.claude/team/
-mkdir -p ~/.claude/team/agents
-cp agents/*.md ~/.claude/team/agents/
-cp -r prompts/ ~/.claude/team/prompts/
-cp -r workflows/ ~/.claude/team/workflows/
-cp -r context/ ~/.claude/team/context/
-cp -r hooks/ ~/.claude/team/hooks/
-cp -r scripts/ ~/.claude/team/scripts/
-mkdir -p ~/.agents/adapters/claude ~/.claude/agents
-cp agents/*.md ~/.agents/adapters/claude/
-for f in ~/.agents/adapters/claude/*.md; do
-  target="$HOME/.claude/agents/$(basename "$f")"
-  [ -e "$target" ] || ln -s "$f" "$target"
-done
-chmod +x ~/.claude/team/hooks/scripts/*.sh
-chmod +x ~/.claude/team/scripts/*.sh
+# 기존 shared adapter 또는 active agent routing을 교체하기로 검토·승인한 경우만
+bash scripts/install-skills.sh --team --force /path/to/your-project
 ```
+
+기본 `--team`은 adapter/active path pair 중 하나라도 이미 있으면 pair 전체를
+건너뛴다. 직접 `cp`/`ln`으로 전역 agent를 덮어쓰지 말고 installer의 skip/backup
+결과를 검토한다.
 
 ### 4. settings.json 설정 (팀 시스템 사용 시)
 

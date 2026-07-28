@@ -62,7 +62,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 |------|------|------|
 | Workflow Guide (상세) | [`.claude/workflow-commands-guide.md`](../.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 (셋업, Agent 전략, 팀 패턴) |
 | DESIGN.md System Guide | [`design-md-system-guide.html`](design-md-system-guide.html) | DESIGN.md 시스템 학습용 HTML 다이어그램과 검색 가능한 UI/UX 용어 사전 |
-| v4.8 Changelog | [`v4.8-changelog.md`](v4.8-changelog.md) | Hook session 격리와 durable crash recovery 릴리즈 노트 |
+| v4.8 Changelog | [`v4.8-changelog.md`](v4.8-changelog.md) | Hook session 격리, durable crash recovery, installer 경계 강화 릴리즈 노트 |
 | v4.7 Changelog | [`v4.7-changelog.md`](v4.7-changelog.md) | Shared Agent Rules 릴리즈 노트 |
 | v4.6 Changelog | [`v4.6-changelog.md`](v4.6-changelog.md) | Codex App instruction/hook hardening parity 릴리즈 노트 |
 | v4.5 Changelog | [`v4.5-changelog.md`](v4.5-changelog.md) | Agent Operating Kernel adapter 릴리즈 노트 |

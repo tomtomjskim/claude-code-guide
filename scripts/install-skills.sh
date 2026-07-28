@@ -13,6 +13,35 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_SRC="$REPO_DIR/skills"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
+prepare_project_directory() {
+    local path="$1"
+    local resolved
+    case "$path" in
+        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        *)
+            echo "ERROR: project install path escapes target: $path" >&2
+            exit 1
+            ;;
+    esac
+    if [ -L "$path" ]; then
+        echo "ERROR: project install path must not be a symlink: $path" >&2
+        exit 1
+    fi
+    if [ -e "$path" ] && [ ! -d "$path" ]; then
+        echo "ERROR: project install path must be a directory: $path" >&2
+        exit 1
+    fi
+    mkdir -p "$path"
+    resolved="$(cd "$path" && pwd -P)"
+    case "$resolved" in
+        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        *)
+            echo "ERROR: project install path resolves outside target: $path" >&2
+            exit 1
+            ;;
+    esac
+}
+
 publish_managed_file() {
     local scope="$1"
     local relative="$2"
@@ -139,12 +168,21 @@ if [ ! -d "$SKILLS_SRC" ]; then
     exit 1
 fi
 
-if [ ! -d "$TARGET" ]; then
-    echo "ERROR: Target directory '$TARGET' does not exist."
+if [ -L "$TARGET" ]; then
+    echo "ERROR: Target directory must not be a symlink: $TARGET" >&2
     exit 1
 fi
 
+if [ ! -d "$TARGET" ]; then
+    echo "ERROR: Target directory '$TARGET' does not exist." >&2
+    exit 1
+fi
+
+TARGET="$(cd "$TARGET" && pwd -P)"
+
 TARGET_SKILLS="$TARGET/.claude/skills"
+prepare_project_directory "$TARGET/.claude"
+prepare_project_directory "$TARGET_SKILLS"
 
 # --- Install skills ---
 echo "=== PDARR Workflow Skills Installer ==="
@@ -153,8 +191,6 @@ echo "Source:  $SKILLS_SRC"
 echo "Target:  $TARGET_SKILLS"
 echo "Force:   $FORCE"
 echo ""
-
-mkdir -p "$TARGET_SKILLS"
 
 INSTALLED=0
 SKIPPED=0
@@ -177,6 +213,15 @@ fi
 for skill_dir in "${SKILL_DIRS[@]}"; do
     skill_name=$(basename "$skill_dir")
     target_dir="$TARGET_SKILLS/$skill_name"
+
+    if [ -L "$target_dir" ]; then
+        echo "ERROR: skill destination must not be a symlink: $target_dir" >&2
+        exit 1
+    fi
+    if [ -e "$target_dir" ] && [ ! -d "$target_dir" ]; then
+        echo "ERROR: skill destination must be a directory: $target_dir" >&2
+        exit 1
+    fi
 
     if [ -d "$target_dir" ] && [ "$FORCE" = false ]; then
         echo "  SKIP  $skill_name (already exists, use --force to overwrite)"
@@ -256,15 +301,12 @@ if [ "$INSTALL_TEAM" = true ]; then
                 adapter_path="$SHARED_CLAUDE_ADAPTERS/$agent_name"
                 link_path="$AGENTS_DST/$agent_name"
 
-                if { [ -e "$adapter_path" ] || [ -L "$adapter_path" ]; } && [ "$FORCE" = false ]; then
-                    if [ ! -e "$link_path" ] && [ ! -L "$link_path" ]; then
-                        ln -s "$adapter_path" "$link_path"
-                        echo "  OK    $AGENTS_DST/$agent_name -> shared adapter"
-                        AGENT_COUNT=$((AGENT_COUNT + 1))
-                    else
-                        echo "  SKIP  agents/$agent_name (shared adapter exists, use --force to overwrite)"
-                        AGENT_SKIPPED=$((AGENT_SKIPPED + 1))
-                    fi
+                if [ "$FORCE" = false ] && {
+                    [ -e "$adapter_path" ] || [ -L "$adapter_path" ] \
+                        || [ -e "$link_path" ] || [ -L "$link_path" ];
+                }; then
+                    echo "  SKIP  agents/$agent_name (adapter or active path exists, use --force to overwrite)"
+                    AGENT_SKIPPED=$((AGENT_SKIPPED + 1))
                     continue
                 fi
 

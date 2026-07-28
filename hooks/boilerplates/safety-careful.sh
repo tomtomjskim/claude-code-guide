@@ -177,7 +177,8 @@ fi
 # Level 3: 경고 (허용하되 stderr 출력 + 옵션 로그 파일 — P1-H7)
 for pattern in "${LEVEL3_PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qEi "$pattern" 2>/dev/null; then
-    msg="WARNING: 주의 필요한 명령 — $pattern (cmd: ${COMMAND:0:120})"
+    command_preview=$(printf '%s' "${COMMAND:0:120}" | tr '\n\r' '  ')
+    msg="WARNING: 주의 필요한 명령 — $pattern (cmd: $command_preview)"
     echo "$msg" >&2
     # 영속 로그 (stderr가 모델 컨텍스트로 surface 안 될 가능성 대비)
     if [ "$LEVEL3_LOG" = "__PRIVATE_HOOK_STATE__" ]; then

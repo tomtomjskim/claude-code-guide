@@ -1205,6 +1205,143 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertFalse(installed.exists())
         self.assertEqual(concurrent.read_text(encoding="utf-8"), "preserve me\n")
 
+    def test_new_manifest_rejects_active_claude_agent_ownership(self):
+        result = self.run_cli(
+            "begin",
+            "--target",
+            self.target,
+            "--output",
+            self.transaction,
+            "--claude-home",
+            self.claude_home,
+            "--source",
+            REPO_ROOT,
+            "--profile",
+            "enterprise",
+            "--source-revision",
+            "test-revision",
+            "--managed-file",
+            "claude-home:agents/code-reviewer.md",
+            "--include-home",
+            expected=2,
+        )
+
+        self.assertIn("team/", result.stderr)
+        self.assertFalse(self.transaction.exists())
+
+    def test_v48_reinstall_relinquishes_legacy_active_agent_ownership(self):
+        source_agent = REPO_ROOT / "agents" / "code-reviewer.md"
+        managed_path = "team/agents/code-reviewer.md"
+        self.begin(include_home=True, managed_paths=[])
+        self.run_cli(
+            "publish",
+            "--target",
+            self.target,
+            "--claude-home",
+            self.claude_home,
+            "--snapshot",
+            self.transaction,
+            "--scope",
+            "claude-home",
+            "--path",
+            managed_path,
+            "--source",
+            source_agent,
+        )
+        self.finalize(include_home=True)
+
+        state_file = self.target / ".claude" / "claude-code-guide-install-state.json"
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        first_state_root = self.state_home / state["state_id"]
+        entry = next(
+            item
+            for item in state["entries"]
+            if item["scope"] == "claude-home"
+            and item["path"] == managed_path
+        )
+
+        installed_payload = (
+            first_state_root
+            / "installed"
+            / "claude-home"
+            / "team"
+            / "agents"
+            / "code-reviewer.md"
+        )
+        legacy_payload = (
+            first_state_root
+            / "installed"
+            / "claude-home"
+            / "agents"
+            / "code-reviewer.md"
+        )
+        legacy_payload.parent.mkdir(parents=True)
+        installed_payload.replace(legacy_payload)
+
+        installed_agent = self.claude_home / managed_path
+        legacy_agent = self.claude_home / "agents" / "code-reviewer.md"
+        legacy_agent.parent.mkdir(parents=True)
+        installed_agent.replace(legacy_agent)
+        shared_adapter = self.root / "shared-adapter.md"
+        shutil.copyfile(legacy_agent, shared_adapter)
+        legacy_agent.unlink()
+        legacy_agent.symlink_to(shared_adapter)
+
+        entry["path"] = "agents/code-reviewer.md"
+        state["guide_version"] = "4.7"
+        state_file.write_text(
+            json.dumps(state, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        second_transaction = self.root / "transaction-v48"
+        self.begin(
+            include_home=True,
+            managed_paths=[],
+            output=second_transaction,
+        )
+        self.run_cli(
+            "publish",
+            "--target",
+            self.target,
+            "--claude-home",
+            self.claude_home,
+            "--snapshot",
+            second_transaction,
+            "--scope",
+            "claude-home",
+            "--path",
+            managed_path,
+            "--source",
+            source_agent,
+        )
+        self.finalize(include_home=True, snapshot=second_transaction)
+
+        migrated_state = json.loads(state_file.read_text(encoding="utf-8"))
+        managed = {
+            (item["scope"], item["path"])
+            for item in migrated_state["entries"]
+        }
+        self.assertIn(("claude-home", managed_path), managed)
+        self.assertNotIn(
+            ("claude-home", "agents/code-reviewer.md"),
+            managed,
+        )
+        self.assertTrue(legacy_agent.is_symlink())
+        self.assertEqual(legacy_agent.resolve(), shared_adapter.resolve())
+        self.assertFalse(first_state_root.exists())
+
+        self.run_cli(
+            "uninstall",
+            "--target",
+            self.target,
+            "--claude-home",
+            self.claude_home,
+        )
+        self.assertTrue(legacy_agent.is_symlink())
+        self.assertEqual(legacy_agent.resolve(), shared_adapter.resolve())
+        self.assertFalse((self.claude_home / managed_path).exists())
+
     def test_copied_state_is_rejected_for_a_different_target(self):
         managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
         self.begin()

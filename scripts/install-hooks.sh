@@ -16,6 +16,35 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 HOOKS_SRC="$REPO_DIR/hooks/boilerplates"
 
+prepare_project_directory() {
+    local path="$1"
+    local resolved
+    case "$path" in
+        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        *)
+            echo "ERROR: project install path escapes target: $path" >&2
+            exit 1
+            ;;
+    esac
+    if [ -L "$path" ]; then
+        echo "ERROR: project install path must not be a symlink: $path" >&2
+        exit 1
+    fi
+    if [ -e "$path" ] && [ ! -d "$path" ]; then
+        echo "ERROR: project install path must be a directory: $path" >&2
+        exit 1
+    fi
+    mkdir -p "$path"
+    resolved="$(cd "$path" && pwd -P)"
+    case "$resolved" in
+        "$TARGET/.claude"|"$TARGET/.claude/"*) ;;
+        *)
+            echo "ERROR: project install path resolves outside target: $path" >&2
+            exit 1
+            ;;
+    esac
+}
+
 # ── Hook 카탈로그 ──
 # name:matcher:event:description
 HOOK_CATALOG=(
@@ -106,10 +135,17 @@ if [ -z "$TARGET" ]; then
     exit 1
 fi
 
-if [ ! -d "$TARGET" ]; then
-    echo "ERROR: 대상 디렉토리 '$TARGET'가 존재하지 않습니다."
+if [ -L "$TARGET" ]; then
+    echo "ERROR: 대상 디렉토리는 symlink일 수 없습니다: $TARGET" >&2
     exit 1
 fi
+
+if [ ! -d "$TARGET" ]; then
+    echo "ERROR: 대상 디렉토리 '$TARGET'가 존재하지 않습니다." >&2
+    exit 1
+fi
+
+TARGET="$(cd "$TARGET" && pwd -P)"
 
 if [ ! -d "$HOOKS_SRC" ]; then
     echo "ERROR: 보일러플레이트 디렉토리를 찾을 수 없습니다: $HOOKS_SRC"
@@ -137,8 +173,29 @@ if [ ${#SELECTED_HOOKS[@]} -eq 0 ]; then
     done
 fi
 
+for hook_name in "${SELECTED_HOOKS[@]}"; do
+    if [[ ! "$hook_name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "ERROR: unsafe Hook name: $hook_name" >&2
+        exit 1
+    fi
+    catalog_match=false
+    for entry in "${HOOK_CATALOG[@]}"; do
+        IFS=':' read -r cat_name _ _ _ <<< "$entry"
+        if [ "$cat_name" = "$hook_name" ]; then
+            catalog_match=true
+            break
+        fi
+    done
+    if [ "$catalog_match" = false ]; then
+        echo "ERROR: Hook is not in the catalog: $hook_name" >&2
+        exit 1
+    fi
+done
+
 TARGET_HOOKS="$TARGET/.claude/hooks"
 TARGET_SETTINGS="$TARGET/.claude/settings.local.json"
+prepare_project_directory "$TARGET/.claude"
+prepare_project_directory "$TARGET_HOOKS"
 
 echo "╔══════════════════════════════════════════════════════════════╗"
 echo "║              Claude Code Hook Installer v1.0                ║"
@@ -150,8 +207,6 @@ echo "  Hooks:   ${SELECTED_HOOKS[*]}"
 echo "  Force:   $FORCE"
 echo ""
 
-mkdir -p "$TARGET_HOOKS"
-
 # ── Hook 파일 복사 ──
 INSTALLED=0
 SKIPPED=0
@@ -159,6 +214,11 @@ SKIPPED=0
 for hook_name in "${SELECTED_HOOKS[@]}"; do
     SRC_FILE="$HOOKS_SRC/${hook_name}.sh"
     DST_FILE="$TARGET_HOOKS/${hook_name}.sh"
+
+    if [ -L "$DST_FILE" ]; then
+        echo "ERROR: Hook destination must not be a symlink: $DST_FILE" >&2
+        exit 1
+    fi
 
     if [ ! -f "$SRC_FILE" ]; then
         echo "  WARN  $hook_name — 보일러플레이트 파일 없음, 건너뜀"
@@ -191,6 +251,11 @@ done
 if [ "$SKIP_SETTINGS" = false ]; then
     echo ""
     echo "--- settings.local.json Hook 등록 ---"
+
+    if [ -L "$TARGET_SETTINGS" ]; then
+        echo "ERROR: settings destination must not be a symlink: $TARGET_SETTINGS" >&2
+        exit 1
+    fi
 
     # 기존 설정 읽기 또는 빈 객체 생성
     if [ -f "$TARGET_SETTINGS" ]; then

@@ -204,6 +204,52 @@ class HookStateIsolationTest(unittest.TestCase):
         self.assertTrue((self.state_dir / "level3.log").is_file())
         self.assertEqual(list(self.legacy_dir.iterdir()), [])
 
+    def test_audit_sanitizes_newlines_in_every_logged_field(self):
+        audit = self.copied_hook("audit-agent.sh")
+        payload = {
+            "tool_name": "Agent",
+            "session_id": "session\nforged-session",
+            "tool_input": {
+                "subagent_type": "reviewer\r\nforged-type",
+                "description": "description\nforged-description",
+                "prompt": "prompt\r\nforged-prompt",
+            },
+        }
+
+        result = self.run_hook(
+            audit,
+            json.dumps(payload),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = (self.state_dir / "agent-audit.log").read_text(encoding="utf-8")
+        self.assertEqual(len(log.splitlines()), 1)
+        self.assertNotIn("\r", log)
+        self.assertIn("session=session forged-session", log)
+        self.assertIn("type=reviewer  forged-type", log)
+
+    def test_level3_log_sanitizes_command_newlines(self):
+        careful = self.copied_hook("safety-careful.sh")
+        log_path = self.root / "level3-injection.log"
+        payload = {
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "docker rm -f current\n[forged] WARNING",
+            },
+        }
+
+        result = self.run_hook(
+            careful,
+            json.dumps(payload),
+            LEVEL3_LOG=str(log_path),
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        log = log_path.read_text(encoding="utf-8")
+        self.assertEqual(len(log.splitlines()), 1)
+        self.assertNotIn("\r", log)
+        self.assertIn("docker rm -f current [forged] WARNING", log)
+
 
 if __name__ == "__main__":
     unittest.main()

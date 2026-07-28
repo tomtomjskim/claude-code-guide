@@ -226,6 +226,25 @@ def validate_scoped_path(scope: str, value: str) -> PurePosixPath:
     raise InstallStateError(f"unknown managed scope: {scope}")
 
 
+def validate_new_manifest_path(scope: str, value: str) -> PurePosixPath:
+    relative = validate_scoped_path(scope, value)
+    if scope == "claude-home" and relative.parts[0] != "team":
+        raise InstallStateError(
+            "new Claude-home managed paths must stay under team/: "
+            f"{value}"
+        )
+    return relative
+
+
+def is_legacy_active_agent_entry(entry: dict) -> bool:
+    relative = PurePosixPath(entry["path"])
+    return (
+        entry["scope"] == "claude-home"
+        and bool(relative.parts)
+        and relative.parts[0] == "agents"
+    )
+
+
 def safe_destination(root: Path, relative_value: str) -> Path:
     relative = validate_relative_path(relative_value)
     if root.is_symlink():
@@ -375,7 +394,7 @@ def add_manifest_entry(
     source: Path | None,
     executable: bool = False,
 ) -> None:
-    relative_value = validate_scoped_path(scope, relative).as_posix()
+    relative_value = validate_new_manifest_path(scope, relative).as_posix()
     key = f"{scope}:{relative_value}"
     if key in entries:
         return
@@ -552,6 +571,8 @@ def build_manifest(
                 raise InstallStateError(
                     "existing state includes Claude-home files; use --include-home"
                 )
+            if is_legacy_active_agent_entry(entry):
+                continue
             key = f"{entry['scope']}:{entry['path']}"
             entries.setdefault(
                 key,
@@ -2034,7 +2055,9 @@ def command_finalize(args: argparse.Namespace) -> int:
         for entry in existing_state["entries"]:
             validate_payload_file(entry, old_state_root, "previous")
             validate_payload_file(entry, old_state_root, "installed")
-            existing_entries[f"{entry['scope']}:{entry['path']}"] = entry
+            key = f"{entry['scope']}:{entry['path']}"
+            if key in declared:
+                existing_entries[key] = entry
 
     state_home = resolved_state_home(create=True)
     state_id = secrets.token_hex(16)

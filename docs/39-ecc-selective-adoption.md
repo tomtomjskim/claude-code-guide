@@ -96,6 +96,13 @@ bash scripts/manage-install.sh uninstall --target <project>
   uninstall해야 한다.
 - 기존 install-state와 source revision이 달라지면 검토 후 `--force`를 명시해야
   하며, source revision과 profile을 동시에 바꾸려면 먼저 uninstall한다.
+- 새 enterprise manifest는 Claude home의 `team/`만 소유한다. 과거 state의
+  `claude-home:agents/*`는 v4.8 재설치 때 파일을 건드리지 않고 소유권만
+  relinquish하며, 이후 repair/uninstall 대상에서 제외한다.
+- standalone installer는 target과 project `.claude`, skill/hook destination
+  symlink를 거부하고 Hook 이름을 catalog allowlist로 제한한다. 비transaction
+  `--team`은 adapter/active pair 중 하나라도 있으면 `--force` 없이는 둘 다
+  변경하지 않는다.
 
 여기서 `doctor`와 `--dry-run`의 읽기 전용 범위는 managed target 파일과 install-state다.
 동시 lifecycle 작업을 배제하기 위한 XDG state home의 target별 lock directory/file은
@@ -107,6 +114,8 @@ Agent counter, 감사 로그, Level 3 로그는 사용자 전용 `0700` runtime 
 공유하되 counter는 hash된 session ID별 `0600` 파일로 분리한다. 누락된 session ID는
 counter를 만들지 않으며, 7일 TTL과 `flock`을 사용한다. 테스트는 별도
 `CLAUDE_HOOK_STATE_DIR`을 사용해 실제 세션 상태를 수정하지 않는다.
+감사 로그의 모든 사용자 입력 필드와 Level 3 command preview는 CR/LF를 정규화해
+한 event가 여러 로그 행을 위조할 수 없게 한다.
 
 legacy `/tmp/claude-hooks/agent-count-unknown`은 자동 초기화하거나 삭제하지 않는다.
 그 작업은 아직 구버전 Hook을 실행 중인 다른 세션의 호출 제한을 되돌릴 수 있다.

@@ -79,20 +79,22 @@ umask 077
 mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || exit 0
 
 TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
+SESSION_ID=$(echo "$INPUT" | jq -jr '.session_id // "unknown"' 2>/dev/null \
+  | tr '\n\r' '  ' | sed 's/"/\\"/g' || echo "unknown")
 
 # 로그 주입 방지: 개행 → 공백, 따옴표 이스케이프
-DESCRIPTION=$(echo "$INPUT" | jq -r '.tool_input.description // ""' 2>/dev/null | tr '\n\r' '  ' | sed 's/"/\\"/g')
-SUBAGENT_TYPE=$(echo "$INPUT" | jq -r '.tool_input.subagent_type // "general-purpose"' 2>/dev/null || echo "unknown")
+DESCRIPTION=$(echo "$INPUT" | jq -jr '.tool_input.description // ""' 2>/dev/null | tr '\n\r' '  ' | sed 's/"/\\"/g')
+SUBAGENT_TYPE=$(echo "$INPUT" | jq -jr '.tool_input.subagent_type // "general-purpose"' 2>/dev/null \
+  | tr '\n\r' '  ' | sed 's/"/\\"/g' || echo "unknown")
 # UTF-8 안전 절단 (P2-L5): head -c는 바이트 단위라 한글 등 multibyte 중간에서 절단 가능
 # iconv -c 로 invalid sequence(잘린 multibyte) 제거 후 sanitize
-PROMPT_PREVIEW=$(echo "$INPUT" | jq -r '.tool_input.prompt // ""' 2>/dev/null \
+PROMPT_PREVIEW=$(echo "$INPUT" | jq -jr '.tool_input.prompt // ""' 2>/dev/null \
   | head -c "$PROMPT_PREVIEW_LENGTH" \
   | iconv -c -f UTF-8 -t UTF-8 2>/dev/null \
   | tr '\n\r' '  ' | sed 's/"/\\"/g')
 # iconv 미설치 fallback
 if [ -z "$PROMPT_PREVIEW" ] && [ -n "$DESCRIPTION" ]; then
-  PROMPT_PREVIEW=$(echo "$INPUT" | jq -r '.tool_input.prompt // ""' 2>/dev/null \
+  PROMPT_PREVIEW=$(echo "$INPUT" | jq -jr '.tool_input.prompt // ""' 2>/dev/null \
     | head -c "$PROMPT_PREVIEW_LENGTH" | tr '\n\r' '  ' | sed 's/"/\\"/g')
 fi
 
