@@ -936,6 +936,8 @@ def command_finalize(args: argparse.Namespace) -> int:
         claude_home,
         args.include_home,
     )
+    if snapshot_meta["profile"] != args.profile:
+        raise InstallStateError("snapshot profile does not match finalize profile")
     validate_snapshot_payload(snapshot, before)
     after = scan_manifest(target, claude_home, manifest)
     changed_keys = changed_record_keys(before, after)

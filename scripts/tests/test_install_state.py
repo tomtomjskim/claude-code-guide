@@ -44,6 +44,7 @@ class InstallStateCliTest(unittest.TestCase):
         return result
 
     def begin(self, include_home=False, managed_paths=None, output=None):
+        profile = "enterprise" if include_home else "team"
         args = [
             "begin",
             "--target",
@@ -55,7 +56,7 @@ class InstallStateCliTest(unittest.TestCase):
             "--source",
             REPO_ROOT,
             "--profile",
-            "team",
+            profile,
         ]
         for managed_path in managed_paths or ["project:skills/managed/SKILL.md"]:
             args.extend(["--managed-file", managed_path])
@@ -64,6 +65,7 @@ class InstallStateCliTest(unittest.TestCase):
         self.run_cli(*args)
 
     def finalize(self, include_home=False, snapshot=None):
+        profile = "enterprise" if include_home else "team"
         args = [
             "finalize",
             "--target",
@@ -71,7 +73,7 @@ class InstallStateCliTest(unittest.TestCase):
             "--snapshot",
             snapshot or self.transaction,
             "--profile",
-            "team",
+            profile,
             "--source-revision",
             "test-revision",
             "--claude-home",
@@ -447,6 +449,27 @@ class InstallStateCliTest(unittest.TestCase):
         )
         self.assertIn("unexpected drift", result.stderr.lower())
         self.assertEqual(managed.read_text(encoding="utf-8"), "concurrent edit\n")
+
+    def test_enterprise_abort_preserves_unmanaged_claude_home_file(self):
+        self.begin(include_home=True, managed_paths=[])
+        installed = self.claude_home / "team" / "agents.yaml"
+        installed.parent.mkdir(parents=True)
+        shutil.copyfile(REPO_ROOT / "agents.yaml", installed)
+        concurrent = self.claude_home / "team" / "user-created.md"
+        concurrent.write_text("preserve me\n", encoding="utf-8")
+
+        self.run_cli(
+            "abort",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--claude-home",
+            self.claude_home,
+            "--include-home",
+        )
+        self.assertFalse(installed.exists())
+        self.assertEqual(concurrent.read_text(encoding="utf-8"), "preserve me\n")
 
     def test_copied_state_is_rejected_for_a_different_target(self):
         managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
