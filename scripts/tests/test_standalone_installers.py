@@ -221,6 +221,24 @@ class StandaloneInstallerSafetyTest(unittest.TestCase):
         self.assertTrue(active.is_symlink())
         self.assertEqual(active.resolve(), custom_target.resolve())
 
+    def test_team_installer_accepts_config_roots_with_trailing_slashes(self):
+        self.env["CLAUDE_CONFIG_DIR"] += "/"
+        self.env["SHARED_AGENTS_HOME"] += "/"
+
+        result = self.run_installer(
+            INSTALL_SKILLS,
+            "--team",
+            "--skills",
+            "dispatch",
+            self.target,
+        )
+
+        self.assertEqual(
+            result.returncode,
+            0,
+            msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+        )
+
     def test_team_install_without_force_preserves_active_symlink_without_adapter(self):
         active = Path(self.env["CLAUDE_CONFIG_DIR"]) / "agents" / "code-reviewer.md"
         active.parent.mkdir(parents=True)

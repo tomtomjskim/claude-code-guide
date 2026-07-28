@@ -12,6 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_SRC="$REPO_DIR/skills"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+if [ "$CLAUDE_HOME" != "/" ]; then
+    CLAUDE_HOME="${CLAUDE_HOME%/}"
+fi
 
 prepare_safe_tree_directory() {
     local root="${1%/}"
@@ -358,6 +361,9 @@ if [ "$INSTALL_TEAM" = true ]; then
     TEAM_DIR="$CLAUDE_HOME/team"
     TEAM_AGENTS_DIR="$TEAM_DIR/agents"
     SHARED_AGENTS_HOME="${SHARED_AGENTS_HOME:-$HOME/.agents}"
+    if [ "$SHARED_AGENTS_HOME" != "/" ]; then
+        SHARED_AGENTS_HOME="${SHARED_AGENTS_HOME%/}"
+    fi
     SHARED_CLAUDE_ADAPTERS="$SHARED_AGENTS_HOME/adapters/claude"
     AGENTS_DST="$CLAUDE_HOME/agents"
 
