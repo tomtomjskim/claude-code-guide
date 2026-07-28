@@ -4,12 +4,71 @@
 
 set -e
 
-PROMPTS_DIR="$HOME/.claude/team/prompts"
-AGENTS_DIR="$HOME/.claude/agents"
-SKILLS_DIR="$HOME/.claude/skills"
-WORKFLOWS_DIR="$HOME/.claude/team/workflows"
-HOOKS_DIR="$HOME/.claude/team/hooks"
-AGENTS_YAML="$HOME/.claude/team/agents.yaml"
+PROJECT_ROOT=""
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
+usage() {
+    cat <<'USAGE'
+Usage: bash scripts/validate-system.sh [--project <path>] [--claude-home <path>]
+
+Without arguments the validator checks the traditional global installation.
+Use --project for project-local skills and settings.local.json.
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --project)
+            PROJECT_ROOT="${2:-}"
+            shift 2
+            ;;
+        --claude-home)
+            CLAUDE_HOME="${2:-}"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument '$1'" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [ -n "$PROJECT_ROOT" ]; then
+    if [ ! -d "$PROJECT_ROOT" ]; then
+        echo "ERROR: project directory not found: $PROJECT_ROOT" >&2
+        exit 2
+    fi
+    PROJECT_ROOT="$(cd "$PROJECT_ROOT" && pwd)"
+fi
+
+if [ -d "$CLAUDE_HOME" ]; then
+    CLAUDE_HOME="$(cd "$CLAUDE_HOME" && pwd)"
+else
+    CLAUDE_HOME="$(cd "$(dirname "$CLAUDE_HOME")" && pwd)/$(basename "$CLAUDE_HOME")"
+fi
+
+PROMPTS_DIR="$CLAUDE_HOME/team/prompts"
+AGENTS_DIR="$CLAUDE_HOME/agents"
+WORKFLOWS_DIR="$CLAUDE_HOME/team/workflows"
+HOOKS_DIR="$CLAUDE_HOME/team/hooks"
+AGENTS_YAML="$CLAUDE_HOME/team/agents.yaml"
+
+if [ -n "$PROJECT_ROOT" ]; then
+    SKILLS_DIR="$PROJECT_ROOT/.claude/skills"
+    if [ -f "$PROJECT_ROOT/.claude/settings.local.json" ]; then
+        SETTINGS_JSON="$PROJECT_ROOT/.claude/settings.local.json"
+    else
+        SETTINGS_JSON="$PROJECT_ROOT/.claude/settings.json"
+    fi
+else
+    SKILLS_DIR="$CLAUDE_HOME/skills"
+    SETTINGS_JSON="$CLAUDE_HOME/settings.json"
+fi
 
 # v4.0 P1-1: 버전 canonical 중앙화 (strategy.md Decision 1)
 # 이 스크립트가 검증하는 team system의 예상 버전. agents.yaml:4의 value와 일치해야 함.
@@ -19,9 +78,8 @@ EXPECTED_VERSION="3.2"
 ERRORS=0
 WARNINGS=0
 
-HOOKS_SCRIPTS_DIR="$HOME/.claude/team/hooks/scripts"
-SETTINGS_JSON="$HOME/.claude/settings.json"
-SESSION_SCHEMA="$HOME/.claude/team/context/session-state-schema.yaml"
+HOOKS_SCRIPTS_DIR="$CLAUDE_HOME/team/hooks/scripts"
+SESSION_SCHEMA="$CLAUDE_HOME/team/context/session-state-schema.yaml"
 
 # v4.0 P0-4: agents.yaml을 SSOT로 삼는 동적 에이전트 이름 파싱
 # bash grep 기반 — yq 외부 의존 회피 (strategy.md Decision 3)
@@ -220,7 +278,7 @@ fi
 # 6. Check handoff-protocol.md exists
 echo ""
 echo "--- 6. Handoff Protocol ---"
-CONTEXT_DIR="$HOME/.claude/team/context"
+CONTEXT_DIR="$CLAUDE_HOME/team/context"
 if [ -f "$CONTEXT_DIR/handoff-protocol.md" ]; then
     echo "  handoff-protocol.md: exists ✓"
 else

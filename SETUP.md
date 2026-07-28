@@ -3,8 +3,8 @@
 <!-- CLAUDE-SETUP-GUIDE v1 -->
 
 **저장소**: https://github.com/tomtomjskim/claude-code-guide  
-**이 파일 raw URL**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/SETUP.md  
-**원라이너 raw URL**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh
+**이 파일 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-tag-or-commit>/SETUP.md
+**원라이너 raw URL 형식**: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/<reviewed-tag-or-commit>/scripts/quick-setup.sh
 
 ---
 
@@ -18,11 +18,14 @@
 
 사용자가 claude-code-guide가 전혀 설치돼 있지 않은 프로젝트에서 Claude Code 세션을 시작했다면, 아래 3가지 진입 경로 중 하나를 택한다.
 
-### 진입 1: 원라이너 (가장 간단, 1줄)
+### 진입 1: 검토된 ref 원라이너
 
 터미널에서:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+  | bash -s -- --ref "$CCG_REF" --dry-run
+# 출력 검토 후 --dry-run을 제거해 적용
 ```
 
 ### 진입 2: Claude Code에 복사-붙여넣기 (대화형)
@@ -34,19 +37,21 @@ Claude Code 세션에서 아래를 그대로 붙여넣기:
 https://github.com/tomtomjskim/claude-code-guide
 
 실행 방법:
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --dry-run
 
-SETUP.md wizard에 따라 프로젝트 분석 → profile 추천 → 확인 후 실행.
+SETUP.md wizard에 따라 프로젝트 분석 → profile 추천 → dry-run 검토 → 확인 후 실행.
 ```
 
 Claude가 SETUP.md(또는 quick-setup.sh)를 WebFetch/실행하여 아래 Wizard Steps 진행.
 
 ### 진입 3: 전역 `/setup-wizard` 스킬 선설치 (한 번만)
 
-한 번 실행:
+검토된 checkout에서 한 번 실행:
 ```bash
-git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg
-bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
+git clone https://github.com/tomtomjskim/claude-code-guide <local-guide-path>
+git -C <local-guide-path> checkout --detach <reviewed-tag-or-commit>
+bash <local-guide-path>/scripts/install-skills.sh --skills setup-wizard ~/
 ```
 
 이후 모든 프로젝트에서:
@@ -131,13 +136,17 @@ User: y
 
 **원라이너 (원격):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh \
-  | bash -s -- --profile team
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+  | bash -s -- --ref "$CCG_REF" --profile team --dry-run
 ```
+
+dry-run 출력과 source ref를 확인한 뒤에만 `--dry-run`을 제거한다.
 
 **옵션:**
 - `--profile <solo|team|enterprise|review-only|auto>` — 프로파일 명시 (기본: auto)
 - `--target <path>` — 설치 대상 프로젝트 경로 (기본: `$PWD` 또는 `$CLAUDE_PROJECT_PATH`)
+- `--ref <tag-or-commit>` — 원격 source를 검토된 ref로 고정
 - `--dry-run` — 실제 변경 없이 실행 명령만 출력
 - `--force` — 기존 설치 덮어쓰기
 - `--skip-stack` — 스택별 CUSTOMIZE 안내 생략
@@ -177,8 +186,13 @@ ls .claude/skills/ | wc -l
 cat .claude/settings.local.json
 
 # enterprise만
-bash ~/.claude/team/scripts/validate-system.sh
-# 기대: Errors 0 (또는 PyYAML baseline 6), Warnings 0, Checks 19 categories
+bash ~/.claude/team/scripts/validate-system.sh \
+  --project <target> \
+  --claude-home ~/.claude
+# 기대: Errors 0, Warnings 0, Checks 19 categories
+
+# quick-setup 설치 상태
+bash scripts/manage-install.sh doctor --target <target> --json
 ```
 
 ### Step 7: 다음 단계 안내
@@ -261,7 +275,7 @@ bash scripts/install-hooks.sh --preset minimal <target>
 3. **Step 1**의 Bash 명령을 실행하여 프로젝트 분석
 4. **Step 2** 매트릭스로 프로파일 추천
 5. **Step 3** 사용자 확인 대화
-6. **Step 4** `quick-setup.sh` 호출 (원라이너 curl 또는 로컬 실행)
+6. **Step 4** 검토된 ref의 `quick-setup.sh`를 dry-run 후 호출
 7. **Step 5** 스택별 CUSTOMIZE 제안 (선택)
 8. **Step 6-7** 검증 + 다음 단계 안내
 
@@ -302,5 +316,5 @@ bash scripts/install-hooks.sh --preset minimal <target>
 
 ## 버전
 
-이 `SETUP.md`는 claude-code-guide v4.0 이후 기준.  
-Canonical 릴리즈 태그: `git tag -l v4.0`
+이 `SETUP.md`는 claude-code-guide v4.5 이후 기준.
+사용할 ref는 release note와 `git tag -l` 또는 명시 commit을 함께 검토해 선택한다.

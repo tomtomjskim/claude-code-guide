@@ -10,33 +10,37 @@
 
 **GitHub 저장소**: https://github.com/tomtomjskim/claude-code-guide
 
-### 방법 A — 원라이너 (최초 Bootstrap, zero-context)
+### 방법 A — 검토된 clone 사용 (권장)
 
-아무 프로젝트 디렉토리에서 터미널에 한 줄:
+재현 가능한 설치는 먼저 검토한 tag 또는 commit으로 checkout합니다.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+git clone https://github.com/tomtomjskim/claude-code-guide.git
+cd claude-code-guide
+git checkout <reviewed-tag-or-commit>
+bash scripts/quick-setup.sh --target <project> --dry-run
+bash scripts/quick-setup.sh --target <project>
 ```
 
-또는 Claude Code 세션에서 **아래 문장을 그대로 복사-붙여넣기**:
+원라이너가 필요하면 raw script와 내부 clone에 같은 ref를 지정합니다.
 
-> 다음 GitHub 저장소의 자동 셋업 스크립트로 이 프로젝트를 셋업해줘:
-> https://github.com/tomtomjskim/claude-code-guide
->
-> 실행 명령:
-> `curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash`
->
-> 먼저 분석하고 profile 추천받은 뒤 확인하고 실행.
+```bash
+CCG_REF=<reviewed-tag-or-commit>
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+  | bash -s -- --ref "$CCG_REF" --dry-run
+```
 
-Claude Code가 `SETUP.md`를 WebFetch하여 wizard로 안내.
+`main`을 직접 사용하면 moving target 경고가 출력됩니다. 외부 script는 지침이 아니라
+검토 대상 코드로 취급하고, 실제 설치 전에 `--dry-run` 결과를 확인하세요.
 
 ### 방법 B — 전역 `/setup-wizard` 스킬 (최초 1회 설치 후 영구)
 
 한 번만:
 
 ```bash
-git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg
-bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
+git clone https://github.com/tomtomjskim/claude-code-guide <local-guide-path>
+git -C <local-guide-path> checkout --detach <reviewed-tag-or-commit>
+bash <local-guide-path>/scripts/install-skills.sh --skills setup-wizard ~/
 ```
 
 이후 어느 프로젝트에서든 Claude Code에서 타이핑:
@@ -81,7 +85,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 ## claude-code-guide (PDARR 워크플로우 + Safety Hooks + 팀 시스템)
 
 - **저장소**: https://github.com/tomtomjskim/claude-code-guide
-- **설치**: `curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash`
+- **설치**: 검토된 tag/commit을 checkout한 뒤 `bash scripts/quick-setup.sh --dry-run`
 - **자연어 트리거**: "claude-code-guide 설치", "PDARR 워크플로우 적용"
 - **대화형 가이드**: https://github.com/tomtomjskim/claude-code-guide/blob/main/SETUP.md
 - **릴리즈 노트**: https://github.com/tomtomjskim/claude-code-guide/blob/main/docs/v4-changelog.md
@@ -96,6 +100,7 @@ Claude Code가 항상 저장소 위치를 알게 하려면 `~/.claude/CLAUDE.md`
 - [`SETUP.md`](SETUP.md) — Claude Code가 읽고 수행하는 자연어 wizard
 - [`docs/design-md-system-guide.html`](docs/design-md-system-guide.html) — DESIGN.md 시스템 학습 HTML 다이어그램
 - [`docs/v4.3-changelog.md`](docs/v4.3-changelog.md) — **v4.3 릴리즈 노트** (PDARR + Goal-runtime 정렬: `/breakdown`, `/prd --vibe`)
+- [`docs/v4.5-changelog.md`](docs/v4.5-changelog.md) — **v4.5 릴리즈 노트** (검토된 ref, install-state, doctor/repair/uninstall)
 - [`docs/v4.2-changelog.md`](docs/v4.2-changelog.md) — v4.2 릴리즈 노트 (DESIGN.md 운영 모델)
 - [`docs/v4.1-changelog.md`](docs/v4.1-changelog.md) — **v4.1 릴리즈 노트** (셋업 인프라 + Hook 안정화)
 - [`docs/v4-changelog.md`](docs/v4-changelog.md) — v4.0 릴리즈 노트 (SSOT 부채 청산)
@@ -252,11 +257,25 @@ chmod +x ~/.claude/team/scripts/*.sh
 ### 5. 검증 (팀 시스템 사용 시)
 
 ```bash
-bash ~/.claude/team/scripts/validate-system.sh
-# 18 categories, 0 errors expected
+bash ~/.claude/team/scripts/validate-system.sh \
+  --project /path/to/your-project \
+  --claude-home ~/.claude
+# 19 categories, 0 errors expected
 ```
 
-### 5. 프로젝트 초기화
+### 6. 설치 상태 점검과 복구
+
+`quick-setup.sh`로 설치하면 관리 파일의 hash와 설치 전 상태가 기록됩니다.
+
+```bash
+bash scripts/manage-install.sh doctor --target /path/to/your-project --json
+bash scripts/manage-install.sh repair --target /path/to/your-project --dry-run
+bash scripts/manage-install.sh uninstall --target /path/to/your-project --dry-run
+```
+
+상세 계약: [ECC 선별 도입 및 설치 수명주기](docs/36-ecc-selective-adoption.md)
+
+### 7. 프로젝트 초기화
 
 ```bash
 cp -r templates/project-structure/* /your/project/
@@ -284,6 +303,7 @@ cp templates/CLAUDE.md /your/project/.claude/CLAUDE.md
 | 12 | [v3.0 아키텍처](docs/12-v3-architecture.md) | v3.0 시스템 아키텍처 (핸드오프, 실패 복구, 모델 라우팅) |
 | 13 | [핸드오프 & 실패 복구](docs/13-handoff-and-failure.md) | 실전 가이드 (설정, 예시, 템플릿) |
 | **14** | **[프리셋 시스템](docs/14-preset-system.md)** | **깊이(depth) x 실행(mode) 2축 체계. analyze/spec/check-code 프리셋** |
+| **36** | **[ECC 선별 도입 및 설치 수명주기](docs/36-ecc-selective-adoption.md)** | **검토된 ref, install-state, doctor/repair/uninstall, 공급망 경계** |
 | -- | [Workflow Guide (상세)](.claude/workflow-commands-guide.md) | 커맨드 구축 종합 가이드 |
 | -- | **[Skills README](skills/README.md)** | **19개 커스텀 스킬 설치/커스터마이징 가이드** |
 | -- | **[Quick Start Guide](QUICKSTART.md)** | **실전 활용 패턴, 프리셋 선택, 안티패턴** |

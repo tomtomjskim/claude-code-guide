@@ -41,7 +41,7 @@ if [[ -z "$COMMAND" ]]; then exit 0; fi
 # 신뢰 경로: 이 경로로 시작하는 명령은 무조건 허용
 # 자동화 스크립트, CI/CD 등 등록
 TRUSTED_PATHS=(
-  # "/home/ubuntu/scripts/deploy.sh"
+  # "/home/<user>/scripts/deploy.sh"
   # "/opt/ci/run-tests.sh"
 )
 

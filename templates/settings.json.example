@@ -9,7 +9,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/.claude/team/hooks/scripts/safety-careful.sh"
+            "command": "/home/<user>/.claude/team/hooks/scripts/safety-careful.sh"
           }
         ]
       },
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/.claude/team/hooks/scripts/safety-freeze.sh"
+            "command": "/home/<user>/.claude/team/hooks/scripts/safety-freeze.sh"
           }
         ]
       },
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/.claude/team/hooks/scripts/safety-freeze.sh"
+            "command": "/home/<user>/.claude/team/hooks/scripts/safety-freeze.sh"
           }
         ]
       }
@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/.claude/team/hooks/scripts/event-review-trigger.sh"
+            "command": "/home/<user>/.claude/team/hooks/scripts/event-review-trigger.sh"
           }
         ]
       },
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/home/ubuntu/.claude/team/hooks/scripts/event-review-trigger.sh"
+            "command": "/home/<user>/.claude/team/hooks/scripts/event-review-trigger.sh"
           }
         ]
       }
@@ -64,7 +64,7 @@
     "team-orchestrator": {
       "command": "node",
       "args": [
-        "/home/ubuntu/projects/team-orchestrator-mcp/dist/index.js"
+        "/home/<user>/projects/team-orchestrator-mcp/dist/index.js"
       ]
     },
     "shadcn": {

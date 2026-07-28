@@ -52,6 +52,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | 33 | [서브에이전트 효율성](33-subagent-efficiency.md) | 12가지 효율화 전략, 성능 리스크 분석, Tiered Dispatch, Result Pipe |
 | 34 | [DESIGN.md 운영 모델](34-design-md-operating-model.md) | DESIGN.md 개념 주입, 토큰 보일러플레이트, 버전 관리, 실행 태스크 |
 | 35 | [DESIGN.md 도입 평가 케이스](35-design-md-adoption-cases.md) | 비권장 시그널, 부분 도입 권장 요소, 케이스 스터디, downstream 평가 절차 |
+| 36 | [ECC 선별 도입 및 설치 수명주기](36-ecc-selective-adoption.md) | 검토된 ref, install-state, doctor/repair/uninstall, 공급망 경계 |
 
 ### 참조 문서
 | 문서 | 위치 | 설명 |
@@ -60,6 +61,7 @@ Claude Code v2.1.88 소스 분석에서 확인된 내부 동작과 최적화 전
 | DESIGN.md System Guide | [`design-md-system-guide.html`](design-md-system-guide.html) | DESIGN.md 시스템 학습용 HTML 다이어그램과 검색 가능한 UI/UX 용어 사전 |
 | v4.3 Changelog | [`v4.3-changelog.md`](v4.3-changelog.md) | PDARR + Goal-runtime 정렬 (`/breakdown` 신규, `/prd --vibe` 모드) |
 | v4.4 Changelog | [`v4.4-changelog.md`](v4.4-changelog.md) | 외부 agent skill 패턴 도입 릴리즈 노트 |
+| v4.5 Changelog | [`v4.5-changelog.md`](v4.5-changelog.md) | ECC 선별 도입과 설치 수명주기 강화 릴리즈 노트 |
 | v4.2 Changelog | [`v4.2-changelog.md`](v4.2-changelog.md) | DESIGN.md 운영 모델 릴리즈 노트 |
 
 ---

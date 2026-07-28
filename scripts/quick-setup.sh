@@ -5,8 +5,9 @@
 # Claude Code 세션에서 자연어 호출 대상.
 #
 # 사용법:
-#   curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh \
-#     | bash -s -- [--profile <name>] [--target <path>] [--dry-run] [--force]
+#   CCG_REF="<reviewed-tag-or-commit>"
+#   curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+#     | bash -s -- --ref "$CCG_REF" [--profile <name>] [--target <path>] [--dry-run] [--force]
 #
 #   로컬 clone 후:
 #   bash scripts/quick-setup.sh --profile team --target /path/to/project
@@ -20,7 +21,7 @@
 #
 # ============================================================================
 
-set -eo pipefail
+set -Eeo pipefail
 # pipefail: pipe 안 어떤 명령이라도 fail 하면 전체 fail (P2-H4)
 # 예: `git clone ... | tail -3` 에서 git clone 실패 시 tail이 0 반환해도 잡힘
 
@@ -34,6 +35,22 @@ FORCE=0
 SKIP_STACK_CUSTOMIZE=0
 REPO_URL="https://github.com/tomtomjskim/claude-code-guide"
 TMPDIR=""
+PRESERVE_TMPDIR=0
+INSTALL_TRANSACTION_ACTIVE=0
+SOURCE_OVERRIDE="${CLAUDE_CODE_GUIDE_SOURCE:-}"
+SOURCE_REF="${CLAUDE_CODE_GUIDE_REF:-main}"
+
+if [ -z "$SOURCE_OVERRIDE" ] \
+  && [ -n "${BASH_SOURCE[0]:-}" ] \
+  && [ -f "${BASH_SOURCE[0]}" ]; then
+  LOCAL_SOURCE_CANDIDATE="$(
+    cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd || true
+  )"
+  if [ -n "$LOCAL_SOURCE_CANDIDATE" ] \
+    && [ -f "$LOCAL_SOURCE_CANDIDATE/scripts/install_state.py" ]; then
+    SOURCE_OVERRIDE="$LOCAL_SOURCE_CANDIDATE"
+  fi
+fi
 
 # -----------------------------
 # 인자 파싱
@@ -45,14 +62,16 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN=1; shift ;;
     --force)   FORCE=1; shift ;;
     --skip-stack) SKIP_STACK_CUSTOMIZE=1; shift ;;
+    --ref) SOURCE_REF="$2"; shift 2 ;;
     --help|-h)
       # P2-L1: 헤더 sed 의존 제거 — 직접 inline 출력
       cat <<'HELP'
 claude-code-guide Quick Setup
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh \
-    | bash -s -- [--profile <name>] [--target <path>] [--dry-run] [--force] [--skip-stack]
+  CCG_REF="<reviewed-tag-or-commit>"
+  curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+    | bash -s -- --ref "$CCG_REF" [--profile <name>] [--target <path>] [--dry-run] [--force] [--skip-stack]
 
   로컬 clone 후:
     bash scripts/quick-setup.sh --profile team --target /path/to/project
@@ -67,6 +86,7 @@ Profiles:
 Options:
   --profile <name>     프로파일 선택 (solo|team|enterprise|review-only|auto)
   --target <path>      설치 대상 (default: $PWD)
+  --ref <value>        clone할 검토된 tag/branch/commit (default: main)
   --dry-run            실행 명령만 출력, 실제 변경 없음
   --force              기존 설치 덮어쓰기
   --skip-stack         스택별 CUSTOMIZE 안내 생략
@@ -97,9 +117,37 @@ run() {
 }
 
 cleanup() {
-  [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ] && rm -rf "$TMPDIR"
+  if [ "$PRESERVE_TMPDIR" = "1" ]; then
+    log "⚠️  Recovery snapshot preserved at: $TMPDIR"
+  elif [ -n "$TMPDIR" ] && [ -d "$TMPDIR" ]; then
+    rm -rf "$TMPDIR"
+  fi
 }
 trap cleanup EXIT
+
+rollback_failed_install() {
+  local original_status=$?
+  local rollback_status=0
+  trap - ERR
+  set +e
+  if [ "$INSTALL_TRANSACTION_ACTIVE" = "1" ]; then
+    log ""
+    log "↩️  Install step failed; restoring the begin snapshot..."
+    python3 "$CCG/scripts/install_state.py" abort \
+      --target "$TARGET" \
+      --snapshot "$STATE_SNAPSHOT" \
+      --claude-home "$CLAUDE_HOME" \
+      "${STATE_HOME_FLAGS[@]}"
+    rollback_status=$?
+    if [ "$rollback_status" -ne 0 ]; then
+      PRESERVE_TMPDIR=1
+      log "❌ Automatic rollback failed (exit $rollback_status)."
+    else
+      log "✅ Partial install rolled back."
+    fi
+  fi
+  exit "$original_status"
+}
 
 # -----------------------------
 # 타겟 경로 검증
@@ -199,20 +247,47 @@ fi
 # -----------------------------
 TMPDIR=$(mktemp -d)
 log ""
-log "📦 Cloning claude-code-guide..."
-# pipe 호출은 eval 없는 run()으로는 어려워 직접 실행 (pipefail이 git clone 실패 잡음)
-if [ "$DRY_RUN" = "1" ]; then
-  echo "[DRY-RUN] git clone --depth 1 \"$REPO_URL\" \"$TMPDIR/ccg\" 2>&1 | tail -3"
+if [ -n "$SOURCE_OVERRIDE" ]; then
+  if [ ! -f "$SOURCE_OVERRIDE/scripts/install-skills.sh" ]; then
+    echo "❌ Invalid CLAUDE_CODE_GUIDE_SOURCE: $SOURCE_OVERRIDE" >&2
+    exit 1
+  fi
+  CCG="$(cd "$SOURCE_OVERRIDE" && pwd)"
+  log "📦 Using local claude-code-guide source: $CCG"
 else
-  git clone --depth 1 "$REPO_URL" "$TMPDIR/ccg" 2>&1 | tail -3
-fi
+  log "📦 Cloning claude-code-guide..."
+  if [[ "$SOURCE_REF" == -* ]] || [[ "$SOURCE_REF" =~ [[:space:]] ]]; then
+    echo "❌ Invalid source ref: $SOURCE_REF" >&2
+    exit 1
+  fi
+  if [ "$SOURCE_REF" = "main" ]; then
+    log "⚠️  moving main을 사용합니다. 재현 가능한 설치는 --ref <reviewed-tag-or-commit>을 지정하세요."
+  fi
+  if [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "[DRY-RUN] git clone --filter=blob:none --no-checkout \"$REPO_URL\" \"$TMPDIR/ccg\""
+      echo "[DRY-RUN] git -C \"$TMPDIR/ccg\" fetch --depth 1 origin \"$SOURCE_REF\""
+      echo "[DRY-RUN] git -C \"$TMPDIR/ccg\" checkout --detach FETCH_HEAD"
+    else
+      git clone --filter=blob:none --no-checkout "$REPO_URL" "$TMPDIR/ccg"
+      git -C "$TMPDIR/ccg" fetch --depth 1 origin "$SOURCE_REF"
+      git -C "$TMPDIR/ccg" checkout --detach FETCH_HEAD
+    fi
+  else
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "[DRY-RUN] git clone --depth 1 --branch $SOURCE_REF \"$REPO_URL\" \"$TMPDIR/ccg\""
+    else
+      git clone --depth 1 --branch "$SOURCE_REF" "$REPO_URL" "$TMPDIR/ccg" 2>&1 | tail -3
+    fi
+  fi
 
-if [ "$DRY_RUN" = "0" ] && [ ! -d "$TMPDIR/ccg" ]; then
-  echo "❌ Clone 실패. 네트워크 확인." >&2
-  exit 1
-fi
+  if [ "$DRY_RUN" = "0" ] && [ ! -d "$TMPDIR/ccg" ]; then
+    echo "❌ Clone 실패. 네트워크 확인." >&2
+    exit 1
+  fi
 
-CCG="$TMPDIR/ccg"
+  CCG="$TMPDIR/ccg"
+fi
 
 # -----------------------------
 # 프로파일별 스킬/훅 설치 (P2-H3 — 배열 기반, eval 제거)
@@ -249,6 +324,21 @@ esac
 [ "$FORCE" = "1" ] && SKILLS_FLAGS+=(--force)
 [ "$FORCE" = "1" ] && HOOKS_FLAGS+=(--force)
 
+STATE_SNAPSHOT="$TMPDIR/install-state-before"
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+STATE_HOME_FLAGS=()
+[ "$INSTALL_TEAM" = "1" ] && STATE_HOME_FLAGS+=(--include-home)
+
+if [ "$DRY_RUN" = "0" ]; then
+  python3 "$CCG/scripts/install_state.py" begin \
+    --target "$TARGET" \
+    --output "$STATE_SNAPSHOT" \
+    --claude-home "$CLAUDE_HOME" \
+    "${STATE_HOME_FLAGS[@]}"
+  INSTALL_TRANSACTION_ACTIVE=1
+  trap rollback_failed_install ERR
+fi
+
 log ""
 log "⚙️  Installing skills ($PROFILE profile)..."
 run bash "$CCG/scripts/install-skills.sh" "${SKILLS_FLAGS[@]}" "$TARGET"
@@ -257,13 +347,27 @@ log ""
 log "🔒 Installing hooks..."
 run bash "$CCG/scripts/install-hooks.sh" "${HOOKS_FLAGS[@]}" "$TARGET"
 
+if [ "$DRY_RUN" = "0" ]; then
+  python3 "$CCG/scripts/install_state.py" finalize \
+    --target "$TARGET" \
+    --snapshot "$STATE_SNAPSHOT" \
+    --profile "$PROFILE" \
+    --claude-home "$CLAUDE_HOME" \
+    "${STATE_HOME_FLAGS[@]}"
+  INSTALL_TRANSACTION_ACTIVE=0
+  trap - ERR
+fi
+
 # -----------------------------
 # enterprise: 팀 시스템 검증
+# 상태를 먼저 확정해 검증 실패 시에도 doctor/uninstall이 가능하게 한다.
 # -----------------------------
 if [ "$VALIDATE_AFTER" = "1" ] && [ "$DRY_RUN" = "0" ]; then
   log ""
   log "🔍 Validating team system..."
-  bash "$CCG/scripts/validate-system.sh" 2>&1 | tail -5 || true
+  bash "$CCG/scripts/validate-system.sh" \
+    --project "$TARGET" \
+    --claude-home "$CLAUDE_HOME" 2>&1 | tail -5
 fi
 
 # -----------------------------

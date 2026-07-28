@@ -2,7 +2,9 @@
 
 **저장소**: https://github.com/tomtomjskim/claude-code-guide
 
-> **Fork 사용 시 (P2-L2)**: 아래 모든 raw URL은 이 저장소(`tomtomjskim/claude-code-guide`)의 main 브랜치 기준. 자체 fork에 있다면 sed 일괄 치환:
+> **공급망 주의**: 원격 `main`을 바로 실행하지 않습니다. 먼저 tag/commit을
+> 검토하고 아래 `<reviewed-tag-or-commit>`을 그 값으로 바꿉니다. 자체 fork를
+> 쓰면 저장소 경로도 함께 바꿉니다.
 > ```bash
 > sed -i.bak 's|tomtomjskim/claude-code-guide|<your-org>/<your-fork>|g' BOOTSTRAP.md
 > ```
@@ -11,10 +13,13 @@ Claude Code 세션 또는 터미널에서 **복사-붙여넣기**로 바로 사�
 
 ---
 
-## 🚀 최소 1줄 (터미널 기준)
+## 🚀 최소 설치 (터미널 기준)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" \
+  | bash -s -- --ref "$CCG_REF" --dry-run
+# 출력 검토 후 --dry-run을 제거해 적용
 ```
 
 자동 프로파일 감지 + 설치. 다른 동작 필요 시 아래 옵션 참고.
@@ -30,9 +35,10 @@ curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/
 https://github.com/tomtomjskim/claude-code-guide
 
 실행 명령:
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --dry-run
 
-SETUP.md wizard 따라서 프로젝트 분석 → profile 추천 → 확인 후 실행.
+SETUP.md wizard에 따라 프로젝트 분석 → profile 추천 → dry-run 검토 → 확인 후 실행.
 ```
 
 ### T2. 프로파일 강제 지정
@@ -40,9 +46,11 @@ SETUP.md wizard 따라서 프로젝트 분석 → profile 추천 → 확인 후 
 ```
 claude-code-guide을 'team' 프로파일로 설치해줘.
 
-실행: curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash -s -- --profile team
+실행:
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --profile team --dry-run
 
-설치 후 /dispatch 테스트.
+dry-run 검토 후 실제 설치하고 /dispatch 테스트.
 ```
 
 지원 profile: `solo` / `team` / `enterprise` / `review-only` / `auto`(기본)
@@ -51,7 +59,8 @@ claude-code-guide을 'team' 프로파일로 설치해줘.
 
 ```
 claude-code-guide 설치 명령 미리 확인하고 싶어. 아래 명령으로 dry-run 실행:
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash -s -- --dry-run
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --dry-run
 
 결과 확인 후 실제 설치 여부 물어봐줘.
 ```
@@ -61,14 +70,16 @@ curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/
 ```
 /path/to/my-project에 claude-code-guide를 설치해줘.
 
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash -s -- --target /path/to/my-project
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --target /path/to/my-project --dry-run
 ```
 
 ### T5. 이미 설치되어 있는 경우 덮어쓰기
 
 ```
-claude-code-guide 기존 설치를 최신 버전으로 덮어쓰기 해줘:
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash -s -- --force
+claude-code-guide 기존 설치를 검토된 버전으로 갱신해줘. 먼저 dry-run:
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --force --dry-run
 ```
 
 ### T6. 리뷰만 도입
@@ -76,9 +87,10 @@ curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/
 ```
 이 프로젝트에 리뷰 도입만 하고 싶어. claude-code-guide의 review-only 프로파일로 설치:
 
-curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash -s -- --profile review-only
+CCG_REF="<reviewed-tag-or-commit>"
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$CCG_REF/scripts/quick-setup.sh" | bash -s -- --ref "$CCG_REF" --profile review-only --dry-run
 
-check-code, check-spec, qa-test 3 스킬만 추가됨.
+dry-run 검토 후 적용하면 check-code, check-spec, qa-test 3 스킬만 추가됨.
 ```
 
 ---
@@ -95,11 +107,11 @@ check-code, check-spec, qa-test 3 스킬만 추가됨.
 ## claude-code-guide (PDARR 워크플로우 + Safety Hooks + 팀 시스템)
 
 - 저장소: https://github.com/tomtomjskim/claude-code-guide
-- 설치 원라이너: curl -fsSL https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh | bash
-- SETUP wizard: https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/SETUP.md
+- 설치: 검토된 tag/commit checkout에서 scripts/quick-setup.sh --dry-run 후 적용
+- SETUP wizard: 저장소의 검토된 tag/commit에 있는 SETUP.md
 - 자연어 트리거: "claude-code-guide 설치", "PDARR 워크플로우 적용", "/setup-wizard"
-- 전역 설치 명령: git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg && bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
-- 릴리즈: v4.0 (docs/v4-changelog.md 참조)
+- 전역 설치 명령: 검토된 checkout에서 bash scripts/install-skills.sh --skills setup-wizard ~/
+- 릴리즈: v4.5 (docs/v4.5-changelog.md 참조)
 ```
 
 이후 어느 세션에서든 "claude-code-guide 설치해줘" 한 문장으로 전체 흐름 자동 진행.
@@ -112,8 +124,10 @@ check-code, check-spec, qa-test 3 스킬만 추가됨.
 # 1. Clone
 git clone https://github.com/tomtomjskim/claude-code-guide
 cd claude-code-guide
+git checkout --detach <reviewed-tag-or-commit>
 
-# 2. 설치 (대상 프로젝트로)
+# 2. 미리보기 후 설치 (대상 프로젝트로)
+bash scripts/quick-setup.sh --target /path/to/my-project --dry-run
 bash scripts/quick-setup.sh --target /path/to/my-project
 
 # 또는 수동 단계별

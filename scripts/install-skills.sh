@@ -11,6 +11,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 SKILLS_SRC="$REPO_DIR/skills"
+CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
 # --- Parse arguments ---
 FORCE=false
@@ -171,8 +172,8 @@ if [ "$INSTALL_TEAM" = true ]; then
     echo ""
     echo "--- Installing Team System ---"
 
-    TEAM_DIR="$HOME/.claude/team"
-    AGENTS_DST="$HOME/.claude/agents"
+    TEAM_DIR="$CLAUDE_HOME/team"
+    AGENTS_DST="$CLAUDE_HOME/agents"
 
     mkdir -p "$TEAM_DIR"/{prompts,workflows,context,hooks/scripts,scripts}
     mkdir -p "$AGENTS_DST"
@@ -191,8 +192,8 @@ if [ "$INSTALL_TEAM" = true ]; then
     chmod +x "$TEAM_DIR/scripts/"*.sh 2>/dev/null
 
     echo ""
-    echo "Team system installed to ~/.claude/team/"
-    echo "Run 'bash ~/.claude/team/scripts/validate-system.sh' to verify."
+    echo "Team system installed to $TEAM_DIR/"
+    echo "Run 'bash $TEAM_DIR/scripts/validate-system.sh --claude-home $CLAUDE_HOME' to verify."
 fi
 
 # --- Summary ---

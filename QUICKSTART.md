@@ -9,9 +9,11 @@
 ```bash
 git clone https://github.com/tomtomjskim/claude-code-guide.git
 cd claude-code-guide
+git checkout <reviewed-tag-or-commit>
 
-# 프로젝트에 워크플로우 스킬 설치
-bash scripts/install-skills.sh /path/to/your-project
+# 실제 변경 전 계획 확인 후 설치
+bash scripts/quick-setup.sh --target /path/to/your-project --dry-run
+bash scripts/quick-setup.sh --target /path/to/your-project
 
 # (선택) 팀 에이전트까지 포함
 bash scripts/install-skills.sh --team /path/to/your-project
@@ -30,6 +32,15 @@ bash scripts/install-hooks.sh --preset minimal /path/to/your-project
 ```
 
 설치 후 각 파일의 `🔧 커스터마이징 영역`을 프로젝트에 맞게 수정하세요. 상세: [hooks/README.md](hooks/README.md)
+
+### 0-c. 설치 상태 확인
+
+```bash
+bash scripts/manage-install.sh doctor --target /path/to/your-project --json
+```
+
+복구와 제거는 [ECC 선별 도입 및 설치 수명주기](docs/36-ecc-selective-adoption.md)를
+따릅니다. 기존 파일 drift가 있으면 uninstall이 자동으로 덮어쓰지 않습니다.
 
 ---
 

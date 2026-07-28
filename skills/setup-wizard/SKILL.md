@@ -21,12 +21,14 @@ description: "claude-code-guide를 현재 프로젝트에 자동 설치. 프로�
 - `/setup-wizard --profile team` — 프로파일 강제
 - `/setup-wizard --profile review-only` — 리뷰만
 - `/setup-wizard --target /path/to/other-project` — 다른 경로
+- `/setup-wizard --ref <reviewed-tag-or-commit>` — 원격 source 고정
 - `/setup-wizard --dry-run` — 실제 변경 없이 미리보기
 
 기본값:
 - profile = auto
 - target = $PWD (Claude Code 현재 작업 디렉토리)
 - dry-run = false
+- source_ref = 사용자가 확인한 tag/commit. 원격 설치에 필수
 
 ### Phase 1: 기존 설치 확인
 
@@ -143,15 +145,17 @@ TDD를 적용할 때 기준으로 사용됩니다. GitHub issue/label/comment wr
 
 ### Phase 4: 원라이너 실행
 
-사용자 확인 후, 다음 명령 실행:
+사용자 확인 후, 먼저 dry-run을 실행한다. `SOURCE_REF`가 없으면 moving `main`을
+추측하지 말고 검토된 tag/commit을 요청한다.
 
 ```bash
-curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/main/scripts/quick-setup.sh" \
-  | bash -s -- --profile <PROFILE> --target "$TARGET" [--force] [--dry-run]
+curl -fsSL "https://raw.githubusercontent.com/tomtomjskim/claude-code-guide/$SOURCE_REF/scripts/quick-setup.sh" \
+  | bash -s -- --ref "$SOURCE_REF" --profile <PROFILE> --target "$TARGET" --dry-run [--force]
 ```
 
 **중요:**
-- 네트워크 오류 시 로컬 clone fallback: `git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg && bash /tmp/ccg/scripts/quick-setup.sh ...`
+- 사용자가 dry-run과 ref를 확인한 뒤에만 `--dry-run`을 제거
+- 네트워크 오류 시 이미 검토된 로컬 checkout의 `scripts/quick-setup.sh` 사용
 - `--dry-run` 지정 시 실제 변경 없이 실행 명령만 출력
 - 실행 결과 tail 20줄 정도를 사용자에게 보고
 
@@ -172,7 +176,9 @@ fi
 
 # enterprise만: 팀 시스템 validate
 if [ "$PROFILE" = "enterprise" ]; then
-    bash ~/.claude/team/scripts/validate-system.sh 2>&1 | tail -5
+    bash ~/.claude/team/scripts/validate-system.sh \
+      --project "$TARGET" \
+      --claude-home "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" 2>&1 | tail -5
 fi
 ```
 
@@ -276,12 +282,13 @@ references/stack-examples.md에 감지된 스택 예시가 카탈로그화되어
 이 스킬을 **1회 전역 설치**하면 어떤 프로젝트에서든 호출 가능:
 
 ```bash
-# 방법 1: setup-wizard만 전역 설치
-git clone --depth 1 https://github.com/tomtomjskim/claude-code-guide /tmp/ccg
-bash /tmp/ccg/scripts/install-skills.sh --skills setup-wizard ~/
+# 방법 1: 검토된 checkout에서 setup-wizard만 전역 설치
+git clone https://github.com/tomtomjskim/claude-code-guide <local-guide-path>
+git -C <local-guide-path> checkout --detach <reviewed-tag-or-commit>
+bash <local-guide-path>/scripts/install-skills.sh --skills setup-wizard ~/
 
 # 방법 2: 전체 스킬 포함 전역 설치
-bash /tmp/ccg/scripts/install-skills.sh ~/
+bash <local-guide-path>/scripts/install-skills.sh ~/
 
 # 설치 확인
 ls ~/.claude/skills/setup-wizard/SKILL.md
