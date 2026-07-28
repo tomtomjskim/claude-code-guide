@@ -53,7 +53,8 @@ enterprise validation 전에 install-state를 확정한다. validation이 실패
 skill/hook 설치 단계가 finalize 전에 실패하거나 `HUP`/`INT`/`TERM`을 받으면 begin
 snapshot으로 부분 변경을 자동 rollback한다. rollback은 profile/source에서 선언한
 정확한 write-set만 다루며, 동시 편집처럼 예상 hash와 다른 변경은 삭제하지 않고
-중단한다. target별 install lock이 병렬 설치를 막는다. 자동 rollback까지 실패하면
+보존하면서 나머지 안전한 경로는 복원한다. target별 install lock이 병렬 설치를
+막는다. 자동 rollback까지 실패하면
 원본 snapshot이 든 권한 제한 임시 디렉터리를 삭제하지 않고 경로를 출력한다.
 동적으로 생성하는 `settings.local.json`은 destination을 바꾸기 전에 생성 결과 hash를
 transaction journal에 승인하며, 승인 전 base가 begin snapshot과 다르면 중단한다.

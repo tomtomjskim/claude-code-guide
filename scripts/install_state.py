@@ -1030,14 +1030,12 @@ def command_abort(args: argparse.Namespace) -> int:
             authorized.get(key),
         ):
             conflicts.append(key)
-    if conflicts:
-        raise InstallStateError(
-            "rollback stopped because of unexpected drift on declared paths: "
-            + ", ".join(conflicts)
-        )
+    conflict_keys = set(conflicts)
 
     restored = 0
     for key in sorted(declared, reverse=True):
+        if key in conflict_keys:
+            continue
         before_record = before.get(key)
         current_record = current.get(key)
         if records_equal(before_record, current_record):
@@ -1058,6 +1056,11 @@ def command_abort(args: argparse.Namespace) -> int:
             )
             copy_record_file(snapshot_record, destination)
         restored += 1
+    if conflicts:
+        raise InstallStateError(
+            f"rollback restored {restored} safe files but preserved unexpected "
+            "drift on declared paths: " + ", ".join(conflicts)
+        )
     print(f"rolled back: {restored} declared files")
     return 0
 

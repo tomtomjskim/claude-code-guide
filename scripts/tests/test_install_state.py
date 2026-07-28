@@ -462,6 +462,12 @@ class InstallStateCliTest(unittest.TestCase):
         managed.write_text("before\n", encoding="utf-8")
         self.begin(managed_paths=[])
         managed.write_text("concurrent edit\n", encoding="utf-8")
+        safe_installed = self.target / ".claude" / "skills" / "stage" / "SKILL.md"
+        safe_installed.parent.mkdir(parents=True)
+        shutil.copyfile(
+            REPO_ROOT / "skills" / "stage" / "SKILL.md",
+            safe_installed,
+        )
 
         result = self.run_cli(
             "abort",
@@ -475,6 +481,7 @@ class InstallStateCliTest(unittest.TestCase):
         )
         self.assertIn("unexpected drift", result.stderr.lower())
         self.assertEqual(managed.read_text(encoding="utf-8"), "concurrent edit\n")
+        self.assertFalse(safe_installed.exists())
 
     def test_authorized_generated_settings_roll_back_when_previously_absent(self):
         self.begin()
