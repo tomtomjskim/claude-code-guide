@@ -381,6 +381,8 @@ STATE_SNAPSHOT="$TMPDIR/install-state-before"
 CLAUDE_HOME="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 STATE_HOME_FLAGS=()
 [ "$INSTALL_TEAM" = "1" ] && STATE_HOME_FLAGS+=(--include-home)
+STATE_SOURCE_FLAGS=(--source-revision "$SOURCE_REVISION")
+[ "$FORCE" = "1" ] && STATE_SOURCE_FLAGS+=(--allow-source-change)
 
 if [ "$DRY_RUN" = "0" ]; then
   if [ -L "$TARGET/.claude" ]; then
@@ -401,6 +403,7 @@ if [ "$DRY_RUN" = "0" ]; then
     --output "$STATE_SNAPSHOT" \
     --source "$CCG" \
     --profile "$PROFILE" \
+    "${STATE_SOURCE_FLAGS[@]}" \
     --claude-home "$CLAUDE_HOME" \
     "${STATE_HOME_FLAGS[@]}"
   INSTALL_TRANSACTION_ACTIVE=1
@@ -412,7 +415,11 @@ run bash "$CCG/scripts/install-skills.sh" "${SKILLS_FLAGS[@]}" "$TARGET"
 
 log ""
 log "🔒 Installing hooks..."
+if [ "$DRY_RUN" = "0" ]; then
+  export CLAUDE_CODE_GUIDE_TRANSACTION="$STATE_SNAPSHOT"
+fi
 run bash "$CCG/scripts/install-hooks.sh" "${HOOKS_FLAGS[@]}" "$TARGET"
+unset CLAUDE_CODE_GUIDE_TRANSACTION
 
 if [ "$DRY_RUN" = "0" ]; then
   python3 "$CCG/scripts/install_state.py" finalize \

@@ -1,3 +1,5 @@
+import argparse
+import importlib.util
 import json
 import os
 import shutil
@@ -5,10 +7,21 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 INSTALL_STATE = REPO_ROOT / "scripts" / "install_state.py"
+
+
+def load_install_state_module():
+    spec = importlib.util.spec_from_file_location(
+        "install_state_under_test",
+        INSTALL_STATE,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class InstallStateCliTest(unittest.TestCase):
@@ -43,7 +56,14 @@ class InstallStateCliTest(unittest.TestCase):
         )
         return result
 
-    def begin(self, include_home=False, managed_paths=None, output=None):
+    def begin(
+        self,
+        include_home=False,
+        managed_paths=None,
+        output=None,
+        source_revision="test-revision",
+        allow_source_change=False,
+    ):
         profile = "enterprise" if include_home else "team"
         args = [
             "begin",
@@ -57,7 +77,11 @@ class InstallStateCliTest(unittest.TestCase):
             REPO_ROOT,
             "--profile",
             profile,
+            "--source-revision",
+            source_revision,
         ]
+        if allow_source_change:
+            args.append("--allow-source-change")
         for managed_path in managed_paths or ["project:skills/managed/SKILL.md"]:
             args.extend(["--managed-file", managed_path])
         if include_home:
@@ -332,6 +356,8 @@ class InstallStateCliTest(unittest.TestCase):
             second_transaction,
             "--claude-home",
             other_claude_home,
+            "--source-revision",
+            "test-revision",
             expected=2,
         )
         self.assertIn("Claude home", result.stderr)
@@ -449,6 +475,66 @@ class InstallStateCliTest(unittest.TestCase):
         )
         self.assertIn("unexpected drift", result.stderr.lower())
         self.assertEqual(managed.read_text(encoding="utf-8"), "concurrent edit\n")
+
+    def test_authorized_generated_settings_roll_back_when_previously_absent(self):
+        self.begin()
+        generated = self.root / "generated-settings.json"
+        generated.write_text('{"hooks": {}}\n', encoding="utf-8")
+        self.run_cli(
+            "authorize",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--scope",
+            "project",
+            "--path",
+            "settings.local.json",
+            "--source",
+            generated,
+        )
+        destination = self.target / ".claude" / "settings.local.json"
+        destination.parent.mkdir(parents=True)
+        os.replace(generated, destination)
+
+        self.run_cli(
+            "abort",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--claude-home",
+            self.claude_home,
+        )
+        self.assertFalse(destination.exists())
+
+    def test_authorize_rejects_concurrent_generated_file_base_drift(self):
+        self.begin()
+        destination = self.target / ".claude" / "settings.local.json"
+        destination.parent.mkdir(parents=True)
+        destination.write_text('{"concurrent": true}\n', encoding="utf-8")
+        generated = self.root / "generated-settings.json"
+        generated.write_text('{"hooks": {}}\n', encoding="utf-8")
+
+        result = self.run_cli(
+            "authorize",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--scope",
+            "project",
+            "--path",
+            "settings.local.json",
+            "--source",
+            generated,
+            expected=2,
+        )
+        self.assertIn("changed since begin", result.stderr.lower())
+        self.assertEqual(
+            destination.read_text(encoding="utf-8"),
+            '{"concurrent": true}\n',
+        )
 
     def test_enterprise_abort_preserves_unmanaged_claude_home_file(self):
         self.begin(include_home=True, managed_paths=[])
@@ -602,9 +688,13 @@ class InstallStateCliTest(unittest.TestCase):
         exclude_path = Path(git_path)
         if not exclude_path.is_absolute():
             exclude_path = self.target / exclude_path
-        self.assertIn(
-            ".claude/claude-code-guide-install-state.json",
-            exclude_path.read_text(encoding="utf-8").splitlines(),
+        self.assertTrue(
+            any(
+                line.endswith(
+                    ".claude/claude-code-guide-install-state.json"
+                )
+                for line in exclude_path.read_text(encoding="utf-8").splitlines()
+            )
         )
 
     def test_finalize_rejects_a_git_tracked_state_file(self):
@@ -640,6 +730,120 @@ class InstallStateCliTest(unittest.TestCase):
             expected=2,
         )
         self.assertIn("must not be tracked", result.stderr.lower())
+
+    def test_nested_git_target_ignores_repository_relative_state_path(self):
+        repository = self.root / "monorepo"
+        nested_target = repository / "apps" / "service"
+        nested_target.mkdir(parents=True)
+        subprocess.run(
+            ["git", "init", "-q", repository],
+            check=True,
+            capture_output=True,
+        )
+        self.target = nested_target
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        self.begin()
+        managed.parent.mkdir(parents=True)
+        managed.write_text("installed\n", encoding="utf-8")
+        self.finalize()
+
+        status = subprocess.run(
+            [
+                "git",
+                "-C",
+                repository,
+                "status",
+                "--porcelain",
+                "--untracked-files=all",
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout
+        self.assertNotIn(
+            "claude-code-guide-install-state.json",
+            status,
+        )
+
+    def test_source_revision_change_requires_explicit_force_boundary(self):
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        self.begin(source_revision="revision-v1")
+        managed.parent.mkdir(parents=True)
+        managed.write_text("installed-v1\n", encoding="utf-8")
+        self.run_cli(
+            "finalize",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--profile",
+            "team",
+            "--source-revision",
+            "revision-v1",
+            "--claude-home",
+            self.claude_home,
+        )
+
+        result = self.run_cli(
+            "begin",
+            "--target",
+            self.target,
+            "--output",
+            self.root / "transaction-v2",
+            "--source",
+            REPO_ROOT,
+            "--profile",
+            "team",
+            "--source-revision",
+            "revision-v2",
+            "--claude-home",
+            self.claude_home,
+            expected=2,
+        )
+        self.assertIn("--force", result.stderr)
+
+    def test_uninstall_rechecks_managed_file_after_initial_doctor(self):
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        managed.parent.mkdir(parents=True)
+        managed.write_text("original\n", encoding="utf-8")
+        self.begin()
+        managed.write_text("installed\n", encoding="utf-8")
+        self.finalize()
+
+        module = load_install_state_module()
+        original_doctor = module.doctor_report
+
+        def inject_edit_after_doctor(target, claude_home, state):
+            report = original_doctor(target, claude_home, state)
+            managed.write_text("CONCURRENT USER EDIT\n", encoding="utf-8")
+            return report
+
+        args = argparse.Namespace(
+            target=str(self.target),
+            claude_home=str(self.claude_home),
+            dry_run=False,
+            json=False,
+        )
+        with mock.patch.dict(os.environ, self.env):
+            with mock.patch.object(
+                module,
+                "doctor_report",
+                side_effect=inject_edit_after_doctor,
+            ):
+                with self.assertRaises(module.InstallStateError):
+                    module.command_uninstall(args)
+
+        self.assertEqual(
+            managed.read_text(encoding="utf-8"),
+            "CONCURRENT USER EDIT\n",
+        )
+        self.assertTrue(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).is_file()
+        )
 
 
 if __name__ == "__main__":

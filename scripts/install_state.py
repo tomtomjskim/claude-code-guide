@@ -47,6 +47,7 @@ ENTRY_KEYS = {
     "previous_gid",
 }
 MANIFEST_ENTRY_KEYS = {"scope", "path", "expected_sha256", "expected_mode"}
+AUTHORIZED_RELATIVE_PATH = Path("authorized.json")
 SNAPSHOT_ENTRY_KEYS = {"scope", "path", "sha256", "mode", "uid", "gid"}
 PATH_ID_PATTERN = re.compile(r"^[0-9a-f]{24}$")
 STATE_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
@@ -208,15 +209,32 @@ def ensure_state_is_git_local(target: Path) -> None:
     inside = run_git(target, "rev-parse", "--is-inside-work-tree")
     if inside.returncode != 0 or inside.stdout.strip() != "true":
         return
-    relative = STATE_RELATIVE_PATH.as_posix()
-    tracked = run_git(target, "ls-files", "--error-unmatch", "--", relative)
+    target_relative = STATE_RELATIVE_PATH.as_posix()
+    tracked = run_git(
+        target,
+        "ls-files",
+        "--error-unmatch",
+        "--",
+        target_relative,
+    )
     if tracked.returncode == 0:
         raise InstallStateError(
-            f"install state must not be tracked by Git: {relative}"
+            f"install state must not be tracked by Git: {target_relative}"
         )
-    ignored = run_git(target, "check-ignore", "-q", "--", relative)
+    ignored = run_git(target, "check-ignore", "-q", "--", target_relative)
     if ignored.returncode == 0:
         return
+    prefix_result = run_git(target, "rev-parse", "--show-prefix")
+    if prefix_result.returncode != 0:
+        raise InstallStateError(
+            f"could not resolve Git target prefix: {prefix_result.stderr.strip()}"
+        )
+    repository_relative = (
+        prefix_result.stdout.strip("/") + "/" + target_relative
+        if prefix_result.stdout.strip("/")
+        else target_relative
+    )
+    exclude_pattern = "/" + repository_relative
     git_path = run_git(target, "rev-parse", "--git-path", "info/exclude")
     if git_path.returncode != 0 or not git_path.stdout.strip():
         raise InstallStateError(
@@ -237,7 +255,7 @@ def ensure_state_is_git_local(target: Path) -> None:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             handle.seek(0)
             content = handle.read()
-            encoded = relative.encode("utf-8")
+            encoded = exclude_pattern.encode("utf-8")
             if encoded not in content.splitlines():
                 prefix = b"" if not content or content.endswith(b"\n") else b"\n"
                 handle.seek(0, os.SEEK_END)
@@ -248,6 +266,11 @@ def ensure_state_is_git_local(target: Path) -> None:
         raise InstallStateError(
             f"could not update Git exclude file: {exclude_path}"
         ) from error
+    ignored = run_git(target, "check-ignore", "-q", "--", target_relative)
+    if ignored.returncode != 0:
+        raise InstallStateError(
+            f"Git exclude postcondition failed for: {repository_relative}"
+        )
 
 
 def read_json(path: Path) -> dict:
@@ -457,6 +480,13 @@ def build_manifest(
                 },
             )
     return [entries[key] for key in sorted(entries)]
+
+
+def manifest_by_key(entries: list[dict]) -> dict[str, dict]:
+    return {
+        f"{entry['scope']}:{entry['path']}": entry
+        for entry in entries
+    }
 
 
 def validate_manifest_entries(raw_entries: object) -> list[dict]:
@@ -754,6 +784,7 @@ def deserialize_snapshot(snapshot: Path) -> tuple[dict, list[dict], dict[str, di
         "claude_home_id",
         "include_home",
         "profile",
+        "source_revision",
         "managed",
         "files",
     }
@@ -762,6 +793,31 @@ def deserialize_snapshot(snapshot: Path) -> tuple[dict, list[dict], dict[str, di
     manifest = validate_manifest_entries(payload["managed"])
     records = deserialize_record_list(payload["files"])
     return payload, manifest, records
+
+
+def load_authorized_entries(
+    snapshot: Path,
+    manifest: list[dict],
+) -> dict[str, dict]:
+    path = snapshot / AUTHORIZED_RELATIVE_PATH
+    if not path.exists():
+        return {}
+    payload = read_json(path)
+    if set(payload) != {"schema_version", "entries"}:
+        raise InstallStateError("invalid authorized-file metadata shape")
+    if payload["schema_version"] != SCHEMA_VERSION:
+        raise InstallStateError("unsupported authorized-file schema version")
+    entries = validate_manifest_entries(payload["entries"])
+    declared = manifest_by_key(manifest)
+    authorized = {}
+    for entry in entries:
+        key = f"{entry['scope']}:{entry['path']}"
+        if key not in declared or declared[key]["expected_sha256"] is not None:
+            raise InstallStateError(
+                f"authorized file is not a generated managed path: {key}"
+            )
+        authorized[key] = entry
+    return authorized
 
 
 def validate_snapshot_identity(
@@ -817,6 +873,17 @@ def command_begin(args: argparse.Namespace) -> int:
             "Claude home does not match the existing install state; "
             "uninstall with the recorded home before reinstalling"
         )
+    if existing_state and existing_state["source_revision"] != args.source_revision:
+        if existing_state["profile"] != args.profile:
+            raise InstallStateError(
+                "source revision and profile changed together; uninstall the "
+                "existing profile before installing the new one"
+            )
+        if not args.allow_source_change:
+            raise InstallStateError(
+                "source revision changed; rerun with --force after reviewing "
+                "the new source"
+            )
     if existing_state:
         state_root = state_root_for(existing_state["state_id"], must_exist=True)
         for entry in existing_state["entries"]:
@@ -854,6 +921,7 @@ def command_begin(args: argparse.Namespace) -> int:
             "claude_home_id": path_identity(claude_home),
             "include_home": bool(args.include_home),
             "profile": args.profile,
+            "source_revision": args.source_revision,
             "managed": manifest,
             "files": serialized_records,
         }
@@ -865,10 +933,57 @@ def command_begin(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_authorize(args: argparse.Namespace) -> int:
+    target = validate_target(Path(args.target))
+    snapshot = Path(args.snapshot)
+    snapshot_meta, manifest, before = deserialize_snapshot(snapshot)
+    if snapshot_meta["target_id"] != path_identity(target):
+        raise InstallStateError("snapshot target does not match requested target")
+    validate_snapshot_payload(snapshot, before)
+    key = f"{args.scope}:{args.path}"
+    declared = manifest_by_key(manifest)
+    if key not in declared or declared[key]["expected_sha256"] is not None:
+        raise InstallStateError(
+            f"path is not a generated managed file: {key}"
+        )
+    current = scan_manifest(target, Path("."), [declared[key]]).get(key)
+    if not records_equal(before.get(key), current):
+        raise InstallStateError(
+            f"generated file base changed since begin: {key}"
+        )
+    source = Path(args.source)
+    if source.is_symlink() or not source.is_file():
+        raise InstallStateError(f"generated source is missing or unsafe: {source}")
+    expected_mode = file_metadata(source)[0]
+    authorized = load_authorized_entries(snapshot, manifest)
+    authorized[key] = {
+        "scope": args.scope,
+        "path": args.path,
+        "expected_sha256": sha256_file(source),
+        "expected_mode": expected_mode,
+    }
+    write_json_atomic(
+        snapshot / AUTHORIZED_RELATIVE_PATH,
+        {
+            "schema_version": SCHEMA_VERSION,
+            "entries": [authorized[item] for item in sorted(authorized)],
+        },
+    )
+    print(f"authorized: {key}")
+    return 0
+
+
 def current_matches_trusted(
     current: dict,
     manifest_entry: dict,
+    authorized_entry: dict | None,
 ) -> bool:
+    if authorized_entry is not None:
+        if (
+            current["sha256"] == authorized_entry["expected_sha256"]
+            and current["mode"] == authorized_entry["expected_mode"]
+        ):
+            return True
     return (
         manifest_entry["expected_sha256"] is not None
         and current["sha256"] == manifest_entry["expected_sha256"]
@@ -899,14 +1014,12 @@ def command_abort(args: argparse.Namespace) -> int:
         args.include_home,
     )
     validate_snapshot_payload(snapshot, before)
+    authorized = load_authorized_entries(snapshot, manifest)
     current = scan_manifest(target, claude_home, manifest)
-    manifest_by_key = {
-        f"{entry['scope']}:{entry['path']}": entry
-        for entry in manifest
-    }
+    declared = manifest_by_key(manifest)
 
     conflicts = []
-    for key, manifest_entry in manifest_by_key.items():
+    for key, manifest_entry in declared.items():
         before_record = before.get(key)
         current_record = current.get(key)
         if records_equal(before_record, current_record):
@@ -914,6 +1027,7 @@ def command_abort(args: argparse.Namespace) -> int:
         if current_record is None or not current_matches_trusted(
             current_record,
             manifest_entry,
+            authorized.get(key),
         ):
             conflicts.append(key)
     if conflicts:
@@ -923,7 +1037,7 @@ def command_abort(args: argparse.Namespace) -> int:
         )
 
     restored = 0
-    for key in sorted(manifest_by_key, reverse=True):
+    for key in sorted(declared, reverse=True):
         before_record = before.get(key)
         current_record = current.get(key)
         if records_equal(before_record, current_record):
@@ -998,6 +1112,10 @@ def command_finalize(args: argparse.Namespace) -> int:
     )
     if snapshot_meta["profile"] != args.profile:
         raise InstallStateError("snapshot profile does not match finalize profile")
+    if snapshot_meta["source_revision"] != args.source_revision:
+        raise InstallStateError(
+            "snapshot source revision does not match finalize source"
+        )
     validate_snapshot_payload(snapshot, before)
     after = scan_manifest(target, claude_home, manifest)
     changed_keys = changed_record_keys(before, after)
@@ -1391,6 +1509,189 @@ def apply_entries_transactionally(
             shutil.rmtree(backup_root, ignore_errors=True)
 
 
+def path_record(entry: dict, path: Path) -> dict:
+    mode, uid, gid = file_metadata(path)
+    return {
+        "scope": entry["scope"],
+        "path": entry["path"],
+        "sha256": sha256_file(path),
+        "mode": mode,
+        "uid": uid,
+        "gid": gid,
+        "source": path,
+    }
+
+
+def record_matches_entry(record: dict | None, entry: dict, prefix: str) -> bool:
+    if not entry[f"{prefix}_exists"]:
+        return record is None
+    if record is None:
+        return False
+    return all(
+        record[field] == entry[f"{prefix}_{field}"]
+        for field in ("sha256", "mode", "uid", "gid")
+    )
+
+
+def copy_payload_exclusive(
+    entry: dict,
+    prefix: str,
+    destination: Path,
+    state_root: Path,
+) -> None:
+    source = state_payload_path(
+        state_root,
+        prefix,
+        entry["scope"],
+        entry["path"],
+    )
+    record = payload_record(entry, prefix, source)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = destination.with_name(
+        f".{destination.name}.install-{os.getpid()}-{secrets.token_hex(4)}"
+    )
+    try:
+        shutil.copyfile(source, temp_path, follow_symlinks=False)
+        apply_metadata(
+            temp_path,
+            record["mode"],
+            record["uid"],
+            record["gid"],
+        )
+        os.link(temp_path, destination, follow_symlinks=False)
+    except FileExistsError as error:
+        raise InstallStateError(
+            f"destination changed during operation: {destination}"
+        ) from error
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+def quarantine_installed_entry(
+    entry: dict,
+    target: Path,
+    claude_home: Path,
+) -> tuple[Path, Path | None]:
+    root = scope_root(entry["scope"], target, claude_home)
+    destination = safe_destination(root, entry["path"])
+    if not entry["installed_exists"]:
+        if destination.exists():
+            raise InstallStateError(
+                f"managed file drifted before uninstall: {destination}"
+            )
+        return destination, None
+    if not destination.exists() or not destination.is_file():
+        raise InstallStateError(
+            f"managed file drifted before uninstall: {destination}"
+        )
+    quarantine = destination.with_name(
+        f".{destination.name}.ccg-quarantine-{secrets.token_hex(8)}"
+    )
+    os.replace(destination, quarantine)
+    captured = path_record(entry, quarantine)
+    if record_matches_entry(captured, entry, "installed"):
+        return destination, quarantine
+    if not destination.exists():
+        os.replace(quarantine, destination)
+        raise InstallStateError(
+            f"managed file changed during uninstall: {destination}"
+        )
+    raise InstallStateError(
+        "managed file changed during uninstall and could not be renamed back; "
+        f"captured file preserved at {quarantine}"
+    )
+
+
+def rollback_quarantined_entry(
+    entry: dict,
+    destination: Path,
+    quarantine: Path | None,
+) -> None:
+    if entry["previous_exists"]:
+        if not destination.exists() or not destination.is_file():
+            raise InstallStateError(
+                f"uninstall rollback destination changed: {destination}"
+            )
+        discard = destination.with_name(
+            f".{destination.name}.ccg-discard-{secrets.token_hex(8)}"
+        )
+        os.replace(destination, discard)
+        written = path_record(entry, discard)
+        if not record_matches_entry(written, entry, "previous"):
+            if not destination.exists():
+                os.replace(discard, destination)
+            raise InstallStateError(
+                f"uninstall rollback found concurrent drift: {destination}"
+            )
+        if quarantine is None:
+            discard.unlink()
+            return
+        os.replace(quarantine, destination)
+        discard.unlink()
+        return
+    if destination.exists():
+        raise InstallStateError(
+            f"uninstall rollback found concurrent drift: {destination}"
+        )
+    if quarantine is not None:
+        os.replace(quarantine, destination)
+
+
+def uninstall_entries_transactionally(
+    entries: list[dict],
+    target: Path,
+    claude_home: Path,
+    state_root: Path,
+    state_file: Path,
+) -> None:
+    applied: list[tuple[dict, Path, Path | None]] = []
+    try:
+        for entry in entries:
+            destination, quarantine = quarantine_installed_entry(
+                entry,
+                target,
+                claude_home,
+            )
+            applied.append((entry, destination, quarantine))
+            if entry["previous_exists"]:
+                copy_payload_exclusive(
+                    entry,
+                    "previous",
+                    destination,
+                    state_root,
+                )
+        state_file.unlink()
+    except (InstallStateError, OSError) as error:
+        failures = []
+        for entry, destination, quarantine in reversed(applied):
+            try:
+                rollback_quarantined_entry(
+                    entry,
+                    destination,
+                    quarantine,
+                )
+            except (InstallStateError, OSError) as rollback_error:
+                failures.append(str(rollback_error))
+        if failures:
+            raise InstallStateError(
+                f"uninstall failed ({error}); rollback incomplete: "
+                + "; ".join(failures)
+            ) from error
+        raise InstallStateError(
+            f"uninstall failed and was rolled back: {error}"
+        ) from error
+    for _, _, quarantine in applied:
+        if quarantine is not None and quarantine.exists():
+            try:
+                quarantine.unlink()
+            except OSError as error:
+                print(
+                    f"WARNING: uninstall quarantine retained: {quarantine}: {error}",
+                    file=sys.stderr,
+                )
+
+
 def command_repair(args: argparse.Namespace) -> int:
     target, claude_home, state, state_root = load_runtime_state(
         args.target,
@@ -1445,14 +1746,12 @@ def command_uninstall(args: argparse.Namespace) -> int:
                 scope_root(entry["scope"], target, claude_home),
                 entry["path"],
             )
-        entries = list(reversed(state["entries"]))
-        apply_entries_transactionally(
-            entries,
-            "previous",
+        uninstall_entries_transactionally(
+            list(reversed(state["entries"])),
             target,
             claude_home,
             state_root,
-            after_apply=lambda: (target / STATE_RELATIVE_PATH).unlink(),
+            target / STATE_RELATIVE_PATH,
         )
         try:
             shutil.rmtree(state_root)
@@ -1506,8 +1805,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=str(Path(__file__).resolve().parents[1]),
     )
     begin.add_argument("--profile", choices=sorted(VALID_PROFILES), default="team")
+    begin.add_argument("--source-revision", required=True)
+    begin.add_argument("--allow-source-change", action="store_true")
     begin.add_argument("--managed-file", action="append", default=[])
     begin.set_defaults(handler=command_begin)
+
+    authorize = subparsers.add_parser("authorize")
+    authorize.add_argument("--target", required=True)
+    authorize.add_argument("--snapshot", required=True)
+    authorize.add_argument("--scope", choices=("project",), required=True)
+    authorize.add_argument("--path", required=True)
+    authorize.add_argument("--source", required=True)
+    authorize.set_defaults(handler=command_authorize)
 
     finalize = subparsers.add_parser("finalize")
     add_transaction_identity_arguments(finalize)

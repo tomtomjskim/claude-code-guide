@@ -541,6 +541,77 @@ class QuickSetupLifecycleTest(unittest.TestCase):
                 / ".claude-code-guide-install.lock"
             ).exists()
         )
+
+    def test_term_after_settings_write_restores_existing_settings(self):
+        slow_source = self.root / "slow-settings-guide"
+        shutil.copytree(
+            REPO_ROOT,
+            slow_source,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+        )
+        marker = self.root / "settings-written"
+        hook_installer = slow_source / "scripts" / "install-hooks.sh"
+        original_script = hook_installer.read_text(encoding="utf-8")
+        move_line = '    mv "$SETTINGS_TMP" "$TARGET_SETTINGS"\n'
+        self.assertIn(move_line, original_script)
+        hook_installer.write_text(
+            original_script.replace(
+                move_line,
+                move_line
+                + f'    touch "{marker}"\n'
+                + "    sleep 30\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        settings = self.target / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text('{"keep": true}\n', encoding="utf-8")
+        env = {
+            **self.env,
+            "CLAUDE_CODE_GUIDE_SOURCE": str(slow_source),
+        }
+        process = subprocess.Popen(
+            [
+                "bash",
+                str(QUICK_SETUP),
+                "--profile",
+                "solo",
+                "--target",
+                str(self.target),
+                "--skip-stack",
+            ],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 10
+        while not marker.exists() and process.poll() is None:
+            if time.monotonic() >= deadline:
+                process.kill()
+                self.fail("settings installer did not reach the signal checkpoint")
+            time.sleep(0.05)
+
+        os.killpg(process.pid, signal.SIGTERM)
+        stdout, stderr = process.communicate(timeout=10)
+        self.assertNotEqual(
+            process.returncode,
+            0,
+            msg=f"stdout:\n{stdout}\nstderr:\n{stderr}",
+        )
+        self.assertNotIn("unexpected drift", stderr.lower())
+        self.assertEqual(settings.read_text(encoding="utf-8"), '{"keep": true}\n')
+        self.assertFalse((self.target / ".claude" / "skills" / "dispatch").exists())
+        self.assertFalse((self.target / ".claude" / "hooks" / "guard-agent.sh").exists())
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).exists()
+        )
         self.assertFalse(
             (
                 self.target

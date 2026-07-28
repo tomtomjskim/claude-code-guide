@@ -38,7 +38,8 @@ revision, 관리 파일의 상대 경로·hash·mode·uid·gid를 기록한다. 
 상태 generation은 예측 불가능한 ID의 임시 디렉터리에서 완성·검증한 뒤 원자적으로
 publish하며, 새 state JSON이 확정된 뒤 이전 generation을 정리한다.
 Git target에서는 상태 파일이 이미 tracked 상태면 finalize를 거부하고, untracked라면
-`.git/info/exclude`에 로컬 ignore를 추가해 다른 checkout으로 전파되지 않게 한다.
+repository root 기준 경로를 `.git/info/exclude`에 로컬 ignore로 추가해 다른
+checkout으로 전파되지 않게 한다.
 
 enterprise profile은 project `.claude/`와 함께 해당 설치가 변경한 Claude home의
 `team/`, `agents/` 파일만 추적한다. 기존 설정, 사용자 skill, 다른 파일은 관리
@@ -54,6 +55,8 @@ snapshot으로 부분 변경을 자동 rollback한다. rollback은 profile/sourc
 정확한 write-set만 다루며, 동시 편집처럼 예상 hash와 다른 변경은 삭제하지 않고
 중단한다. target별 install lock이 병렬 설치를 막는다. 자동 rollback까지 실패하면
 원본 snapshot이 든 권한 제한 임시 디렉터리를 삭제하지 않고 경로를 출력한다.
+동적으로 생성하는 `settings.local.json`은 destination을 바꾸기 전에 생성 결과 hash를
+transaction journal에 승인하며, 승인 전 base가 begin snapshot과 다르면 중단한다.
 
 ## 운영 명령
 
@@ -69,11 +72,15 @@ bash scripts/manage-install.sh uninstall --target <project>
 - `repair`: drift가 있는 관리 파일만 설치 완료 snapshot으로 복구한다.
 - `uninstall`: drift가 없을 때 설치 전 파일을 복원하고 설치가 만든 파일만 제거한다.
 - drift 상태에서 uninstall은 사용자 변경 손실을 막기 위해 중단한다.
+- uninstall은 현재 파일을 같은 디렉터리의 quarantine으로 원자 이동한 뒤 hash,
+  mode, ownership을 다시 확인하고, 불일치 시 원위치로 복구한다.
 - 다른 target으로 복사된 state, 다른 Claude home으로 실행한 state, 더 새 schema는
   자동 추측하지 않는다.
 - 변조된 `state_id`와 관리 경로의 symlink·경로 탈출은 fail closed한다.
 - 같은 target을 다른 Claude home으로 재설치하려면 먼저 기존 home 기준으로
   uninstall해야 한다.
+- 기존 install-state와 source revision이 달라지면 검토 후 `--force`를 명시해야
+  하며, source revision과 profile을 동시에 바꾸려면 먼저 uninstall한다.
 
 ## 검증
 
