@@ -552,12 +552,12 @@ class QuickSetupLifecycleTest(unittest.TestCase):
         marker = self.root / "settings-written"
         hook_installer = slow_source / "scripts" / "install-hooks.sh"
         original_script = hook_installer.read_text(encoding="utf-8")
-        move_line = '    mv "$SETTINGS_TMP" "$TARGET_SETTINGS"\n'
-        self.assertIn(move_line, original_script)
+        published_marker = "    # CCG_SETTINGS_PUBLISHED\n"
+        self.assertIn(published_marker, original_script)
         hook_installer.write_text(
             original_script.replace(
-                move_line,
-                move_line
+                published_marker,
+                published_marker
                 + f'    touch "{marker}"\n'
                 + "    sleep 30\n",
                 1,
@@ -617,6 +617,77 @@ class QuickSetupLifecycleTest(unittest.TestCase):
                 self.target
                 / ".claude"
                 / "claude-code-guide-install-state.json"
+            ).exists()
+        )
+
+    def test_edit_after_settings_publish_is_preserved_and_install_fails(self):
+        edited_source = self.root / "edited-settings-guide"
+        shutil.copytree(
+            REPO_ROOT,
+            edited_source,
+            ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"),
+        )
+        hook_installer = edited_source / "scripts" / "install-hooks.sh"
+        original_script = hook_installer.read_text(encoding="utf-8")
+        published_marker = "    # CCG_SETTINGS_PUBLISHED\n"
+        self.assertIn(published_marker, original_script)
+        hook_installer.write_text(
+            original_script.replace(
+                published_marker,
+                published_marker
+                + "    printf '%s\\n' '{\"concurrent\": true}' "
+                + '> "$TARGET_SETTINGS"\n',
+                1,
+            ),
+            encoding="utf-8",
+        )
+        settings = self.target / ".claude" / "settings.local.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text('{"keep": true}\n', encoding="utf-8")
+        env = {
+            **self.env,
+            "CLAUDE_CODE_GUIDE_SOURCE": str(edited_source),
+        }
+
+        result = subprocess.run(
+            [
+                "bash",
+                str(QUICK_SETUP),
+                "--profile",
+                "solo",
+                "--target",
+                str(self.target),
+                "--skip-stack",
+            ],
+            text=True,
+            capture_output=True,
+            env=env,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "authorized generated file changed",
+            result.stderr.lower(),
+        )
+        self.assertEqual(
+            settings.read_text(encoding="utf-8"),
+            '{"concurrent": true}\n',
+        )
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).exists()
+        )
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / "skills"
+                / "dispatch"
+                / "SKILL.md"
             ).exists()
         )
 

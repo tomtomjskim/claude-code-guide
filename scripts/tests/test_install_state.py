@@ -428,6 +428,49 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertIn("payload", result.stderr.lower())
         self.assertEqual(managed.read_text(encoding="utf-8"), "drifted\n")
 
+    def test_repair_preserves_edit_after_initial_drift_inspection(self):
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        self.begin()
+        managed.parent.mkdir(parents=True)
+        managed.write_text("installed\n", encoding="utf-8")
+        self.finalize()
+        managed.write_text("initial drift\n", encoding="utf-8")
+
+        module = load_install_state_module()
+        original_inspect = module.inspect_runtime_state
+
+        def inject_edit_after_inspection(target, claude_home, state):
+            report, observed = original_inspect(target, claude_home, state)
+            managed.write_text("CONCURRENT USER EDIT\n", encoding="utf-8")
+            return report, observed
+
+        args = argparse.Namespace(
+            target=str(self.target),
+            claude_home=str(self.claude_home),
+            dry_run=False,
+            json=False,
+        )
+        with mock.patch.dict(os.environ, self.env):
+            with mock.patch.object(
+                module,
+                "inspect_runtime_state",
+                side_effect=inject_edit_after_inspection,
+            ):
+                with self.assertRaises(module.InstallStateError):
+                    module.command_repair(args)
+
+        self.assertEqual(
+            managed.read_text(encoding="utf-8"),
+            "CONCURRENT USER EDIT\n",
+        )
+        self.assertTrue(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).is_file()
+        )
+
     def test_abort_only_rolls_back_declared_write_set(self):
         self.begin(managed_paths=[])
         installed = self.target / ".claude" / "skills" / "dispatch" / "SKILL.md"
@@ -488,7 +531,7 @@ class InstallStateCliTest(unittest.TestCase):
         generated = self.root / "generated-settings.json"
         generated.write_text('{"hooks": {}}\n', encoding="utf-8")
         self.run_cli(
-            "authorize",
+            "publish",
             "--target",
             self.target,
             "--snapshot",
@@ -501,8 +544,7 @@ class InstallStateCliTest(unittest.TestCase):
             generated,
         )
         destination = self.target / ".claude" / "settings.local.json"
-        destination.parent.mkdir(parents=True)
-        os.replace(generated, destination)
+        self.assertTrue(destination.is_file())
 
         self.run_cli(
             "abort",
@@ -515,7 +557,7 @@ class InstallStateCliTest(unittest.TestCase):
         )
         self.assertFalse(destination.exists())
 
-    def test_authorize_rejects_concurrent_generated_file_base_drift(self):
+    def test_publish_rejects_concurrent_generated_file_base_drift(self):
         self.begin()
         destination = self.target / ".claude" / "settings.local.json"
         destination.parent.mkdir(parents=True)
@@ -524,7 +566,7 @@ class InstallStateCliTest(unittest.TestCase):
         generated.write_text('{"hooks": {}}\n', encoding="utf-8")
 
         result = self.run_cli(
-            "authorize",
+            "publish",
             "--target",
             self.target,
             "--snapshot",
@@ -541,6 +583,112 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertEqual(
             destination.read_text(encoding="utf-8"),
             '{"concurrent": true}\n',
+        )
+
+    def test_publish_does_not_overwrite_edit_after_journal_authorization(self):
+        destination = self.target / ".claude" / "settings.local.json"
+        destination.parent.mkdir(parents=True)
+        destination.write_text('{"before": true}\n', encoding="utf-8")
+        self.begin()
+        generated = self.root / "generated-settings.json"
+        generated.write_text('{"hooks": {}}\n', encoding="utf-8")
+        module = load_install_state_module()
+        original_write_json = module.write_json_atomic
+
+        def inject_after_authorization(path, payload, mode=0o600):
+            original_write_json(path, payload, mode)
+            if Path(path).name == "authorized.json":
+                replacement = destination.with_name(".concurrent-settings")
+                replacement.write_text(
+                    '{"concurrent": true}\n',
+                    encoding="utf-8",
+                )
+                os.replace(replacement, destination)
+
+        args = argparse.Namespace(
+            target=str(self.target),
+            snapshot=str(self.transaction),
+            scope="project",
+            path="settings.local.json",
+            source=str(generated),
+        )
+        with mock.patch.dict(os.environ, self.env):
+            with mock.patch.object(
+                module,
+                "write_json_atomic",
+                side_effect=inject_after_authorization,
+            ):
+                with self.assertRaises(module.InstallStateError):
+                    module.command_publish(args)
+
+        self.assertEqual(
+            destination.read_text(encoding="utf-8"),
+            '{"concurrent": true}\n',
+        )
+        self.assertTrue(generated.is_file())
+
+    def test_finalize_rejects_edit_after_generated_settings_publish(self):
+        destination = self.target / ".claude" / "settings.local.json"
+        destination.parent.mkdir(parents=True)
+        destination.write_text('{"before": true}\n', encoding="utf-8")
+        self.begin()
+        generated = self.root / "generated-settings.json"
+        generated.write_text('{"hooks": {}}\n', encoding="utf-8")
+        self.run_cli(
+            "publish",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--scope",
+            "project",
+            "--path",
+            "settings.local.json",
+            "--source",
+            generated,
+        )
+        destination.write_text(
+            '{"concurrent": true}\n',
+            encoding="utf-8",
+        )
+
+        result = self.run_cli(
+            "finalize",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--profile",
+            "team",
+            "--source-revision",
+            "test-revision",
+            "--claude-home",
+            self.claude_home,
+            expected=2,
+        )
+        self.assertIn("authorized generated file changed", result.stderr.lower())
+
+        rollback = self.run_cli(
+            "abort",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--claude-home",
+            self.claude_home,
+            expected=2,
+        )
+        self.assertIn("unexpected drift", rollback.stderr.lower())
+        self.assertEqual(
+            destination.read_text(encoding="utf-8"),
+            '{"concurrent": true}\n',
+        )
+        self.assertFalse(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).exists()
         )
 
     def test_enterprise_abort_preserves_unmanaged_claude_home_file(self):
@@ -865,6 +1013,50 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertEqual(
             managed.read_text(encoding="utf-8"),
             "CONCURRENT USER EDIT\n",
+        )
+        self.assertTrue(
+            (
+                self.target
+                / ".claude"
+                / "claude-code-guide-install-state.json"
+            ).is_file()
+        )
+
+    def test_uninstall_restores_quarantine_when_capture_fails(self):
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        managed.parent.mkdir(parents=True)
+        managed.write_text("original\n", encoding="utf-8")
+        self.begin()
+        managed.write_text("installed\n", encoding="utf-8")
+        self.finalize()
+
+        module = load_install_state_module()
+        original_path_record = module.path_record
+
+        def fail_quarantine_capture(entry, path):
+            if ".ccg-quarantine-" in Path(path).name:
+                raise OSError("injected quarantine capture failure")
+            return original_path_record(entry, path)
+
+        args = argparse.Namespace(
+            target=str(self.target),
+            claude_home=str(self.claude_home),
+            dry_run=False,
+            json=False,
+        )
+        with mock.patch.dict(os.environ, self.env):
+            with mock.patch.object(
+                module,
+                "path_record",
+                side_effect=fail_quarantine_capture,
+            ):
+                with self.assertRaises(module.InstallStateError):
+                    module.command_uninstall(args)
+
+        self.assertEqual(managed.read_text(encoding="utf-8"), "installed\n")
+        self.assertEqual(
+            list(managed.parent.glob(".*.ccg-quarantine-*")),
+            [],
         )
         self.assertTrue(
             (

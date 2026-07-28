@@ -934,7 +934,18 @@ def command_begin(args: argparse.Namespace) -> int:
     return 0
 
 
-def command_authorize(args: argparse.Namespace) -> int:
+def restore_capture_exclusive(capture: Path, destination: Path) -> None:
+    try:
+        os.link(capture, destination, follow_symlinks=False)
+    except FileExistsError as error:
+        raise InstallStateError(
+            "generated-file base could not be restored without overwriting "
+            f"concurrent content; capture preserved at {capture}"
+        ) from error
+    capture.unlink()
+
+
+def command_publish(args: argparse.Namespace) -> int:
     target = validate_target(Path(args.target))
     snapshot = Path(args.snapshot)
     snapshot_meta, manifest, before = deserialize_snapshot(snapshot)
@@ -970,7 +981,69 @@ def command_authorize(args: argparse.Namespace) -> int:
             "entries": [authorized[item] for item in sorted(authorized)],
         },
     )
-    print(f"authorized: {key}")
+    destination = safe_destination(
+        scope_root(args.scope, target, Path(".")),
+        args.path,
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination = safe_destination(
+        scope_root(args.scope, target, Path(".")),
+        args.path,
+    )
+    capture = None
+    try:
+        if before.get(key) is not None:
+            capture = destination.with_name(
+                f".{destination.name}.ccg-base-{secrets.token_hex(8)}"
+            )
+            os.replace(destination, capture)
+            if not records_equal(before[key], path_record(declared[key], capture)):
+                restore_capture_exclusive(capture, destination)
+                capture = None
+                raise InstallStateError(
+                    f"generated file base changed during publish: {key}"
+                )
+        elif destination.exists():
+            raise InstallStateError(
+                f"generated file appeared during publish: {key}"
+            )
+        try:
+            os.link(source, destination, follow_symlinks=False)
+        except FileExistsError as error:
+            raise InstallStateError(
+                f"generated destination changed during publish: {key}"
+            ) from error
+        try:
+            source.unlink()
+        except OSError as error:
+            print(
+                f"WARNING: generated source temp retained: {source}: {error}",
+                file=sys.stderr,
+            )
+    except (InstallStateError, OSError) as error:
+        if capture is not None and capture.exists() and not destination.exists():
+            try:
+                restore_capture_exclusive(capture, destination)
+                capture = None
+            except InstallStateError as restore_error:
+                raise InstallStateError(
+                    f"generated publish failed ({error}); {restore_error}"
+                ) from error
+        if capture is not None and capture.exists():
+            raise InstallStateError(
+                f"generated publish failed ({error}); base capture preserved "
+                f"at {capture}"
+            ) from error
+        raise
+    if capture is not None and capture.exists():
+        try:
+            capture.unlink()
+        except OSError as error:
+            print(
+                f"WARNING: generated-file base capture retained: {capture}: {error}",
+                file=sys.stderr,
+            )
+    print(f"published: {key}")
     return 0
 
 
@@ -1122,6 +1195,17 @@ def command_finalize(args: argparse.Namespace) -> int:
         )
     validate_snapshot_payload(snapshot, before)
     after = scan_manifest(target, claude_home, manifest)
+    authorized = load_authorized_entries(snapshot, manifest)
+    for key, authorized_entry in authorized.items():
+        current = after.get(key)
+        if (
+            current is None
+            or current["sha256"] != authorized_entry["expected_sha256"]
+            or current["mode"] != authorized_entry["expected_mode"]
+        ):
+            raise InstallStateError(
+                f"authorized generated file changed before finalize: {key}"
+            )
     changed_keys = changed_record_keys(before, after)
 
     ensure_state_is_git_local(target)
@@ -1283,58 +1367,54 @@ def load_runtime_state(
     return target, claude_home, state, state_root
 
 
-def entry_issue(entry: dict, target: Path, claude_home: Path) -> dict | None:
-    destination = safe_destination(
-        scope_root(entry["scope"], target, claude_home),
-        entry["path"],
-    )
-    if entry["installed_exists"]:
-        if not destination.exists():
-            return {
-                "scope": entry["scope"],
-                "path": entry["path"],
-                "reason": "missing",
-            }
-        if not destination.is_file():
-            return {
-                "scope": entry["scope"],
-                "path": entry["path"],
-                "reason": "not-file",
-            }
-        mode, uid, gid = file_metadata(destination)
-        if (
-            sha256_file(destination) != entry["installed_sha256"]
-            or mode != entry["installed_mode"]
-            or uid != entry["installed_uid"]
-            or gid != entry["installed_gid"]
-        ):
-            return {
-                "scope": entry["scope"],
-                "path": entry["path"],
-                "reason": "drift",
-            }
-    elif destination.exists():
-        return {
-            "scope": entry["scope"],
-            "path": entry["path"],
-            "reason": "unexpected",
-        }
-    return None
-
-
-def doctor_report(target: Path, claude_home: Path, state: dict) -> dict:
+def inspect_runtime_state(
+    target: Path,
+    claude_home: Path,
+    state: dict,
+) -> tuple[dict, dict[str, dict | None]]:
     issues = []
+    observed: dict[str, dict | None] = {}
     for entry in state["entries"]:
-        issue = entry_issue(entry, target, claude_home)
-        if issue:
-            issues.append(issue)
-    return {
+        key = f"{entry['scope']}:{entry['path']}"
+        destination = safe_destination(
+            scope_root(entry["scope"], target, claude_home),
+            entry["path"],
+        )
+        record = None
+        reason = None
+        if destination.exists():
+            if destination.is_symlink() or not destination.is_file():
+                reason = "not-file"
+            else:
+                record = path_record(entry, destination)
+        observed[key] = record
+        if entry["installed_exists"]:
+            if record is None:
+                reason = reason or "missing"
+            elif not record_matches_entry(record, entry, "installed"):
+                reason = "drift"
+        elif destination.exists():
+            reason = reason or "unexpected"
+        if reason:
+            issues.append(
+                {
+                    "scope": entry["scope"],
+                    "path": entry["path"],
+                    "reason": reason,
+                }
+            )
+    report = {
         "schema_version": SCHEMA_VERSION,
         "status": "drifted" if issues else "ok",
         "managed": len(state["entries"]),
         "source_revision": state["source_revision"],
         "issues": issues,
     }
+    return report, observed
+
+
+def doctor_report(target: Path, claude_home: Path, state: dict) -> dict:
+    return inspect_runtime_state(target, claude_home, state)[0]
 
 
 def render_result(payload: dict, as_json: bool) -> None:
@@ -1359,161 +1439,70 @@ def command_doctor(args: argparse.Namespace) -> int:
     return 1 if report["status"] == "drifted" else 0
 
 
-def apply_payload_entry(
-    entry: dict,
-    prefix: str,
-    target: Path,
-    claude_home: Path,
-    state_root: Path,
-) -> None:
-    root = scope_root(entry["scope"], target, claude_home)
-    destination = safe_destination(root, entry["path"])
-    if entry[f"{prefix}_exists"]:
-        source = state_payload_path(
-            state_root,
-            prefix,
-            entry["scope"],
-            entry["path"],
-        )
-        record = payload_record(entry, prefix, source)
-        copy_record_file(record, destination)
-    elif destination.exists():
-        if not destination.is_file():
-            raise InstallStateError(
-                f"managed destination is not a file: {destination}"
-            )
-        destination.unlink()
-        remove_empty_parents(destination, root)
-
-
-def snapshot_runtime_destinations(
-    entries: list[dict],
-    target: Path,
-    claude_home: Path,
-    backup_root: Path,
-) -> dict[str, dict | None]:
-    backups: dict[str, dict | None] = {}
-    for entry in entries:
-        key = f"{entry['scope']}:{entry['path']}"
-        root = scope_root(entry["scope"], target, claude_home)
-        destination = safe_destination(root, entry["path"])
-        if not destination.exists():
-            backups[key] = None
-            continue
-        if destination.is_symlink() or not destination.is_file():
-            raise InstallStateError(
-                f"managed destination is not a regular file: {destination}"
-            )
-        mode, uid, gid = file_metadata(destination)
-        record = {
-            "scope": entry["scope"],
-            "path": entry["path"],
-            "sha256": sha256_file(destination),
-            "mode": mode,
-            "uid": uid,
-            "gid": gid,
-            "source": destination,
-        }
-        validate_restorable_ownership(record)
-        backup_path = state_payload_path(
-            backup_root,
-            "previous",
-            entry["scope"],
-            entry["path"],
-        )
-        copy_record_file(record, backup_path)
-        record["source"] = backup_path
-        backups[key] = record
-    return backups
-
-
-def restore_runtime_destinations(
-    entries: list[dict],
-    backups: dict[str, dict | None],
-    target: Path,
-    claude_home: Path,
-) -> None:
-    failures = []
-    for entry in reversed(entries):
-        key = f"{entry['scope']}:{entry['path']}"
-        root = scope_root(entry["scope"], target, claude_home)
-        try:
-            destination = safe_destination(root, entry["path"])
-            record = backups[key]
-            if record is None:
-                if destination.exists():
-                    if not destination.is_file():
-                        raise InstallStateError(
-                            f"rollback destination is not a file: {destination}"
-                        )
-                    destination.unlink()
-                    remove_empty_parents(destination, root)
-            else:
-                copy_record_file(record, destination)
-        except (InstallStateError, OSError) as error:
-            failures.append(f"{key}: {error}")
-    if failures:
-        raise InstallStateError(
-            "runtime rollback failed: " + "; ".join(failures)
-        )
-
-
 def apply_entries_transactionally(
     entries: list[dict],
     prefix: str,
     target: Path,
     claude_home: Path,
     state_root: Path,
+    expected_records: dict[str, dict | None],
     after_apply=None,
 ) -> None:
-    state_home = resolved_state_home(create=True)
-    backup_root = Path(
-        tempfile.mkdtemp(prefix=".runtime-backup-", dir=state_home)
-    )
-    os.chmod(backup_root, 0o700)
-    backups: dict[str, dict | None] = {}
-    preserve_backup = False
+    applied: list[tuple[dict, Path, Path | None]] = []
     try:
-        backups = snapshot_runtime_destinations(
-            entries,
-            target,
-            claude_home,
-            backup_root,
-        )
-        try:
-            for entry in entries:
-                apply_payload_entry(
+        for entry in entries:
+            key = f"{entry['scope']}:{entry['path']}"
+            destination, quarantine = quarantine_expected_entry(
+                entry,
+                expected_records[key],
+                target,
+                claude_home,
+                "repair",
+            )
+            applied.append((entry, destination, quarantine))
+            if entry[f"{prefix}_exists"]:
+                copy_payload_exclusive(
                     entry,
                     prefix,
-                    target,
-                    claude_home,
+                    destination,
                     state_root,
                 )
-            if after_apply:
-                after_apply()
-        except (InstallStateError, OSError) as error:
+        if after_apply:
+            after_apply()
+    except (InstallStateError, OSError) as error:
+        failures = []
+        for entry, destination, quarantine in reversed(applied):
             try:
-                restore_runtime_destinations(
-                    entries,
-                    backups,
-                    target,
-                    claude_home,
+                rollback_repaired_entry(
+                    entry,
+                    prefix,
+                    destination,
+                    quarantine,
                 )
-            except InstallStateError as rollback_error:
-                preserve_backup = True
-                raise InstallStateError(
-                    f"runtime operation failed ({error}); {rollback_error}; "
-                    f"backup preserved at {backup_root}"
-                ) from error
+            except (InstallStateError, OSError) as rollback_error:
+                failures.append(str(rollback_error))
+        if failures:
             raise InstallStateError(
-                f"runtime operation failed and was rolled back: {error}"
+                f"runtime operation failed ({error}); rollback incomplete: "
+                + "; ".join(failures)
             ) from error
-    finally:
-        if not preserve_backup:
-            shutil.rmtree(backup_root, ignore_errors=True)
+        raise InstallStateError(
+            f"runtime operation failed and was rolled back: {error}"
+        ) from error
+    for _, _, quarantine in applied:
+        if quarantine is not None and quarantine.exists():
+            try:
+                quarantine.unlink()
+            except OSError as error:
+                print(
+                    f"WARNING: repair quarantine retained: {quarantine}: {error}",
+                    file=sys.stderr,
+                )
 
 
 def path_record(entry: dict, path: Path) -> dict:
+    if path.is_symlink() or not path.is_file():
+        raise InstallStateError(f"captured path is not a regular file: {path}")
     mode, uid, gid = file_metadata(path)
     return {
         "scope": entry["scope"],
@@ -1535,6 +1524,140 @@ def record_matches_entry(record: dict | None, entry: dict, prefix: str) -> bool:
         record[field] == entry[f"{prefix}_{field}"]
         for field in ("sha256", "mode", "uid", "gid")
     )
+
+
+def expected_entry_record(entry: dict, prefix: str) -> dict | None:
+    if not entry[f"{prefix}_exists"]:
+        return None
+    return {
+        "scope": entry["scope"],
+        "path": entry["path"],
+        "sha256": entry[f"{prefix}_sha256"],
+        "mode": entry[f"{prefix}_mode"],
+        "uid": entry[f"{prefix}_uid"],
+        "gid": entry[f"{prefix}_gid"],
+    }
+
+
+def quarantine_expected_entry(
+    entry: dict,
+    expected: dict | None,
+    target: Path,
+    claude_home: Path,
+    operation: str,
+) -> tuple[Path, Path | None]:
+    root = scope_root(entry["scope"], target, claude_home)
+    destination = safe_destination(root, entry["path"])
+    if expected is None:
+        if destination.exists():
+            raise InstallStateError(
+                f"managed file changed before {operation}: {destination}"
+            )
+        return destination, None
+    if (
+        not destination.exists()
+        or destination.is_symlink()
+        or not destination.is_file()
+    ):
+        raise InstallStateError(
+            f"managed file changed before {operation}: {destination}"
+        )
+    quarantine = destination.with_name(
+        f".{destination.name}.ccg-quarantine-{secrets.token_hex(8)}"
+    )
+    os.replace(destination, quarantine)
+    try:
+        captured = path_record(entry, quarantine)
+        if records_equal(captured, expected):
+            return destination, quarantine
+        error = InstallStateError(
+            f"managed file changed during {operation}: {destination}"
+        )
+    except (InstallStateError, OSError) as capture_error:
+        error = capture_error
+
+    if not destination.exists():
+        try:
+            restore_capture_exclusive(quarantine, destination)
+        except (InstallStateError, OSError) as restore_error:
+            raise InstallStateError(
+                f"{operation} capture failed ({error}); {restore_error}; "
+                f"captured file preserved at {quarantine}"
+            ) from error
+        raise InstallStateError(
+            f"{operation} capture failed and was restored: {error}"
+        ) from error
+    raise InstallStateError(
+        f"{operation} capture failed ({error}); concurrent destination "
+        f"preserved and captured file retained at {quarantine}"
+    ) from error
+
+
+def rollback_repaired_entry(
+    entry: dict,
+    prefix: str,
+    destination: Path,
+    quarantine: Path | None,
+) -> None:
+    discard = None
+    if destination.exists():
+        if destination.is_symlink() or not destination.is_file():
+            suffix = (
+                f"; original capture preserved at {quarantine}"
+                if quarantine is not None
+                else ""
+            )
+            raise InstallStateError(
+                f"repair rollback found concurrent drift: {destination}{suffix}"
+            )
+        discard = destination.with_name(
+            f".{destination.name}.ccg-discard-{secrets.token_hex(8)}"
+        )
+        os.replace(destination, discard)
+        try:
+            written = path_record(entry, discard)
+            if not record_matches_entry(written, entry, prefix):
+                raise InstallStateError(
+                    f"repair rollback found concurrent drift: {destination}"
+                )
+        except (InstallStateError, OSError) as error:
+            try:
+                restore_capture_exclusive(discard, destination)
+                discard = None
+            except (InstallStateError, OSError) as restore_error:
+                raise InstallStateError(
+                    f"repair rollback capture failed ({error}); "
+                    f"{restore_error}; captured file preserved at {discard}"
+                ) from error
+            suffix = (
+                f"; original capture preserved at {quarantine}"
+                if quarantine is not None
+                else ""
+            )
+            raise InstallStateError(f"{error}{suffix}") from error
+    elif entry[f"{prefix}_exists"] and quarantine is None:
+        return
+
+    if quarantine is not None:
+        try:
+            restore_capture_exclusive(quarantine, destination)
+            quarantine = None
+        except (InstallStateError, OSError) as error:
+            if discard is not None and discard.exists() and not destination.exists():
+                try:
+                    restore_capture_exclusive(discard, destination)
+                    discard = None
+                except (InstallStateError, OSError) as restore_error:
+                    raise InstallStateError(
+                        f"repair rollback failed ({error}); {restore_error}; "
+                        f"captures preserved at {quarantine} and {discard}"
+                    ) from error
+            raise InstallStateError(
+                f"repair rollback failed; original capture preserved at "
+                f"{quarantine}: {error}"
+            ) from error
+    if discard is not None and discard.exists():
+        discard.unlink()
 
 
 def copy_payload_exclusive(
@@ -1577,33 +1700,12 @@ def quarantine_installed_entry(
     target: Path,
     claude_home: Path,
 ) -> tuple[Path, Path | None]:
-    root = scope_root(entry["scope"], target, claude_home)
-    destination = safe_destination(root, entry["path"])
-    if not entry["installed_exists"]:
-        if destination.exists():
-            raise InstallStateError(
-                f"managed file drifted before uninstall: {destination}"
-            )
-        return destination, None
-    if not destination.exists() or not destination.is_file():
-        raise InstallStateError(
-            f"managed file drifted before uninstall: {destination}"
-        )
-    quarantine = destination.with_name(
-        f".{destination.name}.ccg-quarantine-{secrets.token_hex(8)}"
-    )
-    os.replace(destination, quarantine)
-    captured = path_record(entry, quarantine)
-    if record_matches_entry(captured, entry, "installed"):
-        return destination, quarantine
-    if not destination.exists():
-        os.replace(quarantine, destination)
-        raise InstallStateError(
-            f"managed file changed during uninstall: {destination}"
-        )
-    raise InstallStateError(
-        "managed file changed during uninstall and could not be renamed back; "
-        f"captured file preserved at {quarantine}"
+    return quarantine_expected_entry(
+        entry,
+        expected_entry_record(entry, "installed"),
+        target,
+        claude_home,
+        "uninstall",
     )
 
 
@@ -1621,25 +1723,48 @@ def rollback_quarantined_entry(
             f".{destination.name}.ccg-discard-{secrets.token_hex(8)}"
         )
         os.replace(destination, discard)
-        written = path_record(entry, discard)
-        if not record_matches_entry(written, entry, "previous"):
+        try:
+            written = path_record(entry, discard)
+            if not record_matches_entry(written, entry, "previous"):
+                raise InstallStateError(
+                    f"uninstall rollback found concurrent drift: {destination}"
+                )
+        except (InstallStateError, OSError) as error:
             if not destination.exists():
-                os.replace(discard, destination)
-            raise InstallStateError(
-                f"uninstall rollback found concurrent drift: {destination}"
+                try:
+                    restore_capture_exclusive(discard, destination)
+                    discard = None
+                except (InstallStateError, OSError) as restore_error:
+                    raise InstallStateError(
+                        f"uninstall rollback capture failed ({error}); "
+                        f"{restore_error}; captures preserved at "
+                        f"{quarantine} and {discard}"
+                    ) from error
+            suffix = (
+                f"; installed capture preserved at {quarantine}"
+                if quarantine is not None
+                else ""
             )
+            raise InstallStateError(f"{error}{suffix}") from error
         if quarantine is None:
             discard.unlink()
             return
-        os.replace(quarantine, destination)
+        try:
+            restore_capture_exclusive(quarantine, destination)
+        except (InstallStateError, OSError) as error:
+            raise InstallStateError(
+                f"uninstall rollback failed; captures preserved at "
+                f"{quarantine} and {discard}: {error}"
+            ) from error
         discard.unlink()
         return
     if destination.exists():
         raise InstallStateError(
-            f"uninstall rollback found concurrent drift: {destination}"
+            f"uninstall rollback found concurrent drift: {destination}; "
+            f"installed capture preserved at {quarantine}"
         )
     if quarantine is not None:
-        os.replace(quarantine, destination)
+        restore_capture_exclusive(quarantine, destination)
 
 
 def uninstall_entries_transactionally(
@@ -1701,9 +1826,10 @@ def command_repair(args: argparse.Namespace) -> int:
         args.target,
         args.claude_home,
     )
+    report, observed = inspect_runtime_state(target, claude_home, state)
     issues_by_key = {
         f"{issue['scope']}:{issue['path']}": issue
-        for issue in doctor_report(target, claude_home, state)["issues"]
+        for issue in report["issues"]
     }
     entries = [
         entry
@@ -1723,6 +1849,7 @@ def command_repair(args: argparse.Namespace) -> int:
             target,
             claude_home,
             state_root,
+            observed,
         )
     result = {
         "schema_version": SCHEMA_VERSION,
@@ -1814,13 +1941,13 @@ def build_parser() -> argparse.ArgumentParser:
     begin.add_argument("--managed-file", action="append", default=[])
     begin.set_defaults(handler=command_begin)
 
-    authorize = subparsers.add_parser("authorize")
-    authorize.add_argument("--target", required=True)
-    authorize.add_argument("--snapshot", required=True)
-    authorize.add_argument("--scope", choices=("project",), required=True)
-    authorize.add_argument("--path", required=True)
-    authorize.add_argument("--source", required=True)
-    authorize.set_defaults(handler=command_authorize)
+    publish = subparsers.add_parser("publish")
+    publish.add_argument("--target", required=True)
+    publish.add_argument("--snapshot", required=True)
+    publish.add_argument("--scope", choices=("project",), required=True)
+    publish.add_argument("--path", required=True)
+    publish.add_argument("--source", required=True)
+    publish.set_defaults(handler=command_publish)
 
     finalize = subparsers.add_parser("finalize")
     add_transaction_identity_arguments(finalize)

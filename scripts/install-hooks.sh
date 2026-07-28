@@ -250,14 +250,16 @@ if [ "$SKIP_SETTINGS" = false ]; then
     trap 'rm -f "$SETTINGS_TMP"' EXIT
     echo "$SETTINGS" | jq '.' > "$SETTINGS_TMP"
     if [ -n "${CLAUDE_CODE_GUIDE_TRANSACTION:-}" ]; then
-        python3 "$SCRIPT_DIR/install_state.py" authorize \
+        python3 "$SCRIPT_DIR/install_state.py" publish \
           --target "$TARGET" \
           --snapshot "$CLAUDE_CODE_GUIDE_TRANSACTION" \
           --scope project \
           --path settings.local.json \
           --source "$SETTINGS_TMP"
+    else
+        mv "$SETTINGS_TMP" "$TARGET_SETTINGS"
     fi
-    mv "$SETTINGS_TMP" "$TARGET_SETTINGS"
+    # CCG_SETTINGS_PUBLISHED
     trap - EXIT
     echo ""
     echo "  settings.local.json 업데이트 완료"

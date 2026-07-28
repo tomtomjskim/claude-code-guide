@@ -57,7 +57,9 @@ snapshot으로 부분 변경을 자동 rollback한다. rollback은 profile/sourc
 막는다. 자동 rollback까지 실패하면
 원본 snapshot이 든 권한 제한 임시 디렉터리를 삭제하지 않고 경로를 출력한다.
 동적으로 생성하는 `settings.local.json`은 destination을 바꾸기 전에 생성 결과 hash를
-transaction journal에 승인하며, 승인 전 base가 begin snapshot과 다르면 중단한다.
+transaction journal에 기록하고, begin snapshot과 일치하는 base를 같은 디렉터리로
+원자 격리한 뒤 destination이 비어 있을 때만 publish한다. finalize에서도 journal의
+hash와 mode를 다시 확인해 publish 이후 동시 편집을 설치 결과로 채택하지 않는다.
 
 ## 운영 명령
 
@@ -70,7 +72,8 @@ bash scripts/manage-install.sh uninstall --target <project>
 ```
 
 - `doctor`: 관리 파일의 누락, 내용·mode·ownership drift를 읽기 전용으로 검사한다.
-- `repair`: drift가 있는 관리 파일만 설치 완료 snapshot으로 복구한다.
+- `repair`: 처음 관찰한 drift 파일을 원자 격리해 같은 내용인지 다시 확인한 뒤에만
+  설치 완료 snapshot으로 복구한다.
 - `uninstall`: drift가 없을 때 설치 전 파일을 복원하고 설치가 만든 파일만 제거한다.
 - drift 상태에서 uninstall은 사용자 변경 손실을 막기 위해 중단한다.
 - uninstall은 현재 파일을 같은 디렉터리의 quarantine으로 원자 이동한 뒤 hash,
