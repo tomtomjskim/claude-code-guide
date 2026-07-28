@@ -37,6 +37,8 @@ revision, 관리 파일의 상대 경로·hash·mode·uid·gid를 기록한다. 
 `repair`와 `uninstall`은 해당 payload의 hash와 mode를 변경 전에 검증한다.
 상태 generation은 예측 불가능한 ID의 임시 디렉터리에서 완성·검증한 뒤 원자적으로
 publish하며, 새 state JSON이 확정된 뒤 이전 generation을 정리한다.
+Git target에서는 상태 파일이 이미 tracked 상태면 finalize를 거부하고, untracked라면
+`.git/info/exclude`에 로컬 ignore를 추가해 다른 checkout으로 전파되지 않게 한다.
 
 enterprise profile은 project `.claude/`와 함께 해당 설치가 변경한 Claude home의
 `team/`, `agents/` 파일만 추적한다. 기존 설정, 사용자 skill, 다른 파일은 관리

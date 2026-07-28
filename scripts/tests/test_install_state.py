@@ -574,6 +574,73 @@ class InstallStateCliTest(unittest.TestCase):
         )
         self.assertEqual(json.loads(doctor.stdout)["status"], "drifted")
 
+    def test_finalize_adds_state_file_to_local_git_exclude(self):
+        subprocess.run(
+            ["git", "init", "-q", self.target],
+            check=True,
+            capture_output=True,
+        )
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        self.begin()
+        managed.parent.mkdir(parents=True)
+        managed.write_text("installed\n", encoding="utf-8")
+        self.finalize()
+
+        git_path = subprocess.run(
+            [
+                "git",
+                "-C",
+                self.target,
+                "rev-parse",
+                "--git-path",
+                "info/exclude",
+            ],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        exclude_path = Path(git_path)
+        if not exclude_path.is_absolute():
+            exclude_path = self.target / exclude_path
+        self.assertIn(
+            ".claude/claude-code-guide-install-state.json",
+            exclude_path.read_text(encoding="utf-8").splitlines(),
+        )
+
+    def test_finalize_rejects_a_git_tracked_state_file(self):
+        subprocess.run(
+            ["git", "init", "-q", self.target],
+            check=True,
+            capture_output=True,
+        )
+        managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
+        self.begin()
+        managed.parent.mkdir(parents=True)
+        managed.write_text("installed\n", encoding="utf-8")
+        state_file = self.target / ".claude" / "claude-code-guide-install-state.json"
+        state_file.write_text("{}\n", encoding="utf-8")
+        subprocess.run(
+            ["git", "-C", self.target, "add", "-f", state_file],
+            check=True,
+            capture_output=True,
+        )
+
+        result = self.run_cli(
+            "finalize",
+            "--target",
+            self.target,
+            "--snapshot",
+            self.transaction,
+            "--profile",
+            "team",
+            "--source-revision",
+            "test-revision",
+            "--claude-home",
+            self.claude_home,
+            expected=2,
+        )
+        self.assertIn("must not be tracked", result.stderr.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

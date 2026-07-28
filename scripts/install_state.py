@@ -11,6 +11,7 @@ import re
 import secrets
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -188,6 +189,65 @@ def write_json_atomic(path: Path, payload: dict, mode: int = 0o600) -> None:
     finally:
         if temp_path.exists():
             temp_path.unlink()
+
+
+def run_git(target: Path, *arguments: str) -> subprocess.CompletedProcess:
+    environment = {**os.environ, "GIT_OPTIONAL_LOCKS": "0"}
+    return subprocess.run(
+        ["git", "-C", str(target), *arguments],
+        text=True,
+        capture_output=True,
+        env=environment,
+        check=False,
+    )
+
+
+def ensure_state_is_git_local(target: Path) -> None:
+    if shutil.which("git") is None:
+        return
+    inside = run_git(target, "rev-parse", "--is-inside-work-tree")
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        return
+    relative = STATE_RELATIVE_PATH.as_posix()
+    tracked = run_git(target, "ls-files", "--error-unmatch", "--", relative)
+    if tracked.returncode == 0:
+        raise InstallStateError(
+            f"install state must not be tracked by Git: {relative}"
+        )
+    ignored = run_git(target, "check-ignore", "-q", "--", relative)
+    if ignored.returncode == 0:
+        return
+    git_path = run_git(target, "rev-parse", "--git-path", "info/exclude")
+    if git_path.returncode != 0 or not git_path.stdout.strip():
+        raise InstallStateError(
+            f"could not resolve Git exclude file: {git_path.stderr.strip()}"
+        )
+    exclude_path = Path(git_path.stdout.strip())
+    if not exclude_path.is_absolute():
+        exclude_path = target / exclude_path
+    if exclude_path.is_symlink():
+        raise InstallStateError(
+            f"Git exclude file must not be a symlink: {exclude_path}"
+        )
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        import fcntl
+
+        with exclude_path.open("a+b") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            handle.seek(0)
+            content = handle.read()
+            encoded = relative.encode("utf-8")
+            if encoded not in content.splitlines():
+                prefix = b"" if not content or content.endswith(b"\n") else b"\n"
+                handle.seek(0, os.SEEK_END)
+                handle.write(prefix + encoded + b"\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+    except OSError as error:
+        raise InstallStateError(
+            f"could not update Git exclude file: {exclude_path}"
+        ) from error
 
 
 def read_json(path: Path) -> dict:
@@ -942,6 +1002,7 @@ def command_finalize(args: argparse.Namespace) -> int:
     after = scan_manifest(target, claude_home, manifest)
     changed_keys = changed_record_keys(before, after)
 
+    ensure_state_is_git_local(target)
     existing_state = load_existing_state(target)
     old_state_root = None
     existing_entries = {}
