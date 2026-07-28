@@ -229,9 +229,10 @@ def ensure_state_is_git_local(target: Path) -> None:
         raise InstallStateError(
             f"could not resolve Git target prefix: {prefix_result.stderr.strip()}"
         )
+    target_prefix = prefix_result.stdout.rstrip("\r\n").strip("/")
     repository_relative = (
-        prefix_result.stdout.strip("/") + "/" + target_relative
-        if prefix_result.stdout.strip("/")
+        target_prefix + "/" + target_relative
+        if target_prefix
         else target_relative
     )
     exclude_pattern = "/" + repository_relative

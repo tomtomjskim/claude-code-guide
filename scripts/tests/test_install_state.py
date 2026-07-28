@@ -747,6 +747,7 @@ class InstallStateCliTest(unittest.TestCase):
             check=True,
             capture_output=True,
         )
+        self.env["GIT_CONFIG_GLOBAL"] = os.devnull
         self.target = nested_target
         managed = self.target / ".claude" / "skills" / "managed" / "SKILL.md"
         self.begin()
@@ -770,6 +771,27 @@ class InstallStateCliTest(unittest.TestCase):
         self.assertNotIn(
             "claude-code-guide-install-state.json",
             status,
+        )
+        exclude_path = Path(
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    nested_target,
+                    "rev-parse",
+                    "--git-path",
+                    "info/exclude",
+                ],
+                text=True,
+                capture_output=True,
+                check=True,
+            ).stdout.strip()
+        )
+        if not exclude_path.is_absolute():
+            exclude_path = nested_target / exclude_path
+        self.assertIn(
+            "/apps/service/.claude/claude-code-guide-install-state.json",
+            exclude_path.read_text(encoding="utf-8").splitlines(),
         )
 
     def test_source_revision_change_requires_explicit_force_boundary(self):
