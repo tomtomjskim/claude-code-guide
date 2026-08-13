@@ -1,221 +1,260 @@
-# 컨텍스트 윈도우 내부 동작
+# Claude Code 컨텍스트 윈도우와 상태 관리
 
-## 개요
+> 검증 기준일: 2026-08-13
+> 이 문서는 공개 공식 동작을 기준으로 합니다. 특정 Claude Code 버전의 번들 내부 상수와 미공개 구현을 장기 계약으로 취급하지 않습니다.
 
-Claude Code의 컨텍스트 윈도우는 단순한 토큰 버퍼가 아닙니다. 모델별 유효 용량 계산, 자동 압축 트리거, 압축 후 재주입 우선순위, 출력 토큰 에스컬레이션까지 여러 레이어가 협력하여 동작합니다. 이 문서는 v2.1.88 소스 분석을 기반으로 내부 동작을 정리합니다.
+공식 기준:
 
----
+- Model configuration: https://code.claude.com/docs/en/model-config
+- Settings: https://code.claude.com/docs/en/settings
+- Subagents: https://code.claude.com/docs/en/sub-agents
+- Thinking: https://platform.claude.com/docs/en/about-claude/models/extended-thinking-models
+- Prompt caching: https://platform.claude.com/docs/en/build-with-claude/prompt-caching
 
-## 1. 모델별 유효 컨텍스트 용량
+관련 문서:
 
-### 1.1 200K 모델 (claude-sonnet, claude-opus 기본)
-
-| 항목 | 토큰 수 | 계산 방식 |
-|------|--------|----------|
-| 전체 컨텍스트 윈도우 | 200,000 | 모델 스펙 |
-| output 예약 공간 | 20,000 | 최대 output token 예약 |
-| **유효 입력 윈도우** | **180,000** | 200K - 20K |
-| auto-compact 트리거 | **167,000** | 유효 윈도우 - 13,000 |
-| blocking 임계값 | **177,000** | 유효 윈도우 - 3,000 |
-
-**auto-compact**: 사용된 컨텍스트가 167K를 초과하면 자동 압축이 시작됩니다. 이 시점에는 아직 13K의 여유가 있으므로 압축 작업 자체가 컨텍스트를 소진하더라도 안전합니다.
-
-**blocking**: 177K를 초과하면 새로운 요청이 차단됩니다. 이미 auto-compact가 실패했거나 비활성화된 상태에서 도달하는 최후 방어선입니다.
-
-### 1.2 임계값 계산 공식
-
-```
-auto_compact_threshold = effective_window - 13_000
-blocking_threshold     = effective_window - 3_000
-effective_window       = model_context_window - max_output_tokens
-```
-
-`max_output_tokens`의 기본값은 8,192이지만, 에스컬레이션 후에는 최대 64,000까지 확장됩니다 (섹션 5 참조). 에스컬레이션이 발생하면 유효 윈도우가 줄어들고 임계값도 함께 당겨집니다.
+- [토큰 가격 및 비용 최적화](15-token-pricing-optimization.md)
+- [하네스 엔지니어링](29-harness-engineering.md)
+- [스킬 경량화](27-skill-lightweight-guide.md)
 
 ---
 
-## 2. 1M 컨텍스트 모델 활성화
+## 1. 컨텍스트는 무엇으로 구성되는가
 
-### 2.1 활성화 조건
+Claude Code의 active context에는 다음 계층이 들어갈 수 있습니다.
 
-1M 컨텍스트는 기본 활성화되지 않습니다. 다음 세 가지 조건이 모두 충족되어야 합니다.
-
-| 조건 | 설명 |
-|------|------|
-| `[1m]` suffix | 에이전트 이름 또는 설정에 `[1m]` 접미사 포함 |
-| `context_1m` beta flag | API 요청 시 beta header에 `context_1m` 포함 |
-| `coral_reef_sonnet` flag | 내부 feature flag 활성화 필요 |
-
-### 2.2 1M 모델 용량 계산
-
-```
-전체 윈도우:   1,048,576 토큰
-output 예약:      20,000 토큰
-유효 입력:     1,028,576 토큰
-auto-compact:  1,015,576 토큰 (유효 - 13K)
-blocking:      1,025,576 토큰 (유효 - 3K)
+```text
+시스템과 조직 정책
+사용자·프로젝트 CLAUDE.md와 rules
+활성화된 tools, MCP, Skills
+현재 대화 message history
+파일과 검색 결과
+subagent가 반환한 요약
+thinking 또는 redacted_thinking block
+compaction 이후의 summary
 ```
 
-### 2.3 비용 주의사항
-
-1M 컨텍스트는 캐싱 효율이 낮고 per-token 비용이 동일하게 적용됩니다. 장기 세션에서는 200K 모델 + auto-compact 조합이 비용 대비 효율이 더 높을 수 있습니다.
+파일을 많이 읽는 것보다 필요한 근거를 정확히 선택하고, 오래된 정보를 active context에서 제거하는 것이 중요합니다.
 
 ---
 
-## 3. Auto-Compact: 압축 동작
+## 2. Context window와 1M 지원
 
-### 3.1 압축 트리거 조건
+현재 Claude Code 공식 문서는 Fable 5, Sonnet 5, Opus 4.6 이후 일부 모델, Sonnet 4.6에 1M context 지원을 설명합니다. 사용 가능 여부는 모델, 공급자, 구독 플랜과 usage credits에 따라 다릅니다.
 
+확인 방법:
+
+```text
+/model
+/status
 ```
-현재 사용 토큰 > auto_compact_threshold
-AND DISABLE_AUTO_COMPACT != "1"
-AND DISABLE_COMPACT != "1"
-```
 
-### 3.2 압축 9-Section Summary 구조
+일부 모델과 환경은 `[1m]` alias를 지원하고, 일부 최신 모델은 별도 suffix 없이 1M이 기본입니다. 구버전의 고정 임계값이나 feature flag를 그대로 재사용하지 말고 현재 모델 설정 문서를 확인합니다.
 
-자동 압축 시 대화 히스토리는 9개 섹션으로 구조화된 요약문으로 대체됩니다.
+### 컨텍스트가 크다고 모두 넣지 않는다
 
-| 섹션 | 내용 |
-|------|------|
-| 1. Task Overview | 전체 작업 목표와 현재 진행 상태 |
-| 2. Completed Steps | 완료된 작업 목록 (파일 변경 포함) |
-| 3. Current State | 현재 작업 중인 항목과 진행 위치 |
-| 4. Key Decisions | 중요한 설계/구현 결정 사항 |
-| 5. File Changes | 수정/생성/삭제된 파일 목록과 변경 내용 요약 |
-| 6. Errors & Fixes | 발생한 오류와 해결 방법 |
-| 7. Pending Items | 미완료 태스크와 다음 단계 |
-| 8. Context Notes | 이후 작업에 필요한 중요 컨텍스트 |
-| 9. Tool State | 마지막으로 사용한 도구와 결과 상태 |
+1M context는 다음을 허용하지만 권장하지는 않습니다.
 
-압축은 별도의 Sonnet 모델 호출로 수행됩니다. 즉, 압축 자체에도 API 비용이 발생합니다.
+- 저장소 전체 무차별 입력
+- 완료된 debug log 영구 유지
+- 같은 문서의 여러 버전 동시 주입
+- 검증되지 않은 trace와 내부 state 보존
+- 여러 agent의 중복 탐색 결과 누적
+
+큰 window는 선택 비용을 없애지 않습니다. 불필요한 context는 비용, latency, instruction conflict, stale fact 위험을 늘립니다.
 
 ---
 
-## 4. 압축 후 재주입 (Post-Compact Reinjection)
+## 3. Auto-compaction
 
-압축이 완료되면 다음 항목들이 새 컨텍스트 상단에 자동으로 재주입됩니다.
+현재 설정:
 
-### 4.1 재주입 우선순위 및 한도
+```json
+{
+  "autoCompactEnabled": true,
+  "autoCompactWindow": 500000
+}
+```
 
-| 재주입 항목 | 한도 | 설명 |
-|------------|------|------|
-| 1. Files (관련 파일) | 최대 5개, 50K 토큰 | 현재 작업과 관련도 높은 파일 우선 |
-| 2. Skills | 최대 5개, 25K 토큰 | 활성화된 스킬 정의 |
-| 3. Plan | 제한 없음 | 현재 작업 계획 전체 |
-| 4. Tool Delta | 제한 없음 | 마지막 도구 실행 결과 |
-| 5. Agent Listing | 제한 없음 | 사용 가능한 에이전트 목록 |
+- `autoCompactEnabled` 기본값은 true입니다.
+- `autoCompactWindow`는 100,000~1,000,000 token 범위에서 설정할 수 있습니다.
+- 값을 지정하지 않으면 Claude Code가 모델에 맞춘 window를 사용합니다.
+- `/autocompact`, `--autocompact`, `CLAUDE_CODE_AUTO_COMPACT_WINDOW`가 설정을 변경하거나 override할 수 있습니다.
 
-**총 재주입 한도**: 약 75K 토큰 (Files 50K + Skills 25K + 기타)
+### 기본 권장
 
-### 4.2 파일 관련도 순위 결정
+`autoCompactWindow`를 임의로 150K 같은 고정값으로 낮추지 않습니다. 다음을 측정한 뒤 조정합니다.
 
-재주입할 5개 파일은 다음 기준으로 선택됩니다.
+- compaction 전 token
+- summary 이후 재탐색 횟수
+- 누락된 결정과 제약
+- retry와 context 재주입 비용
+- 장기 작업 성공률
 
-1. 압축 직전 대화에서 명시적으로 참조된 파일
-2. 현재 Plan에 언급된 파일
-3. 최근 수정된 파일 (타임스탬프 기준)
-4. 이전 세션에서 자주 참조된 파일 (Memory 기반)
+### Compaction의 신뢰 경계
+
+compaction summary는 연속성을 위한 모델 입력입니다. 다음 용도로 단독 사용하지 않습니다.
+
+- 감사 로그
+- 사실의 최종 source of truth
+- 승인 또는 배포 근거
+- 정확한 tool 실행 기록
+- hidden reasoning의 복원본
+
+중요 상태는 별도의 semantic checkpoint로 관리합니다.
 
 ---
 
-## 5. Output Token 에스컬레이션
+## 4. Semantic checkpoint
 
-Claude Code는 작업 복잡도에 따라 output token 한도를 동적으로 조정합니다.
-
-### 5.1 에스컬레이션 단계
-
-| 단계 | Output Token 한도 | 활성화 조건 |
-|------|-----------------|------------|
-| 기본 | 8,192 | 모든 요청의 초기값 |
-| 에스컬레이션 1 | 16,384 | 긴 코드 생성 감지 |
-| 에스컬레이션 2 | 32,768 | 대용량 파일 작업 |
-| 최대 | 64,000 | 명시적 max output 설정 |
-
-### 5.2 에스컬레이션 영향
-
-output token이 증가하면 유효 입력 윈도우가 감소합니다.
-
-```
-output = 64,000 적용 시:
-  유효 윈도우 = 200,000 - 64,000 = 136,000
-  auto-compact = 136,000 - 13,000 = 123,000  ← 훨씬 일찍 압축 발생
+```yaml
+verified_facts:
+  - claim: "검증된 사실"
+    evidence: "test:runtime-contract"
+assumptions: []
+decisions: []
+open_questions: []
+tool_receipts: []
 ```
 
-대용량 파일 생성 작업 시 예상보다 일찍 auto-compact가 발생하는 원인이 이 때문입니다.
+checkpoint 원칙:
+
+- fact마다 source 또는 validator가 있습니다.
+- assumption과 fact를 분리합니다.
+- contradiction은 기존 내용을 조용히 덮지 않습니다.
+- 완료된 tool 결과는 raw payload보다 실행 영수증과 핵심 결과를 남깁니다.
+- 모델 또는 provider를 변경해도 business state는 유지할 수 있어야 합니다.
+- thinking block을 portable business state로 사용하지 않습니다.
 
 ---
 
-## 6. 환경 변수 레퍼런스
+## 5. Thinking block과 opaque state
 
-컨텍스트 윈도우 동작을 제어하는 환경 변수 목록입니다.
+현재 Claude API는 regular `thinking`, `redacted_thinking`, opaque `signature` 같은 block을 반환할 수 있습니다.
 
-| 변수명 | 타입 | 기본값 | 설명 |
-|--------|------|--------|------|
-| `CLAUDE_CODE_AUTO_COMPACT_WINDOW` | number | 모델 최대값 | auto-compact 트리거 임계값을 강제 설정. 예: `150000`으로 설정 시 150K에서 압축 시작 |
-| `CLAUDE_CODE_DISABLE_AUTO_COMPACT` | `"1"` | 미설정 | `"1"` 설정 시 자동 압축 비활성화 (blocking까지 계속 진행) |
-| `CLAUDE_CODE_DISABLE_COMPACT` | `"1"` | 미설정 | 모든 압축 기능 비활성화 (DISABLE_AUTO_COMPACT 포함) |
-| `CLAUDE_CODE_DISABLE_1M_CONTEXT` | `"1"` | 미설정 | `"1"` 설정 시 1M 컨텍스트 사용 불가 (200K 강제) |
+### 동일 모델의 multi-turn 또는 tool workflow
 
-### 6.1 비대화형 세션 권장 설정
+- API가 반환한 thinking block을 필요한 경우 그대로 round-trip합니다.
+- 내용을 수정, 재구성, 순서 변경하지 않습니다.
+- `redacted_thinking`도 별도 block type으로 포함합니다.
+- `signature`와 encrypted `data`를 해석하거나 파싱하지 않습니다.
 
-NightOps, CI/CD 등 자동화 세션에서는 비용 절감을 위해 다음 설정을 권장합니다.
+### 모델 전환
 
-```bash
-export CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000   # 150K에서 조기 압축
-export CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1   # 백그라운드 태스크 비활성화
+공식 문서는 모델을 전환할 때 이전 assistant turn의 `thinking`과 `redacted_thinking` block을 제거하도록 안내합니다.
+
+```text
+same model continuation
+→ required blocks를 unchanged round-trip
+
+model switch
+→ previous thinking/redacted_thinking strip
+→ verified business checkpoint와 tool evidence로 재구성
 ```
+
+다른 모델이 block을 무시하더라도 input token에는 포함될 수 있습니다. 비용과 상태 오염을 막기 위해 명시적으로 제거합니다.
+
+### 저장 정책
+
+- Git, issue, PR, 공개 transcript에 opaque state를 복사하지 않습니다.
+- 일반 application log에 raw response를 기록하지 않습니다.
+- 필요 시 provider state는 짧은 TTL과 tenant/user/session binding으로 격리합니다.
+- summary text를 실제 내부 reasoning 원문이나 감사 증거로 간주하지 않습니다.
 
 ---
 
-## 7. 컨텍스트 사용량 모니터링
+## 6. Prompt caching과 thinking
 
-### 7.1 토큰 소비 패턴
+공식 API 기준:
 
-일반적인 세션에서 컨텍스트 소비 패턴:
+- thinking block 자체에 `cache_control`을 직접 붙일 수 없습니다.
+- 이전 assistant turn 안의 thinking block은 다른 content와 함께 cache될 수 있습니다.
+- cache read 시 thinking block도 input token에 포함될 수 있습니다.
+- thinking mode, budget 또는 effort 변경은 message cache를 무효화할 수 있습니다.
+- speed를 standard와 fast 사이에서 바꾸면 cache가 분리됩니다.
 
-```
-초기 로드:      CLAUDE.md(들) + MEMORY.md + 초기 질문  ≈ 10-30K
-파일 읽기:      파일당 평균 2-5K                       ≈ 누적
-도구 결과:      Bash 출력, grep 결과 등                ≈ 누적
-대화 히스토리:  턴당 평균 1-3K                         ≈ 누적
-```
-
-### 7.2 압축 빈도 최적화
-
-| 전략 | 효과 |
-|------|------|
-| 파일을 필요한 부분만 Read (offset/limit 활용) | 컨텍스트 절약 |
-| Bash 출력을 `head -50`으로 제한 | 도구 결과 축소 |
-| 불필요한 파일 반복 읽기 방지 | 중복 제거 |
-| `AUTO_COMPACT_WINDOW` 낮게 설정 | 조기 압축으로 긴 세션 안정화 |
+따라서 thinking을 많이 생성한 긴 대화에서 모델, effort, speed를 자주 변경하면 cache hit과 context 비용이 악화될 수 있습니다.
 
 ---
 
-## 8. 흐름도 요약
+## 7. Subagent context
 
+서브에이전트는 독립 context window와 system prompt를 사용하고 메인 대화에는 최종 결과를 반환합니다.
+
+장점:
+
+- 대량 검색 결과와 log를 메인 context에서 격리
+- 도구와 permission 제한
+- 역할별 model과 effort 선택
+
+비용:
+
+- 별도의 model call
+- startup instruction과 file read
+- 결과 통합과 재검증
+- 중복 탐색 가능성
+
+현재 Claude Code는 서브에이전트에도 auto-compaction을 적용합니다. 메인 대화가 compact되어도 별도 subagent transcript는 독립적으로 유지될 수 있으므로, 민감한 output과 retention 정책을 별도로 봅니다.
+
+### 사용 기준
+
+```text
+side task가 메인 context를 크게 오염
+독립적인 read-heavy 조사
+도구 권한을 제한해야 함
+역할별 모델 라우팅 가치가 있음
 ```
-요청 도착
-    ↓
-현재 토큰 수 계산
-    ↓
-  < 167K ?  ─── 정상 처리 ───→ 응답 생성
-    ↓ NO
-  < 177K ?  ─── auto-compact 시작
-    │              ↓
-    │         9-section 요약 생성 (Sonnet 호출)
-    │              ↓
-    │         재주입: Files(5/50K) + Skills(5/25K) + Plan + Tool Delta + Agents
-    │              ↓
-    │         새 컨텍스트로 재처리
-    ↓ NO
-  177K 초과 → BLOCKING (요청 거부, 세션 초기화 필요)
-```
+
+단순 1~2파일 수정이나 즉시 다음 단계에 필요한 조사에는 서브에이전트가 오히려 비쌀 수 있습니다.
 
 ---
 
-## 다음 단계
+## 8. Context hygiene 운영 루프
 
-- [Settings 전체 스키마 레퍼런스](20-settings-schema-reference.md)
-- [Memory 시스템 내부 동작](21-memory-system-internals.md)
-- [Agent Frontmatter 완전 스키마](22-agent-frontmatter-schema.md)
+### 작업 시작
+
+1. CLAUDE.md와 현재 요청을 읽습니다.
+2. 관련 문서와 파일을 검색해 후보를 좁힙니다.
+3. source priority와 최신 상태를 확인합니다.
+4. 긴 history보다 현재 code, test, authoritative docs를 우선합니다.
+
+### 작업 중
+
+- 중복 file read를 줄입니다.
+- tool output은 필요한 부분만 반환합니다.
+- resolved debug trace를 계속 재주입하지 않습니다.
+- subagent에게 compact packet과 명확한 scope를 줍니다.
+- 중요한 결정은 checkpoint에 즉시 반영합니다.
+
+### 작업 종료
+
+- 변경, 검증, 미실행 범위, 잔여 위험을 기록합니다.
+- 일시적 trace와 stable knowledge를 분리합니다.
+- 다음 세션에는 raw transcript 전체가 아니라 검증된 checkpoint를 전달합니다.
+
+---
+
+## 9. 안티패턴
+
+| 안티패턴 | 문제 | 대안 |
+|---|---|---|
+| context window가 크므로 전체 repo 입력 | 비용과 충돌 증가 | 검색 후 관련 범위만 읽기 |
+| autoCompactWindow를 근거 없이 고정 | 요약 누락 또는 불필요한 context 비용 | 모델 기본값 후 계측 |
+| compaction summary를 SSOT로 사용 | 사실 변형과 provenance 손실 | evidence-linked checkpoint |
+| thinking block을 일반 JSON log에 저장 | 민감정보와 opaque state 노출 | logging allowlist |
+| 모델 전환 후 이전 thinking 유지 | 무시되는 token과 state 혼합 | thinking block strip |
+| 서브에이전트 결과를 검증 없이 합침 | 오류 전파 | 메인 executor 검증 |
+| 높은 effort로 context 문제 해결 | token 증가, stale context 유지 | retrieval와 compaction 개선 |
+
+---
+
+## 10. 검증 체크리스트
+
+- [ ] 현재 모델의 context window를 `/model` 또는 공식 문서로 확인했다.
+- [ ] `autoCompactWindow` 값에 측정 근거가 있다.
+- [ ] compaction summary와 verified checkpoint를 구분한다.
+- [ ] model switch 시 thinking과 redacted_thinking을 제거한다.
+- [ ] opaque signature와 encrypted state를 파싱하지 않는다.
+- [ ] raw response와 thinking state를 일반 log에 저장하지 않는다.
+- [ ] cache usage와 context 비용을 usage field로 확인한다.
+- [ ] subagent retention과 민감 output을 별도로 검토한다.
