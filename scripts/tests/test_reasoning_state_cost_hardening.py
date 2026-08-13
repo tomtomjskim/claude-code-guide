@@ -58,6 +58,19 @@ class ReasoningStateCostHardeningTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, doc)
 
+    def test_harness_uses_current_precedence_and_safe_examples(self):
+        doc = self.read("docs/29-harness-engineering.md")
+
+        self.assertIn(
+            "Managed settings\n→ command line arguments\n→ local settings\n→ project settings\n→ user settings",
+            doc,
+        )
+        self.assertIn("prepared statement", doc)
+        self.assertIn("감사 로그 Allowlist", doc)
+        self.assertIn("Provider State", doc)
+        self.assertNotIn("SQL 파라미터 바인딩 사용하지 않음", doc)
+        self.assertNotIn("유일한 방법입니다", doc)
+
     def test_plan_records_second_order_cost_error(self):
         plan = self.read("docs/plans/2026-08-13-reasoning-state-cost-hardening.md")
 
