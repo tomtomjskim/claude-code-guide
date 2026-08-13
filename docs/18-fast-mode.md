@@ -1,6 +1,6 @@
 # Fast Mode 가이드
 
-> 검증 기준일: 2026-08-13  
+> 검증 기준일: 2026-08-13
 > 공식 문서: https://code.claude.com/docs/en/fast-mode
 
 Fast Mode는 지원되는 Claude Opus 모델을 더 빠른 inference configuration으로 실행하는 선택 기능입니다. 비용과 latency의 교환이지, 항상 꺼야 하는 오류 상태가 아닙니다.

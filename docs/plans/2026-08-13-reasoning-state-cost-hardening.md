@@ -1,7 +1,7 @@
 # Reasoning State And Cost Hardening Plan
 
-작성일: 2026-08-13  
-대상: `claude-code-guide`  
+작성일: 2026-08-13
+대상: `claude-code-guide`
 상태: implementation candidate
 
 ## 목표
