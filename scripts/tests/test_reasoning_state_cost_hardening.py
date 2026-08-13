@@ -19,7 +19,8 @@ class ReasoningStateCostHardeningTest(unittest.TestCase):
 
         doc = self.read("docs/15-token-pricing-optimization.md")
         self.assertIn("합계:                                      $0.225", doc)
-        self.assertNotIn("$0.000345", doc)
+        self.assertIn("10,000 input_tokens", doc)
+        self.assertIn("40,000 cache_creation_input_tokens", doc)
         self.assertIn("cache token 이중 계산 금지", doc)
 
     def test_cache_read_example_is_correct(self):
@@ -66,9 +67,9 @@ class ReasoningStateCostHardeningTest(unittest.TestCase):
             doc,
         )
         self.assertIn("prepared statement", doc)
+        self.assertIn("사용자 입력을 SQL 문자열에 직접 보간하지 않는다", doc)
         self.assertIn("감사 로그 Allowlist", doc)
         self.assertIn("Provider State", doc)
-        self.assertNotIn("SQL 파라미터 바인딩 사용하지 않음", doc)
         self.assertNotIn("유일한 방법입니다", doc)
 
     def test_plan_records_second_order_cost_error(self):
